@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                   child: const CircleAvatar(
-                    backgroundColor: Color(0xFF1A0E2E),
+                    backgroundColor: AppTheme.colorSurfaceSoft,
                     child: Icon(
                       Icons.handshake,
                       size: 84,
@@ -113,3 +113,4 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+

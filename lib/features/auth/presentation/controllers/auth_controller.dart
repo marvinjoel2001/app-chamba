@@ -27,10 +27,9 @@ final realtimeServiceProvider = Provider<RealtimeService>((ref) {
   return service;
 });
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(ref.watch(authServiceProvider));
-});
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
+);
 
 class AuthState {
   const AuthState({
@@ -57,10 +56,13 @@ class AuthState {
   }
 }
 
-class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._authService) : super(const AuthState());
+class AuthController extends Notifier<AuthState> {
+  @override
+  AuthState build() {
+    return const AuthState();
+  }
 
-  final AuthService _authService;
+  AuthService get _authService => ref.watch(authServiceProvider);
 
   Future<void> login({required String email, required String password}) async {
     state = state.copyWith(isLoading: true, clearError: true);

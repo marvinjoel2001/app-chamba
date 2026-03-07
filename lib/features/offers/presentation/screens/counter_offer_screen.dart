@@ -47,7 +47,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: AppTheme.colorSurfaceSoft,
                       borderRadius: BorderRadius.circular(40),
                     ),
                     child: const Text(
@@ -151,3 +151,4 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
     );
   }
 }
+

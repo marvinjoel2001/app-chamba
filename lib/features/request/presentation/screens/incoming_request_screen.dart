@@ -51,13 +51,13 @@ class IncomingRequestScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4E1B1C),
+                        color: Color(0xFFFFE4E3),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: const Text(
                         'URGENTE',
                         style: TextStyle(
-                          color: Color(0xFFFF5E59),
+                          color: Color(0xFF8C2622),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -148,3 +148,4 @@ class IncomingRequestScreen extends StatelessWidget {
     );
   }
 }
+

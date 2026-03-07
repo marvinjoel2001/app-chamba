@@ -32,7 +32,7 @@ class ChambaBackground extends StatelessWidget {
             right: -80,
             child: _GlowCircle(
               size: 260,
-              color: AppTheme.colorPrimary.withValues(alpha: 0.25),
+              color: AppTheme.colorPrimary.withValues(alpha: 0.12),
             ),
           ),
           Positioned(
@@ -40,7 +40,7 @@ class ChambaBackground extends StatelessWidget {
             left: -90,
             child: _GlowCircle(
               size: 280,
-              color: AppTheme.colorHighlight.withValues(alpha: 0.12),
+              color: AppTheme.colorHighlight.withValues(alpha: 0.1),
             ),
           ),
           child,
@@ -102,7 +102,7 @@ class ChambaPrimaryButton extends StatelessWidget {
       style: FilledButton.styleFrom(
         backgroundColor:
             isYellow ? AppTheme.colorHighlight : AppTheme.colorPrimary,
-        foregroundColor: isYellow ? Colors.black : Colors.white,
+        foregroundColor: isYellow ? AppTheme.colorText : Colors.white,
         minimumSize: const Size.fromHeight(58),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
@@ -140,20 +140,16 @@ class ChambaChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.colorPrimary
-              : Colors.white.withValues(alpha: 0.06),
+          color: selected ? AppTheme.colorPrimary : AppTheme.colorSurfaceSoft,
           borderRadius: BorderRadius.circular(40),
           border: Border.all(
-            color: selected
-                ? AppTheme.colorPrimary
-                : Colors.white.withValues(alpha: 0.14),
+            color: selected ? AppTheme.colorPrimary : const Color(0xFFCBD4E9),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Colors.white.withValues(alpha: 0.85),
+            color: selected ? Colors.white : AppTheme.colorText,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -175,10 +171,10 @@ class ChambaBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF130E1D),
+      decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          top: BorderSide(color: Color(0x1F1A2A4A)),
         ),
       ),
       child: BottomNavigationBar(
@@ -186,7 +182,7 @@ class ChambaBottomNav extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.transparent,
         selectedItemColor: AppTheme.colorPrimary,
-        unselectedItemColor: const Color(0xFF8692AC),
+        unselectedItemColor: AppTheme.colorMuted,
         onTap: onTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Inicio'),
@@ -239,7 +235,7 @@ class _DotGrid extends StatelessWidget {
 class _DotGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppTheme.colorPrimary.withValues(alpha: 0.2);
+    final paint = Paint()..color = AppTheme.colorPrimary.withValues(alpha: 0.16);
 
     const spacing = 36.0;
     for (double y = 0; y < size.height; y += spacing) {

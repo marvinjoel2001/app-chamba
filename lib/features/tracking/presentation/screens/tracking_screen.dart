@@ -101,7 +101,7 @@ class TrackingScreen extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
+                          color: AppTheme.colorSurfaceSoft,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
@@ -154,3 +154,4 @@ class TrackingScreen extends StatelessWidget {
     );
   }
 }
+

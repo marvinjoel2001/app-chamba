@@ -67,7 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
                           ),
                           Text(
-                            'Activo ahora • Especialista',
+                            'Activo ahora - Especialista',
                             style: TextStyle(color: AppTheme.colorPrimary),
                           ),
                         ],
@@ -97,7 +97,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: message.mine
                               ? AppTheme.colorPrimary
-                              : Colors.white.withValues(alpha: 0.1),
+                              : AppTheme.colorSurfaceSoft,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: message.mine
                               ? const [
@@ -112,11 +112,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(message.text, style: const TextStyle(fontSize: 18)),
+                            Text(
+                              message.text,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: message.mine ? Colors.white : AppTheme.colorText,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Text(
                               message.time,
-                              style: const TextStyle(color: AppTheme.colorMuted),
+                              style: TextStyle(
+                                color: message.mine
+                                    ? Colors.white.withValues(alpha: 0.75)
+                                    : AppTheme.colorMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -194,3 +204,4 @@ class _ChatMessage {
   final String time;
   final bool mine;
 }
+

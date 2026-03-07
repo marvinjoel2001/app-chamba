@@ -103,14 +103,12 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(
-                              alpha: isSelected ? 0.14 : 0.08,
-                            ),
+                            color: isSelected ? AppTheme.colorPrimary.withValues(alpha: 0.1) : AppTheme.colorSurfaceSoft,
                             borderRadius: BorderRadius.circular(34),
                             border: Border.all(
                               color: isSelected
                                   ? AppTheme.colorPrimary
-                                  : Colors.white.withValues(alpha: 0.16),
+                                  : const Color(0xFFCBD4E9),
                               width: 2,
                             ),
                             boxShadow: isSelected
@@ -180,3 +178,4 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     );
   }
 }
+

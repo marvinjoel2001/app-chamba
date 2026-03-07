@@ -91,7 +91,7 @@ class _RadarScreenState extends State<RadarScreen> {
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(24),
-                          color: Colors.white.withValues(alpha: 0.09),
+                          color: AppTheme.colorSurfaceSoft,
                         ),
                       ),
                       Container(
@@ -125,9 +125,9 @@ class _RadarScreenState extends State<RadarScreen> {
                         right: 16,
                         bottom: 16,
                         child: FloatingActionButton.small(
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          backgroundColor: AppTheme.colorSurfaceSoft,
                           onPressed: () {},
-                          child: const Icon(Icons.my_location),
+                          child: const Icon(Icons.my_location, color: AppTheme.colorPrimary),
                         ),
                       ),
                     ],
@@ -215,3 +215,4 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+

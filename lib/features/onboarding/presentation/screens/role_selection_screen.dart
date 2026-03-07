@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../auth/presentation/screens/login_screen.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -33,8 +34,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       height: 112,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.1),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        color: AppTheme.colorSurfaceSoft,
+                        border: Border.all(color: const Color(0xFFCBD4E9)),
                       ),
                       child: const Icon(Icons.handshake, size: 48),
                     ),
@@ -52,7 +53,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   'ENCUENTRA TRABAJO. ENCUENTRA TRABAJADORES.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFFF3C617),
+                    color: AppTheme.colorHighlight,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -121,17 +122,16 @@ class _RoleCard extends StatelessWidget {
         height: 218,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: selected ? 0.12 : 0.07),
+          color: selected ? AppTheme.colorPrimary.withValues(alpha: 0.12) : AppTheme.colorSurfaceSoft,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
             color: selected
-                ? const Color(0xFF7A2BC4)
-                : Colors.white.withValues(alpha: 0.13),
+                ? AppTheme.colorPrimary : const Color(0xFFCBD4E9),
           ),
           boxShadow: selected
               ? const [
                   BoxShadow(
-                    color: Color(0x667A2BC4),
+                    color: Color(0x336B2BBE),
                     blurRadius: 22,
                     spreadRadius: 2,
                   ),
@@ -143,8 +143,8 @@ class _RoleCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 36,
-              backgroundColor: const Color(0xFF7A2BC4).withValues(alpha: 0.35),
-              child: Icon(icon, size: 34, color: Colors.white),
+              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.18),
+              child: Icon(icon, size: 34, color: AppTheme.colorPrimaryDark),
             ),
             const SizedBox(height: 18),
             Text(
@@ -160,3 +160,5 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
+
+

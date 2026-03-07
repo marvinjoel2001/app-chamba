@@ -42,7 +42,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             width: 74,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
+                              color: const Color(0xFFCFD6E8),
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
@@ -82,7 +82,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '4.9  •  47 trabajos completados',
+                            '4.9 - 47 trabajos completados',
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   color: AppTheme.colorMuted,
                                 ),
@@ -124,7 +124,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
+                              color: AppTheme.colorSurfaceSoft,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -202,3 +202,4 @@ class _GalleryItem extends StatelessWidget {
     );
   }
 }
+

@@ -50,14 +50,14 @@ class RequestStatusScreen extends StatelessWidget {
                   width: 74,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: const Color(0xFFCFD6E8),
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
                 const SizedBox(height: 20),
                 CircleAvatar(
                   radius: 38,
-                  backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.25),
+                  backgroundColor: AppTheme.colorPrimary,
                   child: const Icon(Icons.radar, color: Colors.white, size: 36),
                 ),
                 const SizedBox(height: 18),
@@ -140,7 +140,7 @@ class _MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
@@ -158,3 +158,4 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
+

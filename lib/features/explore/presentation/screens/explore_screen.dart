@@ -25,7 +25,7 @@ class ExploreScreen extends StatelessWidget {
                     children: [
                       const CircleAvatar(
                         radius: 24,
-                        backgroundColor: Color(0x33282A44),
+                        backgroundColor: Color(0x1A6B2BBE),
                         child: Icon(Icons.work_history),
                       ),
                       const SizedBox(width: 10),
@@ -75,7 +75,7 @@ class ExploreScreen extends StatelessWidget {
                     width: 90,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
+                      color: const Color(0xFFCFD6E8),
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
@@ -162,8 +162,8 @@ class _MapControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: 30,
-      backgroundColor: Colors.white.withValues(alpha: 0.1),
-      child: Icon(icon, color: highlighted ? AppTheme.colorHighlight : Colors.white),
+      backgroundColor: AppTheme.colorSurfaceSoft,
+      child: Icon(icon, color: highlighted ? AppTheme.colorHighlight : AppTheme.colorText),
     );
   }
 }
@@ -209,3 +209,4 @@ class _MapDots extends StatelessWidget {
     );
   }
 }
+

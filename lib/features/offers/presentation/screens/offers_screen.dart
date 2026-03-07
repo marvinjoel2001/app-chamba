@@ -185,7 +185,7 @@ class _OfferWorkerCard extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 4),
-                    Text('⭐ $score', style: const TextStyle(fontSize: 20)),
+                    Text('Rating: $score', style: const TextStyle(fontSize: 20)),
                   ],
                 ),
               ),
@@ -218,7 +218,7 @@ class _OfferWorkerCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                    side: BorderSide(color: const Color(0xFFCBD4E9)),
                     minimumSize: const Size.fromHeight(52),
                   ),
                   onPressed: () {
@@ -250,3 +250,7 @@ class _OfferWorkerCard extends StatelessWidget {
     );
   }
 }
+
+
+
+

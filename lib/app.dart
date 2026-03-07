@@ -11,9 +11,9 @@ class ChambaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Chamba',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: AppTheme.dark(),
-      theme: AppTheme.dark(),
+      themeMode: ThemeMode.light,
+      darkTheme: AppTheme.light(),
+      theme: AppTheme.light(),
       home: const SplashScreen(),
     );
   }
