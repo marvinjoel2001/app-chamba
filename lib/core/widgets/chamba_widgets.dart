@@ -100,8 +100,9 @@ class ChambaPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton(
       style: FilledButton.styleFrom(
-        backgroundColor:
-            isYellow ? AppTheme.colorHighlight : AppTheme.colorPrimary,
+        backgroundColor: isYellow
+            ? AppTheme.colorHighlight
+            : AppTheme.colorPrimary,
         foregroundColor: isYellow ? AppTheme.colorText : Colors.white,
         minimumSize: const Size.fromHeight(58),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -110,10 +111,7 @@ class ChambaPrimaryButton extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (icon != null) ...[
-            Icon(icon),
-            const SizedBox(width: 10),
-          ],
+          if (icon != null) ...[Icon(icon), const SizedBox(width: 10)],
           Text(label),
         ],
       ),
@@ -168,28 +166,146 @@ class ChambaBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
+  static const _items = [
+    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
+    _NavItemData(icon: Icons.work, label: 'Ofertas'),
+    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
+    _NavItemData(icon: Icons.person, label: 'Perfil'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0x1F1A2A4A)),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 78,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.66),
+                  Colors.white.withValues(alpha: 0.4),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.colorPrimary.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: const Color(0x111A2A4A),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: List.generate(_items.length, (index) {
+                final item = _items[index];
+                final selected = index == currentIndex;
+                return Expanded(
+                  child: _BottomNavItem(
+                    icon: item.icon,
+                    label: item.label,
+                    selected: selected,
+                    onTap: () => onTap(index),
+                  ),
+                );
+              }),
+            ),
+          ),
         ),
       ),
-      child: BottomNavigationBar(
-        currentIndex: currentIndex,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.transparent,
-        selectedItemColor: AppTheme.colorPrimary,
-        unselectedItemColor: AppTheme.colorMuted,
-        onTap: onTap,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Ofertas'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'Mensajes'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
+    );
+  }
+}
+
+class _NavItemData {
+  const _NavItemData({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+}
+
+class _BottomNavItem extends StatelessWidget {
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = selected
+        ? AppTheme.colorPrimary
+        : AppTheme.colorMuted.withValues(alpha: 0.86);
+    final labelColor = selected
+        ? AppTheme.colorPrimary
+        : AppTheme.colorMuted.withValues(alpha: 0.8);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: const BoxDecoration(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedSlide(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              offset: selected ? const Offset(0, -0.06) : Offset.zero,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutBack,
+                scale: selected ? 1.12 : 1,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  child: Icon(
+                    icon,
+                    key: ValueKey<bool>(selected),
+                    size: selected ? 23.5 : 22,
+                    color: iconColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: labelColor,
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -206,10 +322,7 @@ class _GlowCircle extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: const SizedBox.expand(),
@@ -224,10 +337,7 @@ class _DotGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: CustomPaint(
-        painter: _DotGridPainter(),
-        size: Size.infinite,
-      ),
+      child: CustomPaint(painter: _DotGridPainter(), size: Size.infinite),
     );
   }
 }
@@ -235,7 +345,8 @@ class _DotGrid extends StatelessWidget {
 class _DotGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppTheme.colorPrimary.withValues(alpha: 0.16);
+    final paint = Paint()
+      ..color = AppTheme.colorPrimary.withValues(alpha: 0.16);
 
     const spacing = 36.0;
     for (double y = 0; y < size.height; y += spacing) {
