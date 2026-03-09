@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import 'counter_offer_screen.dart';
 import 'worker_profile_screen.dart';
 
@@ -13,9 +15,54 @@ class OffersScreen extends StatefulWidget {
 }
 
 class _OffersScreenState extends State<OffersScreen> {
-  String selectedFilter = 'Mas barato';
+  bool _loading = true;
+  String? _error;
+  List<dynamic> _offers = const [];
+  Map<String, dynamic>? _request;
 
-  final filters = const ['Mas barato', 'Mejor calificado', 'Mas cerca'];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      setState(() {
+        _error = 'Sesion expirada';
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await MobileBackendService.offers(
+        requestId: SessionStore.activeRequestId,
+        clientUserId: user.id,
+      );
+      final request = response['request'] as Map<String, dynamic>?;
+      if (request != null) {
+        SessionStore.activeRequestId = request['id'] as String?;
+      }
+
+      setState(() {
+        _request = request;
+        _offers = (response['offers'] as List<dynamic>? ?? const []);
+        _loading = false;
+      });
+    } catch (error) {
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,105 +87,158 @@ class _OffersScreenState extends State<OffersScreen> {
                           'Ofertas de Trabajo',
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
-                        const Text(
-                          'Negociacion en curso',
-                          style: TextStyle(color: AppTheme.colorPrimary),
+                        Text(
+                          _request == null
+                              ? 'Sin solicitud activa'
+                              : '${_request!['status']} - ${_offers.length} ofertas',
+                          style: const TextStyle(color: AppTheme.colorPrimary),
                         ),
                       ],
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const CounterOfferScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.info_outline),
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    GlassCard(
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 42,
-                            backgroundImage: NetworkImage(
-                              'https://images.unsplash.com/photo-1464890100898-a385f744067f',
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Pintado de fachada exterior',
-                                  style: TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w700,
+              if (_loading)
+                const Expanded(child: Center(child: CircularProgressIndicator()))
+              else if (_error != null)
+                Expanded(child: Center(child: Text(_error!)))
+              else if (_offers.isEmpty)
+                const Expanded(child: Center(child: Text('Aun no hay ofertas.')))
+              else
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemBuilder: (context, index) {
+                      final item = _offers[index] as Map<String, dynamic>;
+                      final worker = item['worker'] as Map<String, dynamic>? ?? {};
+
+                      return GlassCard(
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 38,
+                                  backgroundImage: worker['profilePhotoUrl'] == null
+                                      ? null
+                                      : NetworkImage(worker['profilePhotoUrl'] as String),
+                                  child: worker['profilePhotoUrl'] == null
+                                      ? Text((worker['firstName'] ?? 'W').toString().substring(0, 1))
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${worker['firstName'] ?? ''} ${worker['lastName'] ?? ''}'.trim(),
+                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Rating: ${worker['averageRating'] ?? 0}',
+                                        style: const TextStyle(fontSize: 18),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Presupuesto original: Bs 100/dia',
-                                  style: TextStyle(color: AppTheme.colorPrimary),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Bs ${item['amount']}',
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                            color: AppTheme.colorHighlight,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    Text(
+                                      worker['distanceKm'] == null
+                                          ? '-- km'
+                                          : '${(worker['distanceKm'] as num).toStringAsFixed(1)} km',
+                                      style: const TextStyle(color: AppTheme.colorMuted),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 54,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemBuilder: (context, index) {
-                          final filter = filters[index];
-                          return ChambaChip(
-                            label: filter,
-                            selected: selectedFilter == filter,
-                            onTap: () => setState(() => selectedFilter = filter),
-                          );
-                        },
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 10),
-                        itemCount: filters.length,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const _OfferWorkerCard(
-                      name: 'Roberto Gomez',
-                      price: 'Bs 120/dia',
-                      distance: '2.3 km',
-                      score: '4.9 (124 trabajos)',
-                    ),
-                    const SizedBox(height: 12),
-                    const _OfferWorkerCard(
-                      name: 'Elena Morales',
-                      price: 'Bs 110/dia',
-                      distance: '0.8 km',
-                      score: '4.8 (86 trabajos)',
-                    ),
-                    const SizedBox(height: 12),
-                    const _OfferWorkerCard(
-                      name: 'Marcos Quispe',
-                      price: 'Bs 100/dia',
-                      distance: '4.5 km',
-                      score: '4.7 (210 trabajos)',
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Color(0xFFCBD4E9)),
+                                      minimumSize: const Size.fromHeight(52),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => WorkerProfileScreen(
+                                            workerId: worker['id'] as String,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Ver perfil'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ChambaPrimaryButton(
+                                    label: 'Aceptar',
+                                    isYellow: true,
+                                    onPressed: () async {
+                                      final user = SessionStore.currentUser;
+                                      if (user == null) {
+                                        return;
+                                      }
+                                      await MobileBackendService.acceptOffer(
+                                        offerId: item['id'] as String,
+                                        clientUserId: user.id,
+                                      );
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Oferta aceptada')),
+                                      );
+                                      await _load();
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => CounterOfferScreen(
+                                      requestId: _request?['id'] as String?,
+                                      workerId: worker['id'] as String?,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('Enviar contraoferta'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemCount: _offers.length,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -146,111 +246,4 @@ class _OffersScreenState extends State<OffersScreen> {
     );
   }
 }
-
-class _OfferWorkerCard extends StatelessWidget {
-  const _OfferWorkerCard({
-    required this.name,
-    required this.price,
-    required this.distance,
-    required this.score,
-  });
-
-  final String name;
-  final String price;
-  final String distance;
-  final String score;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 38,
-                backgroundImage: NetworkImage(
-                  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Rating: $score', style: const TextStyle(fontSize: 20)),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    price,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppTheme.colorHighlight,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  Text(distance, style: const TextStyle(color: AppTheme.colorMuted)),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Row(
-            children: [
-              ChambaChip(label: 'PINTURA', selected: false),
-              SizedBox(width: 8),
-              ChambaChip(label: 'CONSTRUCCION', selected: false),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: const Color(0xFFCBD4E9)),
-                    minimumSize: const Size.fromHeight(52),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const WorkerProfileScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('Ver perfil'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ChambaPrimaryButton(
-                  label: 'Seleccionar',
-                  isYellow: true,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('$name seleccionado')),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-
 

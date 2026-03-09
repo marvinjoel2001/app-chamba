@@ -1,17 +1,74 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 
-class ExploreScreen extends StatelessWidget {
+class ExploreScreen extends StatefulWidget {
   const ExploreScreen({required this.role, super.key});
 
   final String role;
 
   @override
+  State<ExploreScreen> createState() => _ExploreScreenState();
+}
+
+class _ExploreScreenState extends State<ExploreScreen> {
+  bool _loading = true;
+  String? _error;
+  List<dynamic> _workers = const [];
+  List<dynamic> _categories = const [];
+  Map<String, dynamic>? _activeRequest;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      setState(() {
+        _error = 'Sesion expirada. Inicia sesion de nuevo.';
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await MobileBackendService.explore(userId: user.id);
+      final activeRequest = response['activeRequest'];
+      if (activeRequest is Map<String, dynamic>) {
+        SessionStore.activeRequestId = activeRequest['id'] as String?;
+      }
+
+      setState(() {
+        _workers = (response['nearbyWorkers'] as List<dynamic>? ?? const []);
+        _categories = (response['categories'] as List<dynamic>? ?? const []);
+        _activeRequest = activeRequest is Map<String, dynamic> ? activeRequest : null;
+        _loading = false;
+      });
+    } catch (error) {
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = SessionStore.currentUser;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -23,43 +80,61 @@ class ExploreScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 24,
-                        backgroundColor: Color(0x1A6B2BBE),
-                        child: Icon(Icons.work_history),
+                        backgroundColor: const Color(0x1A6B2BBE),
+                        child: const Icon(Icons.work_history),
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        'Chamba',
+                        user == null ? 'Chamba' : 'Hola, ${user.firstName}',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                       ),
                       const Spacer(),
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 24,
-                        backgroundImage: NetworkImage(
-                          'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-                        ),
+                        backgroundImage: user?.profilePhotoUrl == null
+                            ? null
+                            : NetworkImage(user!.profilePhotoUrl!),
+                        child: user?.profilePhotoUrl == null
+                            ? Text((user?.firstName ?? 'U').substring(0, 1).toUpperCase())
+                            : null,
                       ),
                     ],
                   ),
                   const Spacer(),
-                  const _MapDots(),
+                  _MapDots(workers: _workers),
                 ],
               ),
             ),
           ),
+          if (_loading)
+            const Center(child: CircularProgressIndicator()),
+          if (_error != null)
+            Positioned(
+              left: 20,
+              right: 20,
+              top: 110,
+              child: GlassCard(
+                child: Text(_error!, textAlign: TextAlign.center),
+              ),
+            ),
           Positioned(
             right: 12,
             bottom: 300,
             child: Column(
-              children: const [
-                _MapControl(icon: Icons.add),
-                SizedBox(height: 12),
-                _MapControl(icon: Icons.remove),
-                SizedBox(height: 12),
-                _MapControl(icon: Icons.navigation, highlighted: true),
+              children: [
+                const _MapControl(icon: Icons.add),
+                const SizedBox(height: 12),
+                const _MapControl(icon: Icons.remove),
+                const SizedBox(height: 12),
+                _MapControl(
+                  icon: Icons.navigation,
+                  highlighted: true,
+                  onTap: _load,
+                ),
               ],
             ),
           ),
@@ -82,12 +157,12 @@ class ExploreScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Que necesitas hoy? Ej: busco alguien...',
-                            prefixIcon: Icon(Icons.search),
-                          ),
+                      Expanded(
+                        child: Text(
+                          _activeRequest == null
+                              ? 'Sin solicitudes activas'
+                              : 'Solicitud activa: ${_activeRequest!['title']}',
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -112,14 +187,15 @@ class ExploreScreen extends StatelessWidget {
                     height: 48,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      children: const [
-                        ChambaChip(label: 'Limpieza', selected: true),
-                        SizedBox(width: 8),
-                        ChambaChip(label: 'Plomeria', selected: false),
-                        SizedBox(width: 8),
-                        ChambaChip(label: 'Electricidad', selected: false),
-                        SizedBox(width: 8),
-                        ChambaChip(label: 'Pintura', selected: false),
+                      children: [
+                        for (var i = 0; i < _categories.length; i++) ...[
+                          ChambaChip(
+                            label: _categories[i].toString(),
+                            selected: i == 0,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        if (_categories.isEmpty) const ChambaChip(label: 'Sin categorias', selected: false),
                       ],
                     ),
                   ),
@@ -128,8 +204,8 @@ class ExploreScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: ChambaPrimaryButton(
-                          label: role == 'worker'
-                              ? 'Ver solicitudes'
+                          label: widget.role == 'worker'
+                              ? 'Ver solicitudes cercanas'
                               : 'Estado solicitud',
                           onPressed: () {
                             Navigator.of(context).push(
@@ -142,6 +218,11 @@ class ExploreScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Trabajadores cercanos: ${_workers.length}'),
+                  ),
                 ],
               ),
             ),
@@ -153,51 +234,66 @@ class ExploreScreen extends StatelessWidget {
 }
 
 class _MapControl extends StatelessWidget {
-  const _MapControl({required this.icon, this.highlighted = false});
+  const _MapControl({
+    required this.icon,
+    this.highlighted = false,
+    this.onTap,
+  });
 
   final IconData icon;
   final bool highlighted;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: 30,
       backgroundColor: AppTheme.colorSurfaceSoft,
-      child: Icon(icon, color: highlighted ? AppTheme.colorHighlight : AppTheme.colorText),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, color: highlighted ? AppTheme.colorHighlight : AppTheme.colorText),
+      ),
     );
   }
 }
 
 class _MapDots extends StatelessWidget {
-  const _MapDots();
+  const _MapDots({required this.workers});
+
+  final List<dynamic> workers;
 
   @override
   Widget build(BuildContext context) {
+    final count = workers.length;
+
     return Stack(
       children: [
-        Positioned(
-          left: 30,
-          child: CircleAvatar(
-            radius: 9,
-            backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
+        if (count > 0)
+          Positioned(
+            left: 30,
+            child: CircleAvatar(
+              radius: 9,
+              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
+            ),
           ),
-        ),
-        Positioned(
-          left: 180,
-          top: 120,
-          child: CircleAvatar(
-            radius: 8,
-            backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.55),
+        if (count > 1)
+          Positioned(
+            left: 180,
+            top: 120,
+            child: CircleAvatar(
+              radius: 8,
+              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.55),
+            ),
           ),
-        ),
-        Positioned(
-          left: 60,
-          top: 220,
-          child: CircleAvatar(
-            radius: 9,
-            backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
+        if (count > 2)
+          Positioned(
+            left: 60,
+            top: 220,
+            child: CircleAvatar(
+              radius: 9,
+              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
+            ),
           ),
-        ),
         Center(
           child: CircleAvatar(
             radius: 28,
@@ -209,4 +305,3 @@ class _MapDots extends StatelessWidget {
     );
   }
 }
-

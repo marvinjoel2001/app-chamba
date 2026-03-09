@@ -1,30 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../../core/config/app_config.dart';
-import '../../../../core/network/api_service.dart';
-import '../../../../core/network/realtime_service.dart';
 import '../../data/services/auth_service.dart';
 
-final httpClientProvider = Provider<http.Client>((ref) {
-  return http.Client();
-});
-
-final apiServiceProvider = Provider<ApiService>((ref) {
-  return ApiService(
-    baseUrl: AppConfig.apiBaseUrl,
-    client: ref.watch(httpClientProvider),
-  );
-});
-
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(ref.watch(apiServiceProvider));
-});
-
-final realtimeServiceProvider = Provider<RealtimeService>((ref) {
-  final service = RealtimeService();
-  ref.onDispose(service.dispose);
-  return service;
+  return AuthService();
 });
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(

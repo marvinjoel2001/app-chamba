@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class SkillsSelectionScreen extends StatefulWidget {
   const SkillsSelectionScreen({super.key});
@@ -11,7 +13,8 @@ class SkillsSelectionScreen extends StatefulWidget {
 }
 
 class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
-  final Set<String> selected = {'Construccion', 'Plomeria'};
+  final Set<String> selected = <String>{};
+  bool _loading = true;
 
   final skills = const [
     ('Construccion', Icons.handyman),
@@ -23,6 +26,74 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     ('Mecanica', Icons.work),
     ('Carpinteria', Icons.architecture),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final response = await MobileBackendService.workerSkills(workerUserId: user.id);
+      final values = (response['skills'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .toSet();
+      selected
+        ..clear()
+        ..addAll(values);
+    } catch (_) {
+      selected
+        ..clear()
+        ..addAll(const {'Construccion', 'Plomeria'});
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      await MobileBackendService.updateWorkerSkills(
+        workerUserId: user.id,
+        skills: selected.toList(),
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +117,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const Spacer(),
-                    const SizedBox(width: 42),
+                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -63,17 +134,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   minHeight: 10,
                 ),
                 const SizedBox(height: 22),
+                if (_loading) const LinearProgressIndicator(),
                 Text(
                   'En que eres bueno?',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Selecciona tus habilidades principales para recibir mejores ofertas de trabajo cerca de ti.',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppTheme.colorMuted,
                       ),
                 ),
                 const SizedBox(height: 16),
@@ -103,7 +168,9 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: isSelected ? AppTheme.colorPrimary.withValues(alpha: 0.1) : AppTheme.colorSurfaceSoft,
+                            color: isSelected
+                                ? AppTheme.colorPrimary.withValues(alpha: 0.1)
+                                : AppTheme.colorSurfaceSoft,
                             borderRadius: BorderRadius.circular(34),
                             border: Border.all(
                               color: isSelected
@@ -111,14 +178,6 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                   : const Color(0xFFCBD4E9),
                               width: 2,
                             ),
-                            boxShadow: isSelected
-                                ? const [
-                                    BoxShadow(
-                                      color: Color(0x447A2BC4),
-                                      blurRadius: 18,
-                                    ),
-                                  ]
-                                : null,
                           ),
                           child: Stack(
                             children: [
@@ -138,8 +197,8 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                   children: [
                                     CircleAvatar(
                                       radius: 30,
-                                      backgroundColor: AppTheme.colorPrimary
-                                          .withValues(alpha: 0.35),
+                                      backgroundColor:
+                                          AppTheme.colorPrimary.withValues(alpha: 0.35),
                                       child: Icon(icon, size: 30),
                                     ),
                                     const SizedBox(height: 14),
@@ -162,13 +221,8 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                 ),
                 const SizedBox(height: 10),
                 ChambaPrimaryButton(
-                  label: 'Continuar',
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
-                    );
-                    Navigator.of(context).pop();
-                  },
+                  label: _loading ? 'Guardando...' : 'Continuar',
+                  onPressed: _loading ? null : _save,
                 ),
               ],
             ),
@@ -178,4 +232,3 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     );
   }
 }
-

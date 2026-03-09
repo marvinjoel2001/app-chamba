@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../request/presentation/screens/empty_requests_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
@@ -12,6 +13,8 @@ class ProfileMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = SessionStore.currentUser;
+
     return Scaffold(
       body: ChambaBackground(
         child: SafeArea(
@@ -25,21 +28,27 @@ class ProfileMenuScreen extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 12),
-              const GlassCard(
+              GlassCard(
                 child: Row(
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundImage: NetworkImage(
-                        'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-                      ),
+                      backgroundImage: user?.profilePhotoUrl == null
+                          ? null
+                          : NetworkImage(user!.profilePhotoUrl!),
+                      child: user?.profilePhotoUrl == null
+                          ? Text((user?.firstName ?? 'U').substring(0, 1))
+                          : null,
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Mario Guzman', style: TextStyle(fontSize: 22)),
-                        Text('Worker verified'),
+                        Text(
+                          user?.fullName ?? 'Usuario',
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                        Text((user?.type ?? 'user').toUpperCase()),
                       ],
                     ),
                   ],

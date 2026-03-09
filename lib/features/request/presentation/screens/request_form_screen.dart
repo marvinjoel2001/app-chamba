@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import 'request_status_screen.dart';
 
 class RequestFormScreen extends StatefulWidget {
@@ -12,6 +14,76 @@ class RequestFormScreen extends StatefulWidget {
 
 class _RequestFormScreenState extends State<RequestFormScreen> {
   String priceType = 'Precio fijo';
+  final _descriptionController = TextEditingController();
+  final _budgetController = TextEditingController(text: '100');
+  final _addressController = TextEditingController(text: 'Av. Arce, Edificio Multicine');
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    _budgetController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesion expirada.')),
+      );
+      return;
+    }
+
+    final description = _descriptionController.text.trim();
+    final budget = double.tryParse(_budgetController.text.trim()) ?? 0;
+
+    if (description.isEmpty || budget <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa descripcion y presupuesto valido.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final response = await MobileBackendService.createRequest(
+        clientUserId: user.id,
+        title: 'Solicitud de ${priceType.toLowerCase()}',
+        description: description,
+        category: 'General',
+        budget: budget,
+        priceType: priceType,
+        address: _addressController.text.trim(),
+        latitude: -16.5002,
+        longitude: -68.1342,
+      );
+
+      final request = response['request'] as Map<String, dynamic>?;
+      SessionStore.activeRequestId = request?['id'] as String?;
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const RequestStatusScreen()),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +120,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextField(
+                            controller: _descriptionController,
                             maxLines: 4,
                             decoration: InputDecoration(
                               hintText:
@@ -56,7 +129,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Dictado por voz (placeholder)'),
+                                      content: Text('Dictado por voz aun no implementado.'),
                                     ),
                                   );
                                 },
@@ -70,9 +143,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
-                          const TextField(
+                          TextField(
+                            controller: _budgetController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(prefixText: 'Bs  '),
+                            decoration: const InputDecoration(prefixText: 'Bs  '),
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -92,56 +166,19 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                 .toList(),
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: const [
-                              Expanded(
-                                child: TextField(
-                                  decoration: InputDecoration(
-                                    labelText: 'Fecha',
-                                    hintText: 'Hoy, 24 Oct',
-                                    prefixIcon: Icon(Icons.calendar_today),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  decoration: InputDecoration(
-                                    labelText: 'Hora',
-                                    hintText: '14:00',
-                                    prefixIcon: Icon(Icons.access_time),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          const TextField(
-                            decoration: InputDecoration(
+                          TextField(
+                            controller: _addressController,
+                            decoration: const InputDecoration(
                               labelText: 'Ubicacion',
                               hintText: 'Av. Arce, Edificio Multicine',
                               prefixIcon: Icon(Icons.location_on_outlined),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          const TextField(
-                            decoration: InputDecoration(
-                              labelText: 'Fotos de referencia',
-                              hintText: 'Adjuntar imagenes (placeholder)',
-                              prefixIcon: Icon(Icons.photo_library_outlined),
-                            ),
-                          ),
                           const SizedBox(height: 24),
                           ChambaPrimaryButton(
-                            label: 'Publicar solicitud',
+                            label: _loading ? 'Publicando...' : 'Publicar solicitud',
                             icon: Icons.send,
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const RequestStatusScreen(),
-                                ),
-                              );
-                            },
+                            onPressed: _loading ? null : _submit,
                           ),
                         ],
                       ),

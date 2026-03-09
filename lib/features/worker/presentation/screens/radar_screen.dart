@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class RadarScreen extends StatefulWidget {
   const RadarScreen({super.key});
@@ -12,6 +14,65 @@ class RadarScreen extends StatefulWidget {
 
 class _RadarScreenState extends State<RadarScreen> {
   bool available = true;
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _summary;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      setState(() {
+        _error = 'Sesion expirada';
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await MobileBackendService.workerRadar(workerUserId: user.id);
+      final summary = response['summary'] as Map<String, dynamic>?;
+      setState(() {
+        available = response['available'] as bool? ?? true;
+        _summary = summary;
+        _loading = false;
+      });
+    } catch (error) {
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _setAvailability(bool nextValue) async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    setState(() => available = nextValue);
+
+    try {
+      await MobileBackendService.setAvailability(
+        workerUserId: user.id,
+        available: nextValue,
+      );
+      await _load();
+    } catch (_) {
+      setState(() => available = !nextValue);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,11 +95,17 @@ class _RadarScreenState extends State<RadarScreen> {
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications),
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh),
                   ),
                 ],
               ),
+              if (_loading) const LinearProgressIndicator(),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!, textAlign: TextAlign.center),
+                ),
               const SizedBox(height: 10),
               GlassCard(
                 borderRadius: 36,
@@ -48,7 +115,7 @@ class _RadarScreenState extends State<RadarScreen> {
                       child: ChambaChip(
                         label: 'DISPONIBLE',
                         selected: available,
-                        onTap: () => setState(() => available = true),
+                        onTap: () => _setAvailability(true),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -56,7 +123,7 @@ class _RadarScreenState extends State<RadarScreen> {
                       child: ChambaChip(
                         label: 'NO DISPONIBLE',
                         selected: !available,
-                        onTap: () => setState(() => available = false),
+                        onTap: () => _setAvailability(false),
                       ),
                     ),
                   ],
@@ -68,9 +135,8 @@ class _RadarScreenState extends State<RadarScreen> {
                 children: [
                   CircleAvatar(
                     radius: 6,
-                    backgroundColor: available
-                        ? AppTheme.colorHighlight
-                        : AppTheme.colorMuted,
+                    backgroundColor:
+                        available ? AppTheme.colorHighlight : AppTheme.colorMuted,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -84,7 +150,7 @@ class _RadarScreenState extends State<RadarScreen> {
               const SizedBox(height: 16),
               GlassCard(
                 child: SizedBox(
-                  height: 420,
+                  height: 260,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -95,8 +161,8 @@ class _RadarScreenState extends State<RadarScreen> {
                         ),
                       ),
                       Container(
-                        width: 280,
-                        height: 280,
+                        width: 220,
+                        height: 220,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -106,8 +172,8 @@ class _RadarScreenState extends State<RadarScreen> {
                         ),
                       ),
                       Container(
-                        width: 190,
-                        height: 190,
+                        width: 140,
+                        height: 140,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -121,51 +187,33 @@ class _RadarScreenState extends State<RadarScreen> {
                         backgroundColor: AppTheme.colorPrimary,
                         child: const Icon(Icons.location_pin, size: 30),
                       ),
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: FloatingActionButton.small(
-                          backgroundColor: AppTheme.colorSurfaceSoft,
-                          onPressed: () {},
-                          child: const Icon(Icons.my_location, color: AppTheme.colorPrimary),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  Text(
-                    'Resumen de Hoy',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('Ver detalle'),
-                  ),
-                ],
+              Text(
+                'Resumen de Hoy',
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: _SummaryCard(
                       icon: Icons.work,
                       title: 'TRABAJOS',
-                      value: '12',
-                      subtitle: '+2 vs ayer',
+                      value: '${_summary?['jobsToday'] ?? 0}',
+                      subtitle: 'aceptados hoy',
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: _SummaryCard(
                       icon: Icons.paid,
                       title: 'GANANCIAS',
-                      value: '\$1,420',
-                      subtitle: 'Sueldo neto',
+                      value: 'Bs ${_summary?['earningsToday'] ?? 0}',
+                      subtitle: '${_summary?['nearbyRequests'] ?? 0} cercanas',
                     ),
                   ),
                 ],
@@ -215,4 +263,3 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-

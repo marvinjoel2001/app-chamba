@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class RatingScreen extends StatefulWidget {
   const RatingScreen({super.key});
@@ -12,6 +14,75 @@ class RatingScreen extends StatefulWidget {
 
 class _RatingScreenState extends State<RatingScreen> {
   int stars = 4;
+  final _commentController = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final user = SessionStore.currentUser;
+    final requestId = SessionStore.activeRequestId;
+
+    if (user == null || requestId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay servicio finalizado para calificar.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final offers = await MobileBackendService.offers(
+        requestId: requestId,
+        clientUserId: user.id,
+      );
+      final offerList = offers['offers'] as List<dynamic>? ?? const [];
+      final accepted = offerList.cast<Map<String, dynamic>>().firstWhere(
+            (item) => item['status'] == 'accepted',
+            orElse: () => <String, dynamic>{},
+          );
+
+      final worker = accepted['worker'] as Map<String, dynamic>?;
+      final workerId = worker?['id'] as String?;
+      if (workerId == null) {
+        throw Exception('No se encontro trabajador aceptado.');
+      }
+
+      await MobileBackendService.createReview(
+        requestId: requestId,
+        workerUserId: workerId,
+        clientUserId: user.id,
+        stars: stars,
+        comment: _commentController.text.trim(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Calificacion enviada: $stars estrellas')),
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,22 +144,18 @@ class _RatingScreenState extends State<RatingScreen> {
                         }),
                       ),
                       const SizedBox(height: 14),
-                      const TextField(
+                      TextField(
+                        controller: _commentController,
                         maxLines: 4,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Escribe aqui tu experiencia con el servicio...',
                         ),
                       ),
                       const SizedBox(height: 18),
                       ChambaPrimaryButton(
-                        label: 'CALIFICAR',
+                        label: _loading ? 'Enviando...' : 'CALIFICAR',
                         isYellow: true,
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Calificacion enviada: $stars estrellas')),
-                          );
-                          Navigator.of(context).pop();
-                        },
+                        onPressed: _loading ? null : _submit,
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
@@ -105,4 +172,3 @@ class _RatingScreenState extends State<RatingScreen> {
     );
   }
 }
-

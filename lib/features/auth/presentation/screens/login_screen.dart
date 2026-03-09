@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/app_config.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../controllers/auth_controller.dart';
@@ -44,7 +43,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (next.isAuthenticated && previous?.isAuthenticated != true) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(
-            builder: (_) => MainShellScreen(role: widget.role),
+            builder: (_) => MainShellScreen(
+              role: SessionStore.currentUser?.type ?? widget.role,
+            ),
           ),
           (route) => false,
         );
@@ -71,12 +72,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               : 'Ingreso contratante',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'API: ${AppConfig.apiBaseUrl}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: AppTheme.colorMuted),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(

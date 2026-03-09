@@ -1,27 +1,26 @@
-import '../../../../core/network/api_service.dart';
+import '../../../../core/session/session_store.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class AuthService {
-  AuthService(this._apiService);
-
-  final ApiService _apiService;
-
   Future<void> login({required String email, required String password}) async {
     if (email.isEmpty || password.isEmpty) {
       throw Exception('Correo/telefono y clave son obligatorios.');
     }
 
-    // Placeholder integration point for backend authentication.
-    // Current fake login keeps UI flow active until OTP endpoint is added.
-    // Example target API:
-    // await _apiService.post('/auth/otp/request', body: {'phone': email});
+    final response = await MobileBackendService.login(
+      identifier: email.trim(),
+      password: password.trim(),
+    );
 
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    final userJson = response['user'];
+    if (userJson is! Map<String, dynamic>) {
+      throw Exception('Respuesta de login invalida.');
+    }
+
+    SessionStore.currentUser = SessionUser.fromJson(userJson);
   }
 
   Future<void> logout() async {
-    // Placeholder integration point for backend logout/session revoke.
-    await Future<void>.delayed(const Duration(milliseconds: 150));
+    SessionStore.clear();
   }
-
-  ApiService get apiService => _apiService;
 }
