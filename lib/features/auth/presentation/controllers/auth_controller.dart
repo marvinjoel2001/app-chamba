@@ -62,6 +62,39 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<void> register({
+    required String role,
+    required String email,
+    String? phone,
+    required String firstName,
+    String? lastName,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    try {
+      await _authService.register(
+        role: role,
+        email: email.trim(),
+        phone: phone,
+        firstName: firstName.trim(),
+        lastName: lastName?.trim(),
+        password: password,
+      );
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isLoading: true, clearError: true);
     await _authService.logout();

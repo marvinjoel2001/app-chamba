@@ -9,6 +9,7 @@ class MobileBackendService {
     copy.removeWhere((key, value) => value == null);
     return copy;
   }
+
   MobileBackendService._();
 
   static final http.Client _client = http.Client();
@@ -23,8 +24,26 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/auth/login',
+      body: {'identifier': identifier, 'password': password},
+    );
+  }
+
+  static Future<Map<String, dynamic>> register({
+    required String type,
+    required String email,
+    String? phone,
+    required String firstName,
+    String? lastName,
+    required String password,
+  }) {
+    return _api.post(
+      '/auth/register',
       body: {
-        'identifier': identifier,
+        'type': type,
+        'email': email,
+        'phone': phone,
+        'firstName': firstName,
+        'lastName': lastName,
         'password': password,
       },
     );
@@ -97,7 +116,9 @@ class MobileBackendService {
     return _api.get('/mobile/messages', queryParameters: {'userId': userId});
   }
 
-  static Future<Map<String, dynamic>> threadMessages({required String threadId}) {
+  static Future<Map<String, dynamic>> threadMessages({
+    required String threadId,
+  }) {
     return _api.get('/mobile/messages/$threadId');
   }
 
@@ -108,14 +129,13 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/mobile/messages/$threadId',
-      body: {
-        'senderUserId': senderUserId,
-        'content': content,
-      },
+      body: {'senderUserId': senderUserId, 'content': content},
     );
   }
 
-  static Future<Map<String, dynamic>> incomingRequest({required String workerUserId}) {
+  static Future<Map<String, dynamic>> incomingRequest({
+    required String workerUserId,
+  }) {
     return _api.get(
       '/mobile/incoming-request',
       queryParameters: {'workerUserId': workerUserId},
@@ -145,18 +165,20 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/mobile/offers/accept',
-      body: {
-        'offerId': offerId,
-        'clientUserId': clientUserId,
-      },
+      body: {'offerId': offerId, 'clientUserId': clientUserId},
     );
   }
 
   static Future<Map<String, dynamic>> tracking({required String requestId}) {
-    return _api.get('/mobile/tracking', queryParameters: {'requestId': requestId});
+    return _api.get(
+      '/mobile/tracking',
+      queryParameters: {'requestId': requestId},
+    );
   }
 
-  static Future<Map<String, dynamic>> workerRadar({required String workerUserId}) {
+  static Future<Map<String, dynamic>> workerRadar({
+    required String workerUserId,
+  }) {
     return _api.get(
       '/mobile/worker/radar',
       queryParameters: {'workerUserId': workerUserId},
@@ -169,14 +191,13 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/mobile/worker/availability',
-      body: {
-        'workerUserId': workerUserId,
-        'available': available,
-      },
+      body: {'workerUserId': workerUserId, 'available': available},
     );
   }
 
-  static Future<Map<String, dynamic>> workerSkills({required String workerUserId}) {
+  static Future<Map<String, dynamic>> workerSkills({
+    required String workerUserId,
+  }) {
     return _api.get(
       '/mobile/worker/skills',
       queryParameters: {'workerUserId': workerUserId},
@@ -189,10 +210,7 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/mobile/worker/skills',
-      body: {
-        'workerUserId': workerUserId,
-        'skills': skills,
-      },
+      body: {'workerUserId': workerUserId, 'skills': skills},
     );
   }
 
@@ -215,4 +233,3 @@ class MobileBackendService {
     );
   }
 }
-

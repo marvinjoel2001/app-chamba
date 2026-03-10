@@ -5,25 +5,30 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../controllers/auth_controller.dart';
-import 'register_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({required this.role, super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({required this.role, super.key});
 
   final String role;
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -69,24 +74,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         Text(
                           widget.role == 'worker'
-                              ? 'Ingreso trabajador'
-                              : 'Ingreso contratante',
+                              ? 'Registro trabajador'
+                              : 'Registro contratante',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _emailController,
+                          controller: _firstNameController,
                           decoration: const InputDecoration(
-                            labelText: 'Correo o telefono',
+                            labelText: 'Nombre',
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu correo o telefono';
+                              return 'Ingresa tu nombre';
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _lastNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Apellido (opcional)',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Correo',
+                            prefixIcon: Icon(Icons.alternate_email),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Ingresa tu correo';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Telefono (opcional)',
+                            prefixIcon: Icon(Icons.phone_android_outlined),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -97,8 +132,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu clave';
+                            final trimmed = value?.trim() ?? '';
+                            if (trimmed.length < 4) {
+                              return 'Minimo 4 caracteres';
                             }
                             return null;
                           },
@@ -106,18 +142,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 18),
                         ChambaPrimaryButton(
                           label: authState.isLoading
-                              ? 'Ingresando...'
-                              : 'Entrar',
+                              ? 'Registrando...'
+                              : 'Crear cuenta',
                           onPressed: authState.isLoading
                               ? null
                               : () async {
                                   if (!_formKey.currentState!.validate()) {
                                     return;
                                   }
+
                                   await ref
                                       .read(authControllerProvider.notifier)
-                                      .login(
+                                      .register(
+                                        role: widget.role,
                                         email: _emailController.text,
+                                        phone: _phoneController.text,
+                                        firstName: _firstNameController.text,
+                                        lastName: _lastNameController.text,
                                         password: _passwordController.text,
                                       );
                                 },
@@ -125,18 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 10),
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Volver'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    RegisterScreen(role: widget.role),
-                              ),
-                            );
-                          },
-                          child: const Text('Crear cuenta'),
+                          child: const Text('Ya tengo cuenta'),
                         ),
                       ],
                     ),
