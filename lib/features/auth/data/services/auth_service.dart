@@ -1,4 +1,5 @@
 import '../../../../core/session/session_store.dart';
+import '../../../../core/push/push_notification_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class AuthService {
@@ -18,6 +19,7 @@ class AuthService {
     }
 
     SessionStore.currentUser = SessionUser.fromJson(userJson);
+    await const PushNotificationService().syncTokenForCurrentUser();
   }
 
   Future<void> register({
@@ -49,6 +51,7 @@ class AuthService {
     }
 
     SessionStore.currentUser = SessionUser.fromJson(userJson);
+    await const PushNotificationService().syncTokenForCurrentUser();
   }
 
   Future<void> logout() async {

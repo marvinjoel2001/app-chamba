@@ -64,6 +64,7 @@ class MobileBackendService {
     required double latitude,
     required double longitude,
     String? scheduledAt,
+    List<String>? photosBase64,
   }) {
     return _api.post(
       '/mobile/requests',
@@ -78,7 +79,45 @@ class MobileBackendService {
         'latitude': latitude,
         'longitude': longitude,
         'scheduledAt': scheduledAt,
+        'photosBase64': photosBase64,
       },
+    );
+  }
+
+  static Future<Map<String, dynamic>> uploadProfilePhoto({
+    required String userId,
+    required String imageBase64,
+  }) {
+    return _api.post(
+      '/mobile/profile/photo',
+      body: {'userId': userId, 'imageBase64': imageBase64},
+    );
+  }
+
+  static Future<Map<String, dynamic>> deleteProfilePhoto({
+    required String userId,
+  }) {
+    return _api.post('/mobile/profile/photo/delete', body: {'userId': userId});
+  }
+
+  static Future<Map<String, dynamic>> deleteRequestPhoto({
+    required String requestPhotoId,
+    required String clientUserId,
+  }) {
+    return _api.post(
+      '/mobile/requests/photos/delete',
+      body: {'requestPhotoId': requestPhotoId, 'clientUserId': clientUserId},
+    );
+  }
+
+  static Future<Map<String, dynamic>> registerPushToken({
+    required String userId,
+    required String token,
+    required String platform,
+  }) {
+    return _api.post(
+      '/mobile/push/token',
+      body: {'userId': userId, 'token': token, 'platform': platform},
     );
   }
 

@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -16,7 +20,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   String priceType = 'Precio fijo';
   final _descriptionController = TextEditingController();
   final _budgetController = TextEditingController(text: '100');
-  final _addressController = TextEditingController(text: 'Av. Arce, Edificio Multicine');
+  final _addressController = TextEditingController(
+    text: 'Av. Arce, Edificio Multicine',
+  );
+  final ImagePicker _imagePicker = ImagePicker();
+  final List<_PendingImage> _pendingImages = [];
   bool _loading = false;
 
   @override
@@ -30,9 +38,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   Future<void> _submit() async {
     final user = SessionStore.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesion expirada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sesion expirada.')));
       return;
     }
 
@@ -41,7 +49,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
     if (description.isEmpty || budget <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa descripcion y presupuesto valido.')),
+        const SnackBar(
+          content: Text('Completa descripcion y presupuesto valido.'),
+        ),
       );
       return;
     }
@@ -59,6 +69,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         address: _addressController.text.trim(),
         latitude: -16.5002,
         longitude: -68.1342,
+        photosBase64: _pendingImages.map((item) => item.dataUri).toList(),
       );
 
       final request = response['request'] as Map<String, dynamic>?;
@@ -76,13 +87,57 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _pickImages() async {
+    if (_pendingImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximo 5 fotos por solicitud')),
+      );
+      return;
+    }
+
+    final selected = await _imagePicker.pickMultiImage(
+      imageQuality: 82,
+      maxWidth: 1440,
+    );
+    if (selected.isEmpty) {
+      return;
+    }
+
+    final remaining = 5 - _pendingImages.length;
+    final toProcess = selected.take(remaining);
+    for (final item in toProcess) {
+      final bytes = await item.readAsBytes();
+      final dataUri =
+          'data:${_resolveMimeType(item.path)};base64,${base64Encode(bytes)}';
+      _pendingImages.add(_PendingImage(bytes: bytes, dataUri: dataUri));
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
+  String _resolveMimeType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lower.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    return 'image/jpeg';
   }
 
   @override
@@ -129,7 +184,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Dictado por voz aun no implementado.'),
+                                      content: Text(
+                                        'Dictado por voz aun no implementado.',
+                                      ),
                                     ),
                                   );
                                 },
@@ -146,7 +203,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           TextField(
                             controller: _budgetController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(prefixText: 'Bs  '),
+                            decoration: const InputDecoration(
+                              prefixText: 'Bs  ',
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -174,9 +233,86 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                               prefixIcon: Icon(Icons.location_on_outlined),
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Fotos del trabajo (${_pendingImages.length}/5)',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _loading ? null : _pickImages,
+                                icon: const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                ),
+                                label: const Text('Agregar'),
+                              ),
+                            ],
+                          ),
+                          if (_pendingImages.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 84,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _pendingImages.length,
+                                separatorBuilder: (_, itemIndex) =>
+                                    const SizedBox(width: 10),
+                                itemBuilder: (context, index) {
+                                  final image = _pendingImages[index];
+                                  return Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.memory(
+                                          image.bytes,
+                                          width: 84,
+                                          height: 84,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 0,
+                                        right: 0,
+                                        child: GestureDetector(
+                                          onTap: _loading
+                                              ? null
+                                              : () {
+                                                  setState(() {
+                                                    _pendingImages.removeAt(
+                                                      index,
+                                                    );
+                                                  });
+                                                },
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black87,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            padding: const EdgeInsets.all(4),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           ChambaPrimaryButton(
-                            label: _loading ? 'Publicando...' : 'Publicar solicitud',
+                            label: _loading
+                                ? 'Publicando...'
+                                : 'Publicar solicitud',
                             icon: Icons.send,
                             onPressed: _loading ? null : _submit,
                           ),
@@ -192,4 +328,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       ),
     );
   }
+}
+
+class _PendingImage {
+  _PendingImage({required this.bytes, required this.dataUri});
+
+  final Uint8List bytes;
+  final String dataUri;
 }

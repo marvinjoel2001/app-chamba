@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "899491855193",
+    "project_id": "chamba-9f6db",
+    "storage_bucket": "chamba-9f6db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899491855193:android:7dd6a185131eab5eaf6a48",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeUwMnmX-bpqmd3W8k57ttTaAmo_XocGs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

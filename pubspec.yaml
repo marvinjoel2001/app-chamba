@@ -40,6 +40,9 @@ dependencies:
   firebase_messaging: ^16.1.2
   google_fonts: ^8.0.2
   socket_io_client: ^3.1.4
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  image_picker: ^1.2.0
 
 dev_dependencies:
   flutter_test:

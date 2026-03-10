@@ -22,6 +22,29 @@ class SessionUser {
     return ln.isEmpty ? firstName : '$firstName $ln';
   }
 
+  SessionUser copyWith({
+    String? id,
+    String? type,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? phone,
+    String? profilePhotoUrl,
+    bool clearProfilePhotoUrl = false,
+  }) {
+    return SessionUser(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      profilePhotoUrl: clearProfilePhotoUrl
+          ? null
+          : profilePhotoUrl ?? this.profilePhotoUrl,
+    );
+  }
+
   factory SessionUser.fromJson(Map<String, dynamic> json) {
     return SessionUser(
       id: json['id'] as String,

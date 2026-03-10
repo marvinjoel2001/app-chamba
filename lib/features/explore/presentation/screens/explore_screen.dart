@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -17,11 +20,13 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
+  final MapController _mapController = MapController();
   bool _loading = true;
   String? _error;
   List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
+  double _currentZoom = 13;
 
   @override
   void initState() {
@@ -54,7 +59,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       setState(() {
         _workers = (response['nearbyWorkers'] as List<dynamic>? ?? const []);
         _categories = (response['categories'] as List<dynamic>? ?? const []);
-        _activeRequest = activeRequest is Map<String, dynamic> ? activeRequest : null;
+        _activeRequest = activeRequest is Map<String, dynamic>
+            ? activeRequest
+            : null;
         _loading = false;
       });
     } catch (error) {
@@ -63,6 +70,49 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _loading = false;
       });
     }
+  }
+
+  LatLng get _mapCenter {
+    if (_workers.isNotEmpty) {
+      final first = _workers.first as Map<String, dynamic>;
+      final lat = (first['latitude'] as num?)?.toDouble();
+      final lng = (first['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        return LatLng(lat, lng);
+      }
+    }
+
+    return const LatLng(-16.5002, -68.1342);
+  }
+
+  List<Marker> get _workerMarkers {
+    return _workers.map((raw) {
+      final worker = raw as Map<String, dynamic>;
+      final lat = (worker['latitude'] as num?)?.toDouble() ?? -16.5002;
+      final lng = (worker['longitude'] as num?)?.toDouble() ?? -68.1342;
+      return Marker(
+        point: LatLng(lat, lng),
+        width: 54,
+        height: 54,
+        child: CircleAvatar(
+          radius: 22,
+          backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.82),
+          child: const Icon(Icons.handyman, color: Colors.white, size: 22),
+        ),
+      );
+    }).toList();
+  }
+
+  void _zoomIn() {
+    _currentZoom += 0.8;
+    _mapController.move(_mapController.camera.center, _currentZoom);
+    setState(() {});
+  }
+
+  void _zoomOut() {
+    _currentZoom = (_currentZoom - 0.8).clamp(3, 20);
+    _mapController.move(_mapController.camera.center, _currentZoom);
+    setState(() {});
   }
 
   @override
@@ -88,9 +138,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const SizedBox(width: 10),
                       Text(
                         user == null ? 'Chamba' : 'Hola, ${user.firstName}',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const Spacer(),
                       CircleAvatar(
@@ -99,19 +148,76 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             ? null
                             : NetworkImage(user!.profilePhotoUrl!),
                         child: user?.profilePhotoUrl == null
-                            ? Text((user?.firstName ?? 'U').substring(0, 1).toUpperCase())
+                            ? Text(
+                                (user?.firstName ?? 'U')
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                              )
                             : null,
                       ),
                     ],
                   ),
-                  const Spacer(),
-                  _MapDots(workers: _workers),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: AppConfig.mapboxAccessToken.trim().isEmpty
+                          ? const ColoredBox(
+                              color: Color(0x22000000),
+                              child: Center(
+                                child: Text(
+                                  'Falta MAPBOX_ACCESS_TOKEN para mostrar el mapa',
+                                ),
+                              ),
+                            )
+                          : FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: _mapCenter,
+                                initialZoom: _currentZoom,
+                                interactionOptions: const InteractionOptions(
+                                  flags: InteractiveFlag.all,
+                                ),
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                  userAgentPackageName: 'com.example.mobile',
+                                  additionalOptions: {
+                                    'accessToken': AppConfig.mapboxAccessToken,
+                                  },
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    ..._workerMarkers,
+                                    Marker(
+                                      point: _mapCenter,
+                                      width: 60,
+                                      height: 60,
+                                      child: CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor:
+                                            AppTheme.colorHighlight,
+                                        child: Icon(
+                                          Icons.location_on,
+                                          color: Colors.black.withValues(
+                                            alpha: 0.75,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          if (_loading)
-            const Center(child: CircularProgressIndicator()),
+          if (_loading) const Center(child: CircularProgressIndicator()),
           if (_error != null)
             Positioned(
               left: 20,
@@ -126,14 +232,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
             bottom: 300,
             child: Column(
               children: [
-                const _MapControl(icon: Icons.add),
+                _MapControl(icon: Icons.add, onTap: _zoomIn),
                 const SizedBox(height: 12),
-                const _MapControl(icon: Icons.remove),
+                _MapControl(icon: Icons.remove, onTap: _zoomOut),
                 const SizedBox(height: 12),
                 _MapControl(
                   icon: Icons.navigation,
                   highlighted: true,
-                  onTap: _load,
+                  onTap: () {
+                    _mapController.move(_mapCenter, _currentZoom);
+                    _load();
+                  },
                 ),
               ],
             ),
@@ -195,7 +304,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        if (_categories.isEmpty) const ChambaChip(label: 'Sin categorias', selected: false),
+                        if (_categories.isEmpty)
+                          const ChambaChip(
+                            label: 'Sin categorias',
+                            selected: false,
+                          ),
                       ],
                     ),
                   ),
@@ -234,11 +347,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 class _MapControl extends StatelessWidget {
-  const _MapControl({
-    required this.icon,
-    this.highlighted = false,
-    this.onTap,
-  });
+  const _MapControl({required this.icon, this.highlighted = false, this.onTap});
 
   final IconData icon;
   final bool highlighted;
@@ -251,57 +360,11 @@ class _MapControl extends StatelessWidget {
       backgroundColor: AppTheme.colorSurfaceSoft,
       child: IconButton(
         onPressed: onTap,
-        icon: Icon(icon, color: highlighted ? AppTheme.colorHighlight : AppTheme.colorText),
-      ),
-    );
-  }
-}
-
-class _MapDots extends StatelessWidget {
-  const _MapDots({required this.workers});
-
-  final List<dynamic> workers;
-
-  @override
-  Widget build(BuildContext context) {
-    final count = workers.length;
-
-    return Stack(
-      children: [
-        if (count > 0)
-          Positioned(
-            left: 30,
-            child: CircleAvatar(
-              radius: 9,
-              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
-            ),
-          ),
-        if (count > 1)
-          Positioned(
-            left: 180,
-            top: 120,
-            child: CircleAvatar(
-              radius: 8,
-              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.55),
-            ),
-          ),
-        if (count > 2)
-          Positioned(
-            left: 60,
-            top: 220,
-            child: CircleAvatar(
-              radius: 9,
-              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.6),
-            ),
-          ),
-        Center(
-          child: CircleAvatar(
-            radius: 28,
-            backgroundColor: AppTheme.colorHighlight,
-            child: Icon(Icons.location_on, color: Colors.black.withValues(alpha: 0.7)),
-          ),
+        icon: Icon(
+          icon,
+          color: highlighted ? AppTheme.colorHighlight : AppTheme.colorText,
         ),
-      ],
+      ),
     );
   }
 }
