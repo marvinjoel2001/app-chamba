@@ -16,12 +16,20 @@ class RequestStatusScreen extends StatefulWidget {
 class _RequestStatusScreenState extends State<RequestStatusScreen> {
   bool _loading = true;
   String? _error;
+  String? _infoMessage;
   Map<String, dynamic>? _status;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  bool _isNoRequestError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('no request found') ||
+        normalized.contains('requestid or clientuserid is required') ||
+        normalized.contains('api error 404');
   }
 
   Future<void> _load() async {
@@ -34,9 +42,20 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       return;
     }
 
+    if (user.type == 'worker') {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _infoMessage = 'Esta pantalla aplica para clientes que publican una solicitud.';
+        _status = null;
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
+      _infoMessage = null;
     });
 
     try {
@@ -53,8 +72,20 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
         _loading = false;
       });
     } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '');
+      if (_isNoRequestError(message)) {
+        setState(() {
+          _loading = false;
+          _error = null;
+          _infoMessage = 'Aun no tienes una solicitud activa.';
+          _status = null;
+          SessionStore.activeRequestId = null;
+        });
+        return;
+      }
+
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = message;
         _loading = false;
       });
     }
@@ -129,6 +160,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _error ??
+                      _infoMessage ??
                       'Estamos conectando con los mejores perfiles cerca de ti',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -225,3 +257,4 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
+

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../data/services/request_ai_service.dart';
 import 'request_status_screen.dart';
 
 class RequestFormScreen extends StatefulWidget {
@@ -59,11 +60,17 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     setState(() => _loading = true);
 
     try {
+      final generatedTitle = 'Solicitud de ${priceType.toLowerCase()}';
+      final inferredCategory = await RequestAiService.inferCategory(
+        title: generatedTitle,
+        description: description,
+      );
+
       final response = await MobileBackendService.createRequest(
         clientUserId: user.id,
-        title: 'Solicitud de ${priceType.toLowerCase()}',
+        title: generatedTitle,
         description: description,
-        category: 'General',
+        category: inferredCategory,
         budget: budget,
         priceType: priceType,
         address: _addressController.text.trim(),
@@ -176,22 +183,14 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           const SizedBox(height: 12),
                           TextField(
                             controller: _descriptionController,
-                            maxLines: 4,
-                            decoration: InputDecoration(
+                            minLines: 2,
+                            maxLines: null,
+                            textInputAction: TextInputAction.newline,
+                            keyboardType: TextInputType.multiline,
+                            decoration: const InputDecoration(
                               hintText:
-                                  'Ej: Necesito un plomero para arreglar una fuga en la cocina...',
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Dictado por voz aun no implementado.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.mic),
-                              ),
+                                  'Que buscas? Estoy buscando un trabajador para...',
+                              hintMaxLines: 3,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -336,3 +335,4 @@ class _PendingImage {
   final Uint8List bytes;
   final String dataUri;
 }
+

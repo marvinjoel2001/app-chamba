@@ -7,6 +7,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 
@@ -323,7 +324,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => const RequestStatusScreen(),
+                                builder: (_) => widget.role == 'worker'
+                                    ? const IncomingRequestScreen()
+                                    : const RequestStatusScreen(),
                               ),
                             );
                           },
@@ -368,3 +371,4 @@ class _MapControl extends StatelessWidget {
     );
   }
 }
+

@@ -17,6 +17,7 @@ class OffersScreen extends StatefulWidget {
 class _OffersScreenState extends State<OffersScreen> {
   bool _loading = true;
   String? _error;
+  String? _infoMessage;
   List<dynamic> _offers = const [];
   Map<String, dynamic>? _request;
 
@@ -24,6 +25,33 @@ class _OffersScreenState extends State<OffersScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  bool _isNoRequestError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('no request found') ||
+        normalized.contains('requestid or clientuserid is required') ||
+        normalized.contains('api error 404');
+  }
+
+  Future<void> _syncActiveThreadForAcceptedOffer({
+    required String userId,
+    required String workerId,
+    required String requestId,
+  }) async {
+    final messages = await MobileBackendService.messages(userId: userId);
+    final threads = messages['threads'] as List<dynamic>? ?? const [];
+
+    for (final thread in threads) {
+      final map = thread as Map<String, dynamic>;
+      final counterpart = map['counterpart'] as Map<String, dynamic>? ?? {};
+      final threadRequestId = map['requestId']?.toString();
+      final counterpartId = counterpart['id']?.toString();
+      if (threadRequestId == requestId && counterpartId == workerId) {
+        SessionStore.activeThreadId = map['id']?.toString();
+        return;
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -36,9 +64,21 @@ class _OffersScreenState extends State<OffersScreen> {
       return;
     }
 
+    if (user.type == 'worker') {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _infoMessage = 'Como trabajador, revisa la pestana de solicitudes entrantes.';
+        _offers = const [];
+        _request = null;
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
+      _infoMessage = null;
     });
 
     try {
@@ -57,8 +97,21 @@ class _OffersScreenState extends State<OffersScreen> {
         _loading = false;
       });
     } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '');
+      if (_isNoRequestError(message)) {
+        setState(() {
+          _loading = false;
+          _error = null;
+          _infoMessage = 'Aun no tienes una solicitud activa.';
+          _request = null;
+          _offers = const [];
+          SessionStore.activeRequestId = null;
+        });
+        return;
+      }
+
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = message;
         _loading = false;
       });
     }
@@ -107,6 +160,8 @@ class _OffersScreenState extends State<OffersScreen> {
                 const Expanded(child: Center(child: CircularProgressIndicator()))
               else if (_error != null)
                 Expanded(child: Center(child: Text(_error!)))
+              else if (_infoMessage != null)
+                Expanded(child: Center(child: Text(_infoMessage!)))
               else if (_offers.isEmpty)
                 const Expanded(child: Center(child: Text('Aun no hay ofertas.')))
               else
@@ -205,6 +260,16 @@ class _OffersScreenState extends State<OffersScreen> {
                                         offerId: item['id'] as String,
                                         clientUserId: user.id,
                                       );
+                                      final requestId = _request?['id']?.toString();
+                                      final workerId = worker['id']?.toString();
+                                      if (requestId != null && workerId != null) {
+                                        SessionStore.activeRequestId = requestId;
+                                        await _syncActiveThreadForAcceptedOffer(
+                                          userId: user.id,
+                                          workerId: workerId,
+                                          requestId: requestId,
+                                        );
+                                      }
                                       if (!context.mounted) {
                                         return;
                                       }

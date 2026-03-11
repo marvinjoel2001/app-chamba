@@ -8,7 +8,7 @@ class AppConfig {
   static String get apiBaseUrl => _resolveLocalhost(
     const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://localhost:3001/api',
+      defaultValue: 'http://localhost:3000/api',
     ),
   );
 
@@ -18,10 +18,19 @@ class AppConfig {
     defaultValue: '',
   );
 
+  static const String geminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
+  static const String geminiModel = String.fromEnvironment(
+    'GEMINI_MODEL',
+    defaultValue: 'gemini-2.0-flash',
+  );
+
   static String get socketBaseUrl => _resolveLocalhost(
     const String.fromEnvironment(
       'SOCKET_BASE_URL',
-      defaultValue: 'http://localhost:3001',
+      defaultValue: 'http://localhost:3000',
     ),
   );
 

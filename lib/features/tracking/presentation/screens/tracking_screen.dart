@@ -24,6 +24,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _load();
   }
 
+  Future<void> _ensureActiveThread() async {
+    final user = SessionStore.currentUser;
+    final requestId = SessionStore.activeRequestId;
+    final workerId = _tracking?['worker']?['id']?.toString();
+    if (user == null || requestId == null || workerId == null) {
+      return;
+    }
+
+    final response = await MobileBackendService.messages(userId: user.id);
+    final threads = response['threads'] as List<dynamic>? ?? const [];
+    for (final thread in threads) {
+      final map = thread as Map<String, dynamic>;
+      final counterpart = map['counterpart'] as Map<String, dynamic>? ?? {};
+      if (map['requestId']?.toString() == requestId &&
+          counterpart['id']?.toString() == workerId) {
+        SessionStore.activeThreadId = map['id']?.toString();
+        return;
+      }
+    }
+  }
+
   Future<void> _load() async {
     final requestId = SessionStore.activeRequestId;
     if (requestId == null) {
@@ -41,8 +62,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     try {
       final response = await MobileBackendService.tracking(requestId: requestId);
+      _tracking = response;
+      if (SessionStore.activeThreadId == null) {
+        await _ensureActiveThread();
+      }
+      if (!mounted) {
+        return;
+      }
       setState(() {
-        _tracking = response;
         _loading = false;
       });
     } catch (error) {
@@ -170,7 +197,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
-                                    'Distancia actual ${( _tracking?['distanceKm'] ?? 0 ).toString()} km',
+                                    'Distancia actual ${(_tracking?['distanceKm'] ?? 0).toString()} km',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(fontSize: 20),
                                   ),
@@ -196,14 +223,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       child: ChambaPrimaryButton(
                                         label: 'Chatear',
                                         icon: Icons.chat,
-                                        onPressed: () {
+                                        onPressed: () async {
+                                          if (SessionStore.activeThreadId == null) {
+                                            await _ensureActiveThread();
+                                          }
                                           final threadId = SessionStore.activeThreadId;
                                           if (threadId == null) {
+                                            if (!context.mounted) {
+                                              return;
+                                            }
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               const SnackBar(
                                                 content: Text('No hay chat activo.'),
                                               ),
                                             );
+                                            return;
+                                          }
+                                          if (!context.mounted) {
                                             return;
                                           }
                                           Navigator.of(context).push(
@@ -232,3 +268,4 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 }
+

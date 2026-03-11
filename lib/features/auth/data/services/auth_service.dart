@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../../core/session/session_store.dart';
 import '../../../../core/push/push_notification_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
@@ -19,7 +21,7 @@ class AuthService {
     }
 
     SessionStore.currentUser = SessionUser.fromJson(userJson);
-    await const PushNotificationService().syncTokenForCurrentUser();
+    unawaited(_syncPushTokenBestEffort());
   }
 
   Future<void> register({
@@ -51,10 +53,18 @@ class AuthService {
     }
 
     SessionStore.currentUser = SessionUser.fromJson(userJson);
-    await const PushNotificationService().syncTokenForCurrentUser();
+    unawaited(_syncPushTokenBestEffort());
   }
 
   Future<void> logout() async {
     SessionStore.clear();
+  }
+
+  Future<void> _syncPushTokenBestEffort() async {
+    try {
+      await const PushNotificationService()
+          .syncTokenForCurrentUser()
+          .timeout(const Duration(seconds: 6));
+    } catch (_) {}
   }
 }

@@ -21,6 +21,22 @@ flutter run \
 
 If `API_BASE_URL` is not provided, default is `http://localhost:3000/api`.
 
+## Variables locales seguras
+
+Usa un archivo local de defines para no hardcodear tokens:
+
+```bash
+cp env/dart_define.example.json env/dart_define.local.json
+```
+
+Luego completa tus claves reales en `env/dart_define.local.json` y ejecuta:
+
+```bash
+flutter run --dart-define-from-file=env/dart_define.local.json
+```
+
+`env/dart_define.local.json` está ignorado por git.
+
 ## Optional Firebase push config
 
 When you are ready to enable real push notifications in mobile, add:

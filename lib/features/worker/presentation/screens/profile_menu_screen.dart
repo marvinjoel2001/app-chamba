@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../auth/data/services/auth_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../onboarding/presentation/screens/role_selection_screen.dart';
 import '../../../request/presentation/screens/empty_requests_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -113,6 +115,41 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
         setState(() => _updatingPhoto = false);
       }
     }
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesion'),
+        content: const Text('Quieres cerrar tu sesion actual?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cerrar sesion'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    await AuthService().logout();
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+      (_) => false,
+    );
   }
 
   String _resolveMimeType(String path) {
@@ -261,6 +298,12 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                   );
                 },
               ),
+              _NavTile(
+                title: 'Cerrar sesion',
+                subtitle: 'Salir de tu cuenta en este dispositivo',
+                icon: Icons.logout,
+                onTap: _logout,
+              ),
             ],
           ),
         ),
@@ -299,3 +342,4 @@ class _NavTile extends StatelessWidget {
     );
   }
 }
+
