@@ -5,6 +5,8 @@ import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/offers_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
+import '../../../worker/presentation/screens/radar_screen.dart';
+import '../../../worker/presentation/screens/worker_history_screen.dart';
 import '../../../worker/presentation/screens/profile_menu_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
@@ -21,16 +23,24 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      ExploreScreen(role: widget.role),
-      widget.role == 'worker' ? const IncomingRequestScreen() : const OffersScreen(),
-      const MessagesScreen(),
-      const ProfileMenuScreen(),
-    ];
+    final pages = widget.role == 'worker'
+        ? const [
+            IncomingRequestScreen(),
+            RadarScreen(),
+            WorkerHistoryScreen(),
+            ProfileMenuScreen(),
+          ]
+        : [
+            ExploreScreen(role: widget.role),
+            const OffersScreen(),
+            const MessagesScreen(),
+            const ProfileMenuScreen(),
+          ];
 
     return Scaffold(
       body: IndexedStack(index: currentIndex, children: pages),
       bottomNavigationBar: ChambaBottomNav(
+        role: widget.role,
         currentIndex: currentIndex,
         onTap: (index) {
           setState(() {
@@ -41,4 +51,3 @@ class _MainShellScreenState extends State<MainShellScreen> {
     );
   }
 }
-

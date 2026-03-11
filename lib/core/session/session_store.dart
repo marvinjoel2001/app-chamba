@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 class SessionUser {
   const SessionUser({
     required this.id,
@@ -45,6 +49,18 @@ class SessionUser {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'phone': phone,
+      'profilePhotoUrl': profilePhotoUrl,
+    };
+  }
+
   factory SessionUser.fromJson(Map<String, dynamic> json) {
     return SessionUser(
       id: json['id'] as String,
@@ -61,15 +77,53 @@ class SessionUser {
 class SessionStore {
   const SessionStore._();
 
+  static const _keySessionUser = 'session_user';
+
   static SessionUser? currentUser;
   static String? activeRequestId;
   static String? activeThreadId;
 
   static bool get isLoggedIn => currentUser != null;
 
-  static void clear() {
+  static Future<void> hydrate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keySessionUser);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        currentUser = SessionUser.fromJson(decoded);
+      }
+    } catch (_) {
+      await prefs.remove(_keySessionUser);
+    }
+  }
+
+  static Future<void> setCurrentUser(SessionUser user) async {
+    currentUser = user;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
+  }
+
+  static Future<void> persistCurrentUser() async {
+    final user = currentUser;
+    final prefs = await SharedPreferences.getInstance();
+    if (user == null) {
+      await prefs.remove(_keySessionUser);
+      return;
+    }
+    await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
+  }
+
+  static Future<void> clear() async {
     currentUser = null;
     activeRequestId = null;
     activeThreadId = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keySessionUser);
   }
 }

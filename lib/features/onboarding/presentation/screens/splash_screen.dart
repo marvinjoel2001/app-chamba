@@ -2,8 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/network/realtime_service.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import 'role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -20,18 +25,59 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    timer = Timer.periodic(const Duration(milliseconds: 220), (tick) {
+    timer = Timer.periodic(const Duration(milliseconds: 180), (tick) {
       setState(() {
-        progress = (progress + 0.13).clamp(0.0, 1.0);
+        progress = (progress + 0.1).clamp(0.0, 1.0);
       });
 
       if (progress >= 1) {
         timer?.cancel();
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
-        );
+        _resolveInitialRoute();
       }
     });
+  }
+
+  Future<void> _resolveInitialRoute() async {
+    await SessionStore.hydrate();
+
+    if (!mounted) {
+      return;
+    }
+
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+      );
+      return;
+    }
+
+    RealtimeService.instance.connect(userId: user.id);
+
+    if (user.type == 'worker') {
+      try {
+        final result = await MobileBackendService.workerSkills(
+          workerUserId: user.id,
+        );
+        final skills = (result['skills'] as List<dynamic>? ?? const []);
+        if (!mounted) {
+          return;
+        }
+        if (skills.isEmpty) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const SkillsSelectionScreen(forceToHomeAfterSave: true),
+            ),
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => MainShellScreen(role: user.type)),
+    );
   }
 
   @override
@@ -73,8 +119,8 @@ class _SplashScreenState extends State<SplashScreen> {
                 Text(
                   'Chamba',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 const Text(
@@ -88,7 +134,10 @@ class _SplashScreenState extends State<SplashScreen> {
                 const Spacer(),
                 Row(
                   children: [
-                    const Text('Initializing...', style: TextStyle(fontSize: 20)),
+                    const Text(
+                      'Initializing...',
+                      style: TextStyle(fontSize: 20),
+                    ),
                     const Spacer(),
                     Text(
                       '${(progress * 100).toInt()}%',
@@ -100,7 +149,9 @@ class _SplashScreenState extends State<SplashScreen> {
                 LinearProgressIndicator(
                   value: progress,
                   color: AppTheme.colorPrimary,
-                  backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.25),
+                  backgroundColor: AppTheme.colorPrimary.withValues(
+                    alpha: 0.25,
+                  ),
                   minHeight: 10,
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -113,4 +164,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-

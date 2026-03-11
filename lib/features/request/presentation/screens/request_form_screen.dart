@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
@@ -27,6 +29,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PendingImage> _pendingImages = [];
   bool _loading = false;
+  static final http.Client _client = http.Client();
 
   @override
   void dispose() {
@@ -46,12 +49,15 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     }
 
     final description = _descriptionController.text.trim();
+    final address = _addressController.text.trim();
     final budget = double.tryParse(_budgetController.text.trim()) ?? 0;
 
-    if (description.isEmpty || budget <= 0) {
+    if (description.isEmpty || budget <= 0 || address.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Completa descripcion y presupuesto valido.'),
+          content: Text(
+            'Completa descripcion, direccion y presupuesto valido.',
+          ),
         ),
       );
       return;
@@ -61,21 +67,26 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
     try {
       final generatedTitle = 'Solicitud de ${priceType.toLowerCase()}';
-      final inferredCategory = await RequestAiService.inferCategory(
+      final inferredCategories = await RequestAiService.inferCategories(
         title: generatedTitle,
         description: description,
       );
+      final inferredCategory = inferredCategories.isEmpty
+          ? 'General'
+          : inferredCategories.first['name']?.toString() ?? 'General';
+      final coordinates = await _resolveCoordinates(address);
 
       final response = await MobileBackendService.createRequest(
         clientUserId: user.id,
         title: generatedTitle,
         description: description,
         category: inferredCategory,
+        aiCategories: inferredCategories,
         budget: budget,
         priceType: priceType,
-        address: _addressController.text.trim(),
-        latitude: -16.5002,
-        longitude: -68.1342,
+        address: address,
+        latitude: coordinates.$1,
+        longitude: coordinates.$2,
         photosBase64: _pendingImages.map((item) => item.dataUri).toList(),
       );
 
@@ -102,6 +113,48 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<(double, double)> _resolveCoordinates(String address) async {
+    final token = AppConfig.mapboxAccessToken.trim();
+    if (token.isEmpty) {
+      return (-16.5002, -68.1342);
+    }
+
+    try {
+      final endpoint = Uri.https(
+        'api.mapbox.com',
+        '/geocoding/v5/mapbox.places/${Uri.encodeComponent(address)}.json',
+        {'access_token': token, 'limit': '1', 'language': 'es'},
+      );
+
+      final response = await _client.get(endpoint);
+      if (response.statusCode >= 400) {
+        return (-16.5002, -68.1342);
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final features = decoded['features'] as List<dynamic>? ?? const [];
+      if (features.isEmpty) {
+        return (-16.5002, -68.1342);
+      }
+
+      final center =
+          (features.first as Map<String, dynamic>)['center'] as List<dynamic>?;
+      if (center == null || center.length < 2) {
+        return (-16.5002, -68.1342);
+      }
+
+      final lng = (center[0] as num?)?.toDouble();
+      final lat = (center[1] as num?)?.toDouble();
+      if (lat == null || lng == null) {
+        return (-16.5002, -68.1342);
+      }
+
+      return (lat, lng);
+    } catch (_) {
+      return (-16.5002, -68.1342);
     }
   }
 
@@ -335,4 +388,3 @@ class _PendingImage {
   final Uint8List bytes;
   final String dataUri;
 }
-

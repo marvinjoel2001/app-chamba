@@ -58,6 +58,7 @@ class MobileBackendService {
     required String title,
     required String description,
     required String category,
+    List<Map<String, dynamic>>? aiCategories,
     required double budget,
     required String priceType,
     required String address,
@@ -73,6 +74,7 @@ class MobileBackendService {
         'title': title,
         'description': description,
         'category': category,
+        'aiCategories': aiCategories,
         'budget': budget,
         'priceType': priceType,
         'address': address,
@@ -80,6 +82,31 @@ class MobileBackendService {
         'longitude': longitude,
         'scheduledAt': scheduledAt,
         'photosBase64': photosBase64,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> categories() {
+    return _api.get('/mobile/categories');
+  }
+
+  static Future<Map<String, dynamic>> createCategory({
+    required String name,
+    String? id,
+    String? description,
+    String? icon,
+    String? parentId,
+    bool active = true,
+  }) {
+    return _api.post(
+      '/mobile/categories',
+      body: {
+        'id': id,
+        'name': name,
+        'description': description,
+        'icon': icon,
+        'parentId': parentId,
+        'active': active,
       },
     );
   }
@@ -250,6 +277,30 @@ class MobileBackendService {
     return _api.post(
       '/mobile/worker/skills',
       body: {'workerUserId': workerUserId, 'skills': skills},
+    );
+  }
+
+  static Future<Map<String, dynamic>> workerHistory({
+    required String workerUserId,
+  }) {
+    return _api.get(
+      '/mobile/worker/history',
+      queryParameters: {'workerUserId': workerUserId},
+    );
+  }
+
+  static Future<Map<String, dynamic>> updateWorkerLocation({
+    required String workerUserId,
+    required double latitude,
+    required double longitude,
+  }) {
+    return _api.post(
+      '/mobile/worker/location',
+      body: {
+        'workerUserId': workerUserId,
+        'latitude': latitude,
+        'longitude': longitude,
+      },
     );
   }
 

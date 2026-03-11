@@ -4,9 +4,12 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../shell/presentation/screens/main_shell_screen.dart';
 
 class SkillsSelectionScreen extends StatefulWidget {
-  const SkillsSelectionScreen({super.key});
+  const SkillsSelectionScreen({this.forceToHomeAfterSave = false, super.key});
+
+  final bool forceToHomeAfterSave;
 
   @override
   State<SkillsSelectionScreen> createState() => _SkillsSelectionScreenState();
@@ -15,8 +18,7 @@ class SkillsSelectionScreen extends StatefulWidget {
 class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
   final Set<String> selected = <String>{};
   bool _loading = true;
-
-  final skills = const [
+  List<(String, IconData)> _skills = const [
     ('Construccion', Icons.handyman),
     ('Electricidad', Icons.flash_on),
     ('Plomeria', Icons.plumbing),
@@ -43,7 +45,20 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     setState(() => _loading = true);
 
     try {
-      final response = await MobileBackendService.workerSkills(workerUserId: user.id);
+      final categoriesResponse = await MobileBackendService.categories();
+      final categories =
+          (categoriesResponse['categories'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map((item) => item['name']?.toString().trim() ?? '')
+              .where((name) => name.isNotEmpty)
+              .toList();
+      if (categories.isNotEmpty) {
+        _skills = categories.map((name) => (name, _resolveIcon(name))).toList();
+      }
+
+      final response = await MobileBackendService.workerSkills(
+        workerUserId: user.id,
+      );
       final values = (response['skills'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
           .toSet();
@@ -59,6 +74,21 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  IconData _resolveIcon(String label) {
+    final value = label.toLowerCase();
+    if (value.contains('elect')) return Icons.flash_on;
+    if (value.contains('plom') || value.contains('gas')) return Icons.plumbing;
+    if (value.contains('jardin')) return Icons.yard;
+    if (value.contains('transp') || value.contains('logis')) {
+      return Icons.local_shipping;
+    }
+    if (value.contains('limp')) return Icons.cleaning_services;
+    if (value.contains('mecan')) return Icons.build;
+    if (value.contains('carpint')) return Icons.architecture;
+    if (value.contains('pint')) return Icons.format_paint;
+    return Icons.handyman;
   }
 
   Future<void> _save() async {
@@ -80,13 +110,26 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
       );
-      Navigator.of(context).pop();
+      if (widget.forceToHomeAfterSave) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => MainShellScreen(
+              role: SessionStore.currentUser?.type ?? 'worker',
+            ),
+          ),
+          (_) => false,
+        );
+      } else {
+        Navigator.of(context).pop();
+      }
     } catch (error) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -117,7 +160,10 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const Spacer(),
-                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                    IconButton(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -138,22 +184,22 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                 Text(
                   'En que eres bueno?',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Expanded(
                   child: GridView.builder(
-                    itemCount: skills.length,
+                    itemCount: _skills.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.9,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.9,
+                        ),
                     itemBuilder: (context, index) {
-                      final (label, icon) = skills[index];
+                      final (label, icon) = _skills[index];
                       final isSelected = selected.contains(label);
 
                       return GestureDetector(
@@ -188,7 +234,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                   child: CircleAvatar(
                                     radius: 13,
                                     backgroundColor: AppTheme.colorHighlight,
-                                    child: Icon(Icons.check, size: 16, color: Colors.black),
+                                    child: Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               Center(
@@ -197,8 +247,8 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                   children: [
                                     CircleAvatar(
                                       radius: 30,
-                                      backgroundColor:
-                                          AppTheme.colorPrimary.withValues(alpha: 0.35),
+                                      backgroundColor: AppTheme.colorPrimary
+                                          .withValues(alpha: 0.35),
                                       child: Icon(icon, size: 30),
                                     ),
                                     const SizedBox(height: 14),
@@ -207,7 +257,9 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleLarge
-                                          ?.copyWith(fontWeight: FontWeight.w600),
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
                                   ],
                                 ),

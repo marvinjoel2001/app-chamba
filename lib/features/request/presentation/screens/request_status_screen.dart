@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -14,6 +15,7 @@ class RequestStatusScreen extends StatefulWidget {
 }
 
 class _RequestStatusScreenState extends State<RequestStatusScreen> {
+  final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   String? _error;
   String? _infoMessage;
@@ -22,6 +24,21 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+    _realtime.on('offer.new', _onOfferEvent);
+    _realtime.on('offer.accepted', _onOfferEvent);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _realtime.off('offer.new', _onOfferEvent);
+    _realtime.off('offer.accepted', _onOfferEvent);
+    super.dispose();
+  }
+
+  void _onOfferEvent(dynamic payload) {
     _load();
   }
 
@@ -46,7 +63,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       setState(() {
         _loading = false;
         _error = null;
-        _infoMessage = 'Esta pantalla aplica para clientes que publican una solicitud.';
+        _infoMessage =
+            'Esta pantalla aplica para clientes que publican una solicitud.';
         _status = null;
       });
       return;
@@ -103,7 +121,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
           Expanded(
             child: Stack(
               children: [
-                const ChambaBackground(showGrid: true, child: SizedBox.expand()),
+                const ChambaBackground(
+                  showGrid: true,
+                  child: SizedBox.expand(),
+                ),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -152,7 +173,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                 Text(
                   _loading
                       ? 'Buscando trabajadores...'
-                      : (request == null ? 'Sin solicitud activa' : 'Solicitud: ${request['title']}'),
+                      : (request == null
+                            ? 'Sin solicitud activa'
+                            : 'Solicitud: ${request['title']}'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -163,9 +186,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                       _infoMessage ??
                       'Estamos conectando con los mejores perfiles cerca de ti',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.colorMuted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: AppTheme.colorMuted),
                 ),
                 const SizedBox(height: 20),
                 if (_loading)
@@ -193,7 +216,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                 const SizedBox(height: 16),
                 if (offers.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.colorPrimary.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(30),
@@ -247,9 +273,9 @@ class _MetricCard extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: AppTheme.colorPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppTheme.colorPrimary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           Text(label, style: const TextStyle(color: AppTheme.colorMuted)),
         ],
@@ -257,4 +283,3 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
-

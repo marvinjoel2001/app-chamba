@@ -19,8 +19,8 @@ class ChambaBackground extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [AppTheme.colorBackground, AppTheme.colorBackgroundAccent],
         ),
       ),
@@ -28,19 +28,19 @@ class ChambaBackground extends StatelessWidget {
         children: [
           if (showGrid) const _DotGrid(),
           Positioned(
-            top: -120,
-            right: -80,
+            top: -140,
+            right: -70,
             child: _GlowCircle(
-              size: 260,
-              color: AppTheme.colorPrimary.withValues(alpha: 0.12),
+              size: 320,
+              color: AppTheme.colorPrimary.withValues(alpha: 0.10),
             ),
           ),
           Positioned(
-            bottom: -140,
-            left: -90,
+            bottom: -150,
+            left: -100,
             child: _GlowCircle(
-              size: 280,
-              color: AppTheme.colorHighlight.withValues(alpha: 0.1),
+              size: 340,
+              color: AppTheme.colorHighlight.withValues(alpha: 0.12),
             ),
           ),
           child,
@@ -54,26 +54,35 @@ class GlassCard extends StatelessWidget {
   const GlassCard({
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.borderRadius = 24,
+    this.borderRadius = 20,
+    this.elevated = false,
     super.key,
   });
 
   final Widget child;
   final EdgeInsets padding;
   final double borderRadius;
+  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
+    final blur = elevated ? 32.0 : 24.0;
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: AppTheme.colorGlass,
+            color: elevated ? AppTheme.colorGlassHigh : AppTheme.colorGlass,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: AppTheme.colorGlassBorder),
+            border: Border.all(
+              color: elevated
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : AppTheme.colorGlassBorder,
+              width: 1,
+            ),
+            boxShadow: elevated ? AppTheme.shadowLg : AppTheme.shadowMd,
           ),
           child: child,
         ),
@@ -82,7 +91,7 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-class ChambaPrimaryButton extends StatelessWidget {
+class ChambaPrimaryButton extends StatefulWidget {
   const ChambaPrimaryButton({
     required this.label,
     required this.onPressed,
@@ -97,23 +106,85 @@ class ChambaPrimaryButton extends StatelessWidget {
   final bool isYellow;
 
   @override
+  State<ChambaPrimaryButton> createState() => _ChambaPrimaryButtonState();
+}
+
+class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return FilledButton(
-      style: FilledButton.styleFrom(
-        backgroundColor: isYellow
-            ? AppTheme.colorHighlight
-            : AppTheme.colorPrimary,
-        foregroundColor: isYellow ? AppTheme.colorText : Colors.white,
-        minimumSize: const Size.fromHeight(58),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-      onPressed: onPressed,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) ...[Icon(icon), const SizedBox(width: 10)],
-          Text(label),
-        ],
+    final enabled = widget.onPressed != null;
+
+    final decoration = BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      gradient: widget.isYellow
+          ? null
+          : const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.colorPrimary,
+                AppTheme.colorPrimaryLight,
+                AppTheme.colorHighlight,
+              ],
+            ),
+      color: widget.isYellow ? AppTheme.colorHighlight : null,
+      border: widget.isYellow
+          ? null
+          : Border.all(color: Colors.white.withValues(alpha: 0.26), width: 1),
+      boxShadow: enabled
+          ? (_pressed
+                ? AppTheme.shadowSm
+                : widget.isYellow
+                ? AppTheme.shadowYellow
+                : AppTheme.shadowMd)
+          : const [],
+    );
+
+    final foreground = widget.isYellow
+        ? AppTheme.colorText
+        : AppTheme.colorTextOnPurple;
+
+    return GestureDetector(
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: enabled
+          ? (_) {
+              setState(() => _pressed = false);
+              widget.onPressed?.call();
+            }
+          : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        scale: _pressed ? 0.97 : 1,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: enabled ? 1 : 0.6,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 52),
+            decoration: decoration,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, color: foreground),
+                  const SizedBox(width: 10),
+                ],
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -135,20 +206,28 @@ class ChambaChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.colorPrimary : AppTheme.colorSurfaceSoft,
-          borderRadius: BorderRadius.circular(40),
+          color: selected
+              ? AppTheme.colorPrimary
+              : AppTheme.colorPrimary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(100),
           border: Border.all(
-            color: selected ? AppTheme.colorPrimary : const Color(0xFFCBD4E9),
+            color: selected
+                ? AppTheme.colorPrimary
+                : AppTheme.colorPrimary.withValues(alpha: 0.20),
           ),
+          boxShadow: selected ? AppTheme.shadowSm : const [],
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : AppTheme.colorText,
+            color: selected ? Colors.white : AppTheme.colorPrimary,
             fontWeight: FontWeight.w600,
+            fontSize: 13,
           ),
         ),
       ),
@@ -158,60 +237,52 @@ class ChambaChip extends StatelessWidget {
 
 class ChambaBottomNav extends StatelessWidget {
   const ChambaBottomNav({
+    required this.role,
     required this.currentIndex,
     required this.onTap,
     super.key,
   });
 
+  final String role;
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  static const _items = [
+  static const _clientItems = [
     _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
     _NavItemData(icon: Icons.work, label: 'Ofertas'),
     _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
     _NavItemData(icon: Icons.person, label: 'Perfil'),
   ];
+  static const _workerItems = [
+    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
+    _NavItemData(icon: Icons.radar, label: 'Radar'),
+    _NavItemData(icon: Icons.history, label: 'Historial'),
+    _NavItemData(icon: Icons.person, label: 'Perfil'),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final items = role == 'worker' ? _workerItems : _clientItems;
+
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
           child: Container(
-            height: 78,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.66),
-                  Colors.white.withValues(alpha: 0.4),
-                ],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.colorPrimary.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: const Color(0x111A2A4A),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                ),
-              ],
+              color: Colors.white.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+              boxShadow: AppTheme.shadowMd,
             ),
             child: Row(
-              children: List.generate(_items.length, (index) {
-                final item = _items[index];
+              children: List.generate(items.length, (index) {
+                final item = items[index];
                 final selected = index == currentIndex;
                 return Expanded(
                   child: _BottomNavItem(
@@ -254,51 +325,40 @@ class _BottomNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconColor = selected
         ? AppTheme.colorPrimary
-        : AppTheme.colorMuted.withValues(alpha: 0.86);
+        : const Color(0xFFA78BCA);
     final labelColor = selected
         ? AppTheme.colorPrimary
-        : AppTheme.colorMuted.withValues(alpha: 0.8);
+        : const Color(0xFFA78BCA);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(100),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: const BoxDecoration(),
+        curve: Curves.easeOutBack,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.colorPrimary.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSlide(
+            AnimatedScale(
               duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              offset: selected ? const Offset(0, -0.06) : Offset.zero,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutBack,
-                scale: selected ? 1.12 : 1,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                  child: Icon(
-                    icon,
-                    key: ValueKey<bool>(selected),
-                    size: selected ? 23.5 : 22,
-                    color: iconColor,
-                  ),
-                ),
-              ),
+              curve: Curves.easeOutBack,
+              scale: selected ? 1.05 : 1,
+              child: Icon(icon, size: 24, color: iconColor),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
+              curve: Curves.easeOut,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: labelColor,
               ),
@@ -324,7 +384,7 @@ class _GlowCircle extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        filter: ImageFilter.blur(sigmaX: 42, sigmaY: 42),
         child: const SizedBox.expand(),
       ),
     );
@@ -346,12 +406,12 @@ class _DotGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppTheme.colorPrimary.withValues(alpha: 0.16);
+      ..color = AppTheme.colorPrimary.withValues(alpha: 0.08);
 
-    const spacing = 36.0;
+    const spacing = 34.0;
     for (double y = 0; y < size.height; y += spacing) {
       for (double x = 0; x < size.width; x += spacing) {
-        canvas.drawCircle(Offset(x, y), 1.2, paint);
+        canvas.drawCircle(Offset(x, y), 1.15, paint);
       }
     }
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
@@ -14,6 +15,7 @@ class MessagesScreen extends StatefulWidget {
 }
 
 class _MessagesScreenState extends State<MessagesScreen> {
+  final RealtimeService _realtime = RealtimeService.instance;
   String _formatDate(String? value) {
     if (value == null || value.isEmpty) {
       return '--';
@@ -21,6 +23,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final normalized = value.replaceFirst('T', ' ');
     return normalized.length > 16 ? normalized.substring(0, 16) : normalized;
   }
+
   bool _loading = true;
   String? _error;
   List<dynamic> _threads = const [];
@@ -28,6 +31,19 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+    _realtime.on('message.new', _onMessageEvent);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _realtime.off('message.new', _onMessageEvent);
+    super.dispose();
+  }
+
+  void _onMessageEvent(dynamic payload) {
     _load();
   }
 
@@ -73,8 +89,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   Text(
                     'Mensajes',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const Spacer(),
                   IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
@@ -90,7 +106,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
               else
                 ..._threads.map((thread) {
                   final threadMap = thread as Map<String, dynamic>;
-                  final counterpart = threadMap['counterpart'] as Map<String, dynamic>? ?? {};
+                  final counterpart =
+                      threadMap['counterpart'] as Map<String, dynamic>? ?? {};
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -99,30 +116,43 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
                           radius: 26,
-                          backgroundImage: counterpart['profilePhotoUrl'] == null
+                          backgroundImage:
+                              counterpart['profilePhotoUrl'] == null
                               ? null
-                              : NetworkImage(counterpart['profilePhotoUrl'] as String),
+                              : NetworkImage(
+                                  counterpart['profilePhotoUrl'] as String,
+                                ),
                           child: counterpart['profilePhotoUrl'] == null
-                              ? Text((counterpart['firstName'] ?? 'U').toString().substring(0, 1))
+                              ? Text(
+                                  (counterpart['firstName'] ?? 'U')
+                                      .toString()
+                                      .substring(0, 1),
+                                )
                               : null,
                         ),
                         title: Text(
-                          '${counterpart['firstName'] ?? ''} ${counterpart['lastName'] ?? ''}'.trim(),
+                          '${counterpart['firstName'] ?? ''} ${counterpart['lastName'] ?? ''}'
+                              .trim(),
                         ),
-                        subtitle: Text(threadMap['lastMessage']?.toString() ?? ''),
+                        subtitle: Text(
+                          threadMap['lastMessage']?.toString() ?? '',
+                        ),
                         trailing: Text(
                           _formatDate(threadMap['lastMessageAt']?.toString()),
                           textAlign: TextAlign.right,
                         ),
                         onTap: () {
-                          SessionStore.activeThreadId = threadMap['id'] as String?;
+                          SessionStore.activeThreadId =
+                              threadMap['id'] as String?;
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => ChatScreen(
                                 threadId: threadMap['id'] as String,
                                 title:
-                                    '${counterpart['firstName'] ?? ''} ${counterpart['lastName'] ?? ''}'.trim(),
-                                avatarUrl: counterpart['profilePhotoUrl'] as String?,
+                                    '${counterpart['firstName'] ?? ''} ${counterpart['lastName'] ?? ''}'
+                                        .trim(),
+                                avatarUrl:
+                                    counterpart['profilePhotoUrl'] as String?,
                               ),
                             ),
                           );
@@ -149,4 +179,3 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 }
-

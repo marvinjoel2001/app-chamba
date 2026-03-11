@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -14,6 +15,7 @@ class IncomingRequestScreen extends StatefulWidget {
 }
 
 class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
+  final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _request;
@@ -21,6 +23,27 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+    _realtime.on('request.new', _onRequestUpdated);
+    _realtime.on('offer.accepted', _onRequestUpdated);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _realtime.off('request.new', _onRequestUpdated);
+    _realtime.off('offer.accepted', _onRequestUpdated);
+    super.dispose();
+  }
+
+  void _onRequestUpdated(dynamic payload) {
+    final userId = SessionStore.currentUser?.id;
+    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    if (map['workerUserId'] != null &&
+        map['workerUserId'].toString() != userId) {
+      return;
+    }
     _load();
   }
 
@@ -40,7 +63,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
     });
 
     try {
-      final response = await MobileBackendService.incomingRequest(workerUserId: user.id);
+      final response = await MobileBackendService.incomingRequest(
+        workerUserId: user.id,
+      );
       final request = response['request'];
       setState(() {
         _request = request is Map<String, dynamic> ? request : null;
@@ -83,7 +108,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                         ),
                       ),
                       const Spacer(),
-                      IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                      IconButton(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 22),
@@ -92,11 +120,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                   else if (_error != null)
                     Center(child: Text(_error!))
                   else if (req == null)
-                    const Center(child: Text('No hay solicitudes cercanas por ahora.'))
+                    const Center(
+                      child: Text('No hay solicitudes cercanas por ahora.'),
+                    )
                   else ...[
                     CircleAvatar(
                       radius: 80,
-                      backgroundColor: AppTheme.colorHighlight.withValues(alpha: 0.22),
+                      backgroundColor: AppTheme.colorHighlight.withValues(
+                        alpha: 0.22,
+                      ),
                       child: const Icon(
                         Icons.format_paint,
                         size: 62,
@@ -106,7 +138,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                     const SizedBox(height: 18),
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFE4E3),
                           borderRadius: BorderRadius.circular(30),
@@ -153,13 +188,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                           const SizedBox(height: 10),
                           Text(
                             'Bs ${req['budget']}/dia',
-                            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                            style: Theme.of(context).textTheme.displayMedium
+                                ?.copyWith(
                                   color: AppTheme.colorHighlight,
                                   fontWeight: FontWeight.w800,
                                 ),
                           ),
                           const SizedBox(height: 10),
-                          ChambaChip(label: req['status']?.toString() ?? 'searching', selected: true),
+                          ChambaChip(
+                            label: req['status']?.toString() ?? 'searching',
+                            selected: true,
+                          ),
                         ],
                       ),
                     ),
@@ -223,5 +262,3 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
     );
   }
 }
-
-

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -53,6 +54,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
       final updated = response['user'];
       if (updated is Map<String, dynamic>) {
         SessionStore.currentUser = SessionUser.fromJson(updated);
+        unawaited(SessionStore.persistCurrentUser());
       }
 
       if (!mounted) {
@@ -94,6 +96,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
       } else {
         SessionStore.currentUser = user.copyWith(clearProfilePhotoUrl: true);
       }
+      unawaited(SessionStore.persistCurrentUser());
 
       if (!mounted) {
         return;
@@ -342,4 +345,3 @@ class _NavTile extends StatelessWidget {
     );
   }
 }
-

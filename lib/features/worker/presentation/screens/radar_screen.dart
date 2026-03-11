@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -13,10 +16,14 @@ class RadarScreen extends StatefulWidget {
 }
 
 class _RadarScreenState extends State<RadarScreen> {
+  final MapController _mapController = MapController();
   bool available = true;
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _summary;
+  LatLng? _workerLocation;
+  double _workRadiusKm = 5;
+  double _zoom = 13;
 
   @override
   void initState() {
@@ -40,11 +47,21 @@ class _RadarScreenState extends State<RadarScreen> {
     });
 
     try {
-      final response = await MobileBackendService.workerRadar(workerUserId: user.id);
+      final response = await MobileBackendService.workerRadar(
+        workerUserId: user.id,
+      );
       final summary = response['summary'] as Map<String, dynamic>?;
+      final location = response['location'] as Map<String, dynamic>?;
+      final latitude = (location?['latitude'] as num?)?.toDouble();
+      final longitude = (location?['longitude'] as num?)?.toDouble();
+
       setState(() {
         available = response['available'] as bool? ?? true;
         _summary = summary;
+        _workRadiusKm = (location?['workRadiusKm'] as num?)?.toDouble() ?? 5;
+        _workerLocation = latitude != null && longitude != null
+            ? LatLng(latitude, longitude)
+            : const LatLng(-16.5002, -68.1342);
         _loading = false;
       });
     } catch (error) {
@@ -74,8 +91,54 @@ class _RadarScreenState extends State<RadarScreen> {
     }
   }
 
+  Future<void> _updateLocationFromCenter() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final center = _mapController.camera.center;
+    try {
+      await MobileBackendService.updateWorkerLocation(
+        workerUserId: user.id,
+        latitude: center.latitude,
+        longitude: center.longitude,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ubicacion de radar actualizada')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  void _zoomIn() {
+    _zoom += 0.8;
+    _mapController.move(_mapController.camera.center, _zoom);
+    setState(() {});
+  }
+
+  void _zoomOut() {
+    _zoom = (_zoom - 0.8).clamp(3, 19);
+    _mapController.move(_mapController.camera.center, _zoom);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mapCenter = _workerLocation ?? const LatLng(-16.5002, -68.1342);
+
     return Scaffold(
       body: ChambaBackground(
         child: SafeArea(
@@ -84,20 +147,12 @@ class _RadarScreenState extends State<RadarScreen> {
             children: [
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.menu),
-                  ),
-                  const Spacer(),
                   Text(
                     'Radar de Trabajo',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const Spacer(),
-                  IconButton(
-                    onPressed: _load,
-                    icon: const Icon(Icons.refresh),
-                  ),
+                  IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                 ],
               ),
               if (_loading) const LinearProgressIndicator(),
@@ -135,8 +190,9 @@ class _RadarScreenState extends State<RadarScreen> {
                 children: [
                   CircleAvatar(
                     radius: 6,
-                    backgroundColor:
-                        available ? AppTheme.colorHighlight : AppTheme.colorMuted,
+                    backgroundColor: available
+                        ? AppTheme.colorHighlight
+                        : AppTheme.colorMuted,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -150,44 +206,94 @@ class _RadarScreenState extends State<RadarScreen> {
               const SizedBox(height: 16),
               GlassCard(
                 child: SizedBox(
-                  height: 260,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          color: AppTheme.colorSurfaceSoft,
+                  height: 360,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: AppConfig.mapboxAccessToken.trim().isEmpty
+                              ? Container(
+                                  color: AppTheme.colorSurfaceSoft,
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'Configura MAPBOX_ACCESS_TOKEN',
+                                  ),
+                                )
+                              : FlutterMap(
+                                  mapController: _mapController,
+                                  options: MapOptions(
+                                    initialCenter: mapCenter,
+                                    initialZoom: _zoom,
+                                    onPositionChanged: (position, hasGesture) {
+                                      _zoom = position.zoom;
+                                    },
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                      userAgentPackageName:
+                                          'com.example.mobile',
+                                      additionalOptions: {
+                                        'accessToken':
+                                            AppConfig.mapboxAccessToken,
+                                      },
+                                    ),
+                                    CircleLayer(
+                                      circles: [
+                                        CircleMarker(
+                                          point: mapCenter,
+                                          radius: _workRadiusKm * 1000,
+                                          useRadiusInMeter: true,
+                                          color: AppTheme.colorPrimary
+                                              .withValues(alpha: 0.10),
+                                          borderColor: AppTheme.colorPrimary
+                                              .withValues(alpha: 0.45),
+                                          borderStrokeWidth: 2,
+                                        ),
+                                      ],
+                                    ),
+                                    MarkerLayer(
+                                      markers: [
+                                        Marker(
+                                          point: mapCenter,
+                                          width: 56,
+                                          height: 56,
+                                          child: CircleAvatar(
+                                            radius: 26,
+                                            backgroundColor:
+                                                AppTheme.colorPrimary,
+                                            child: const Icon(
+                                              Icons.location_pin,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                         ),
-                      ),
-                      Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.colorPrimary.withValues(alpha: 0.3),
-                            width: 2,
+                        Positioned(
+                          right: 10,
+                          top: 10,
+                          child: Column(
+                            children: [
+                              _MapControl(icon: Icons.add, onTap: _zoomIn),
+                              const SizedBox(height: 10),
+                              _MapControl(icon: Icons.remove, onTap: _zoomOut),
+                              const SizedBox(height: 10),
+                              _MapControl(
+                                icon: Icons.my_location,
+                                highlighted: true,
+                                onTap: _updateLocationFromCenter,
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.colorPrimary.withValues(alpha: 0.55),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundColor: AppTheme.colorPrimary,
-                        child: const Icon(Icons.location_pin, size: 30),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -252,13 +358,45 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
           Text(subtitle, style: const TextStyle(color: Color(0xFF25D366))),
         ],
+      ),
+    );
+  }
+}
+
+class _MapControl extends StatelessWidget {
+  const _MapControl({
+    required this.icon,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: highlighted ? AppTheme.colorPrimary : Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Icon(
+            icon,
+            color: highlighted ? Colors.white : AppTheme.colorText,
+          ),
+        ),
       ),
     );
   }

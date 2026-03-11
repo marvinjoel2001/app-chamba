@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/network/realtime_service.dart';
+import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -33,6 +36,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _handleAuthenticated() async {
+    final user = SessionStore.currentUser;
+    if (user == null || !mounted) {
+      return;
+    }
+
+    if (user.type == 'worker') {
+      try {
+        final result = await MobileBackendService.workerSkills(
+          workerUserId: user.id,
+        );
+        final skills = (result['skills'] as List<dynamic>? ?? const []);
+        if (!mounted) {
+          return;
+        }
+        if (skills.isEmpty) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const SkillsSelectionScreen(forceToHomeAfterSave: true),
+            ),
+            (_) => false,
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+
+    RealtimeService.instance.connect(userId: user.id);
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => MainShellScreen(
+          role: SessionStore.currentUser?.type ?? widget.role,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -47,14 +90,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
 
       if (next.isAuthenticated && previous?.isAuthenticated != true) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => MainShellScreen(
-              role: SessionStore.currentUser?.type ?? widget.role,
-            ),
-          ),
-          (route) => false,
-        );
+        _handleAuthenticated();
       }
     });
 

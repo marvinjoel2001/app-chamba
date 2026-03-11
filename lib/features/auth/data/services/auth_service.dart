@@ -20,7 +20,7 @@ class AuthService {
       throw Exception('Respuesta de login invalida.');
     }
 
-    SessionStore.currentUser = SessionUser.fromJson(userJson);
+    await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
     unawaited(_syncPushTokenBestEffort());
   }
 
@@ -52,19 +52,19 @@ class AuthService {
       throw Exception('Respuesta de registro invalida.');
     }
 
-    SessionStore.currentUser = SessionUser.fromJson(userJson);
+    await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
     unawaited(_syncPushTokenBestEffort());
   }
 
   Future<void> logout() async {
-    SessionStore.clear();
+    await SessionStore.clear();
   }
 
   Future<void> _syncPushTokenBestEffort() async {
     try {
-      await const PushNotificationService()
-          .syncTokenForCurrentUser()
-          .timeout(const Duration(seconds: 6));
+      await const PushNotificationService().syncTokenForCurrentUser().timeout(
+        const Duration(seconds: 6),
+      );
     } catch (_) {}
   }
 }
