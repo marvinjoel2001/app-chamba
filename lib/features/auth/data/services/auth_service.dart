@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../../../core/session/session_store.dart';
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/push/push_notification_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
@@ -57,6 +58,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    RealtimeService.instance.dispose();
     await SessionStore.clear();
   }
 

@@ -9,7 +9,6 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
-import '../../data/services/request_ai_service.dart';
 import 'request_status_screen.dart';
 
 class RequestFormScreen extends StatefulWidget {
@@ -67,21 +66,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
     try {
       final generatedTitle = 'Solicitud de ${priceType.toLowerCase()}';
-      final inferredCategories = await RequestAiService.inferCategories(
-        title: generatedTitle,
-        description: description,
-      );
-      final inferredCategory = inferredCategories.isEmpty
-          ? 'General'
-          : inferredCategories.first['name']?.toString() ?? 'General';
       final coordinates = await _resolveCoordinates(address);
 
       final response = await MobileBackendService.createRequest(
         clientUserId: user.id,
         title: generatedTitle,
         description: description,
-        category: inferredCategory,
-        aiCategories: inferredCategories,
         budget: budget,
         priceType: priceType,
         address: address,

@@ -57,7 +57,7 @@ class MobileBackendService {
     required String clientUserId,
     required String title,
     required String description,
-    required String category,
+    String? category,
     List<Map<String, dynamic>>? aiCategories,
     required double budget,
     required String priceType,
@@ -67,23 +67,26 @@ class MobileBackendService {
     String? scheduledAt,
     List<String>? photosBase64,
   }) {
-    return _api.post(
-      '/mobile/requests',
-      body: {
-        'clientUserId': clientUserId,
-        'title': title,
-        'description': description,
-        'category': category,
-        'aiCategories': aiCategories,
-        'budget': budget,
-        'priceType': priceType,
-        'address': address,
-        'latitude': latitude,
-        'longitude': longitude,
-        'scheduledAt': scheduledAt,
-        'photosBase64': photosBase64,
-      },
-    );
+    final body = <String, dynamic>{
+      'clientUserId': clientUserId,
+      'title': title,
+      'description': description,
+      'budget': budget,
+      'priceType': priceType,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+      'scheduledAt': scheduledAt,
+      'photosBase64': photosBase64,
+    };
+    if (category != null && category.trim().isNotEmpty) {
+      body['category'] = category;
+    }
+    if (aiCategories != null && aiCategories.isNotEmpty) {
+      body['aiCategories'] = aiCategories;
+    }
+
+    return _api.post('/mobile/requests', body: body);
   }
 
   static Future<Map<String, dynamic>> categories() {

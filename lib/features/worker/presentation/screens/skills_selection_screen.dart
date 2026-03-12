@@ -91,6 +91,104 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     return Icons.handyman;
   }
 
+  Future<void> _createCategoryFromDialog() async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final created = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        var saving = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Nueva categoria'),
+              content: Form(
+                key: formKey,
+                child: TextFormField(
+                  controller: controller,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    hintText: 'Ej: Instalacion de paneles',
+                  ),
+                  validator: (value) {
+                    final name = value?.trim() ?? '';
+                    if (name.isEmpty) {
+                      return 'Ingresa un nombre';
+                    }
+                    if (name.length < 3) {
+                      return 'Minimo 3 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.of(context).pop(null),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false)) {
+                            return;
+                          }
+                          setDialogState(() => saving = true);
+                          final name = controller.text.trim();
+                          try {
+                            final response =
+                                await MobileBackendService.createCategory(
+                                  name: name,
+                                );
+                            final category =
+                                response['category'] as Map<String, dynamic>?;
+                            if (!context.mounted) {
+                              return;
+                            }
+                            Navigator.of(
+                              context,
+                            ).pop(category?['name']?.toString().trim() ?? name);
+                          } catch (error) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  error.toString().replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  ),
+                                ),
+                              ),
+                            );
+                            setDialogState(() => saving = false);
+                          }
+                        },
+                  child: Text(saving ? 'Guardando...' : 'Crear'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+
+    if (created == null || created.isEmpty || !mounted) {
+      return;
+    }
+
+    await _load();
+    setState(() {
+      selected.add(created);
+    });
+  }
+
   Future<void> _save() async {
     final user = SessionStore.currentUser;
     if (user == null) {
@@ -163,6 +261,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                     IconButton(
                       onPressed: _load,
                       icon: const Icon(Icons.refresh),
+                    ),
+                    IconButton(
+                      onPressed: _loading ? null : _createCategoryFromDialog,
+                      tooltip: 'Nueva categoria',
+                      icon: const Icon(Icons.add_circle_outline),
                     ),
                   ],
                 ),

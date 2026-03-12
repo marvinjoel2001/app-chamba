@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../tracking/presentation/screens/tracking_screen.dart';
 import 'counter_offer_screen.dart';
 import 'worker_profile_screen.dart';
 
@@ -15,16 +19,71 @@ class OffersScreen extends StatefulWidget {
 }
 
 class _OffersScreenState extends State<OffersScreen> {
+  final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   String? _error;
   String? _infoMessage;
   List<dynamic> _offers = const [];
   Map<String, dynamic>? _request;
+  int _offerLifetimeSeconds = 120;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+    _realtime.on('offer.new', _onOfferEvent);
+    _realtime.on('offer.expired', _onOfferEvent);
+    _realtime.on('offer.accepted', _onOfferEvent);
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _tickCountdown(),
+    );
     _load();
+  }
+
+  @override
+  void dispose() {
+    _realtime.off('offer.new', _onOfferEvent);
+    _realtime.off('offer.expired', _onOfferEvent);
+    _realtime.off('offer.accepted', _onOfferEvent);
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  void _onOfferEvent(dynamic _) {
+    _load();
+  }
+
+  void _tickCountdown() {
+    if (!mounted || _offers.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _offers = _offers
+          .map(
+            (item) => Map<String, dynamic>.from(item as Map<String, dynamic>),
+          )
+          .map((offer) {
+            final status = offer['status']?.toString() ?? '';
+            final remaining = (offer['secondsRemaining'] as num?)?.toInt();
+            if (status == 'pending' && remaining != null) {
+              offer['secondsRemaining'] = remaining - 1;
+            }
+            return offer;
+          })
+          .where((offer) {
+            final status = offer['status']?.toString() ?? '';
+            final remaining = (offer['secondsRemaining'] as num?)?.toInt();
+            if (status != 'pending' || remaining == null) {
+              return true;
+            }
+            return remaining > 0;
+          })
+          .toList();
+    });
   }
 
   bool _isNoRequestError(String message) {
@@ -68,7 +127,8 @@ class _OffersScreenState extends State<OffersScreen> {
       setState(() {
         _loading = false;
         _error = null;
-        _infoMessage = 'Como trabajador, revisa la pestana de solicitudes entrantes.';
+        _infoMessage =
+            'Como trabajador, revisa la pestana de solicitudes entrantes.';
         _offers = const [];
         _request = null;
       });
@@ -94,6 +154,8 @@ class _OffersScreenState extends State<OffersScreen> {
       setState(() {
         _request = request;
         _offers = (response['offers'] as List<dynamic>? ?? const []);
+        _offerLifetimeSeconds =
+            (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
         _loading = false;
       });
     } catch (error) {
@@ -157,43 +219,92 @@ class _OffersScreenState extends State<OffersScreen> {
                 ),
               ),
               if (_loading)
-                const Expanded(child: Center(child: CircularProgressIndicator()))
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (_error != null)
                 Expanded(child: Center(child: Text(_error!)))
               else if (_infoMessage != null)
                 Expanded(child: Center(child: Text(_infoMessage!)))
               else if (_offers.isEmpty)
-                const Expanded(child: Center(child: Text('Aun no hay ofertas.')))
+                const Expanded(
+                  child: Center(child: Text('Aun no hay ofertas.')),
+                )
               else
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemBuilder: (context, index) {
                       final item = _offers[index] as Map<String, dynamic>;
-                      final worker = item['worker'] as Map<String, dynamic>? ?? {};
+                      final worker =
+                          item['worker'] as Map<String, dynamic>? ?? {};
+                      final secondsRemaining =
+                          (item['secondsRemaining'] as num?)?.toInt();
+                      final progress = secondsRemaining == null
+                          ? null
+                          : (secondsRemaining / _offerLifetimeSeconds)
+                                .clamp(0.0, 1.0)
+                                .toDouble();
 
                       return GlassCard(
                         child: Column(
                           children: [
+                            if (progress != null) ...[
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  minHeight: 5,
+                                  value: progress,
+                                  backgroundColor: AppTheme.colorPrimary
+                                      .withValues(alpha: 0.18),
+                                  color: AppTheme.colorPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'Expira en ${secondsRemaining}s',
+                                  style: const TextStyle(
+                                    color: AppTheme.colorMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                             Row(
                               children: [
                                 CircleAvatar(
                                   radius: 38,
-                                  backgroundImage: worker['profilePhotoUrl'] == null
+                                  backgroundImage:
+                                      worker['profilePhotoUrl'] == null
                                       ? null
-                                      : NetworkImage(worker['profilePhotoUrl'] as String),
+                                      : NetworkImage(
+                                          worker['profilePhotoUrl'] as String,
+                                        ),
                                   child: worker['profilePhotoUrl'] == null
-                                      ? Text((worker['firstName'] ?? 'W').toString().substring(0, 1))
+                                      ? Text(
+                                          (worker['firstName'] ?? 'W')
+                                              .toString()
+                                              .substring(0, 1),
+                                        )
                                       : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '${worker['firstName'] ?? ''} ${worker['lastName'] ?? ''}'.trim(),
-                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                        '${worker['firstName'] ?? ''} ${worker['lastName'] ?? ''}'
+                                            .trim(),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
                                               fontWeight: FontWeight.w700,
                                             ),
                                       ),
@@ -210,7 +321,10 @@ class _OffersScreenState extends State<OffersScreen> {
                                   children: [
                                     Text(
                                       'Bs ${item['amount']}',
-                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
                                             color: AppTheme.colorHighlight,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -219,7 +333,9 @@ class _OffersScreenState extends State<OffersScreen> {
                                       worker['distanceKm'] == null
                                           ? '-- km'
                                           : '${(worker['distanceKm'] as num).toStringAsFixed(1)} km',
-                                      style: const TextStyle(color: AppTheme.colorMuted),
+                                      style: const TextStyle(
+                                        color: AppTheme.colorMuted,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -231,7 +347,9 @@ class _OffersScreenState extends State<OffersScreen> {
                                 Expanded(
                                   child: OutlinedButton(
                                     style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Color(0xFFCBD4E9)),
+                                      side: const BorderSide(
+                                        color: Color(0xFFCBD4E9),
+                                      ),
                                       minimumSize: const Size.fromHeight(52),
                                     ),
                                     onPressed: () {
@@ -260,10 +378,13 @@ class _OffersScreenState extends State<OffersScreen> {
                                         offerId: item['id'] as String,
                                         clientUserId: user.id,
                                       );
-                                      final requestId = _request?['id']?.toString();
+                                      final requestId = _request?['id']
+                                          ?.toString();
                                       final workerId = worker['id']?.toString();
-                                      if (requestId != null && workerId != null) {
-                                        SessionStore.activeRequestId = requestId;
+                                      if (requestId != null &&
+                                          workerId != null) {
+                                        SessionStore.activeRequestId =
+                                            requestId;
                                         await _syncActiveThreadForAcceptedOffer(
                                           userId: user.id,
                                           workerId: workerId,
@@ -273,10 +394,23 @@ class _OffersScreenState extends State<OffersScreen> {
                                       if (!context.mounted) {
                                         return;
                                       }
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Oferta aceptada')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Oferta aceptada'),
+                                        ),
                                       );
                                       await _load();
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const TrackingScreen(),
+                                        ),
+                                      );
                                     },
                                   ),
                                 ),
@@ -300,7 +434,8 @@ class _OffersScreenState extends State<OffersScreen> {
                         ),
                       );
                     },
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemCount: _offers.length,
                   ),
                 ),
@@ -311,4 +446,3 @@ class _OffersScreenState extends State<OffersScreen> {
     );
   }
 }
-
