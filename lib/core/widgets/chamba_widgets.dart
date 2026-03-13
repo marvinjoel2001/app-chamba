@@ -313,40 +313,25 @@ class _BottomNavItem extends StatelessWidget {
     final iconColor = selected
         ? AppTheme.colorPrimary
         : const Color(0xFFA78BCA);
-    final labelColor = selected
-        ? AppTheme.colorPrimary
-        : const Color(0xFFA78BCA);
+    const labelColor = Color(0xFFA78BCA);
 
     return InkWell(
       borderRadius: BorderRadius.circular(100),
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutBack,
+      child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.colorPrimary.withValues(alpha: 0.10)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(100),
-        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutBack,
-              scale: selected ? 1.05 : 1,
-              child: Icon(icon, size: 24, color: iconColor),
-            ),
+            Icon(icon, size: 24, color: iconColor),
             const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: FontWeight.w500,
                 color: labelColor,
               ),
               child: Text(label),
