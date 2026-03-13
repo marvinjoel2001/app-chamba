@@ -8,7 +8,7 @@ class AppConfig {
   static String get apiBaseUrl => _resolveLocalhost(
     const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://localhost:3000/api',
+      defaultValue: 'https://eloquent-vibrancy-production.up.railway.app/api',
     ),
   );
 
@@ -17,11 +17,19 @@ class AppConfig {
     'MAPBOX_ACCESS_TOKEN',
     defaultValue: '',
   );
+  static const String cloudinaryCloudName = String.fromEnvironment(
+    'CLOUDINARY_CLOUD_NAME',
+    defaultValue: '',
+  );
+  static const String cloudinaryUploadPreset = String.fromEnvironment(
+    'CLOUDINARY_UPLOAD_PRESET',
+    defaultValue: '',
+  );
 
   static String get socketBaseUrl => _resolveLocalhost(
     const String.fromEnvironment(
       'SOCKET_BASE_URL',
-      defaultValue: 'http://localhost:3000',
+      defaultValue: 'https://eloquent-vibrancy-production.up.railway.app',
     ),
   );
 

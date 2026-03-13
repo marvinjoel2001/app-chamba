@@ -1,6 +1,8 @@
 {
-  "API_BASE_URL": "http://localhost:3000/api",
-  "SOCKET_BASE_URL": "http://localhost:3000",
+  "API_BASE_URL": "https://eloquent-vibrancy-production.up.railway.app/api",
+  "SOCKET_BASE_URL": "https://eloquent-vibrancy-production.up.railway.app",
+  "CLOUDINARY_CLOUD_NAME": "chamba",
+  "CLOUDINARY_UPLOAD_PRESET": "Unsigned",
   "MAPBOX_ACCESS_TOKEN": "pk.tu_token_publico_mapbox",
   "GEMINI_API_KEY": "tu_gemini_api_key",
   "GEMINI_MODEL": "gemini-2.0-flash"

@@ -21,8 +21,26 @@ class ApiService {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
 
     return Uri.parse('$normalizedBaseUrl$normalizedPath').replace(
-      queryParameters: queryParameters,
+      queryParameters: _normalizeQueryParameters(queryParameters),
     );
+  }
+
+  Map<String, String>? _normalizeQueryParameters(
+    Map<String, dynamic>? raw,
+  ) {
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    final normalized = <String, String>{};
+    raw.forEach((key, value) {
+      if (value == null) {
+        return;
+      }
+      normalized[key] = value.toString();
+    });
+
+    return normalized.isEmpty ? null : normalized;
   }
 
   List<String> _candidateBaseUrls() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
@@ -47,6 +48,7 @@ class _RadarScreenState extends State<RadarScreen> {
     });
 
     try {
+      final deviceLocation = await _syncDeviceLocation(user.id);
       final response = await MobileBackendService.workerRadar(
         workerUserId: user.id,
       );
@@ -59,9 +61,11 @@ class _RadarScreenState extends State<RadarScreen> {
         available = response['available'] as bool? ?? true;
         _summary = summary;
         _workRadiusKm = (location?['workRadiusKm'] as num?)?.toDouble() ?? 5;
-        _workerLocation = latitude != null && longitude != null
-            ? LatLng(latitude, longitude)
-            : const LatLng(-16.5002, -68.1342);
+        _workerLocation =
+            deviceLocation ??
+            (latitude != null && longitude != null
+                ? LatLng(latitude, longitude)
+                : const LatLng(-16.5002, -68.1342));
         _loading = false;
       });
     } catch (error) {
@@ -91,24 +95,80 @@ class _RadarScreenState extends State<RadarScreen> {
     }
   }
 
-  Future<void> _updateLocationFromCenter() async {
+  Future<LatLng?> _resolveCurrentLocation() async {
+    try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) {
+        return null;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      return LatLng(position.latitude, position.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<LatLng?> _syncDeviceLocation(String workerUserId) async {
+    final current = await _resolveCurrentLocation();
+    if (current == null) {
+      return null;
+    }
+
+    try {
+      await MobileBackendService.updateWorkerLocation(
+        workerUserId: workerUserId,
+        latitude: current.latitude,
+        longitude: current.longitude,
+      );
+      return current;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _updateLocationFromDevice() async {
     final user = SessionStore.currentUser;
     if (user == null) {
       return;
     }
 
-    final center = _mapController.camera.center;
-    try {
-      await MobileBackendService.updateWorkerLocation(
-        workerUserId: user.id,
-        latitude: center.latitude,
-        longitude: center.longitude,
-      );
+    final current = await _syncDeviceLocation(user.id);
+    if (current == null) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ubicacion de radar actualizada')),
+        const SnackBar(
+          content: Text('No se pudo obtener la ubicación actual del teléfono'),
+        ),
+      );
+      return;
+    }
+
+    _mapController.move(current, _zoom);
+    try {
+      setState(() => _workerLocation = current);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ubicación actual sincronizada')),
       );
       await _load();
     } catch (error) {
@@ -287,7 +347,7 @@ class _RadarScreenState extends State<RadarScreen> {
                               _MapControl(
                                 icon: Icons.my_location,
                                 highlighted: true,
-                                onTap: _updateLocationFromCenter,
+                                onTap: _updateLocationFromDevice,
                               ),
                             ],
                           ),

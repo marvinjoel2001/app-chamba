@@ -118,21 +118,8 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
 
     final decoration = BoxDecoration(
       borderRadius: BorderRadius.circular(16),
-      gradient: widget.isYellow
-          ? null
-          : const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.colorPrimary,
-                AppTheme.colorPrimaryLight,
-                AppTheme.colorHighlight,
-              ],
-            ),
-      color: widget.isYellow ? AppTheme.colorHighlight : null,
-      border: widget.isYellow
-          ? null
-          : Border.all(color: Colors.white.withValues(alpha: 0.26), width: 1),
+      color: widget.isYellow ? AppTheme.colorHighlight : AppTheme.colorPrimary,
+      border: null,
       boxShadow: enabled
           ? (_pressed
                 ? AppTheme.shadowSm

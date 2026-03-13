@@ -15,11 +15,11 @@ Flutter starter with clean scalable folder layout and Riverpod state management.
 ```bash
 flutter pub get
 flutter run \
-  --dart-define=API_BASE_URL=http://localhost:3000/api \
-  --dart-define=SOCKET_BASE_URL=http://localhost:3000
+  --dart-define=API_BASE_URL=https://eloquent-vibrancy-production.up.railway.app/api \
+  --dart-define=SOCKET_BASE_URL=https://eloquent-vibrancy-production.up.railway.app
 ```
 
-If `API_BASE_URL` is not provided, default is `http://localhost:3000/api`.
+If `API_BASE_URL` is not provided, default is `https://eloquent-vibrancy-production.up.railway.app/api`.
 
 ## Variables locales seguras
 
@@ -36,6 +36,13 @@ flutter run --dart-define-from-file=env/dart_define.local.json
 ```
 
 `env/dart_define.local.json` está ignorado por git.
+
+Para subida directa de imágenes a Cloudinary desde la app, agrega:
+
+```json
+"CLOUDINARY_CLOUD_NAME": "tu_cloud_name",
+"CLOUDINARY_UPLOAD_PRESET": "tu_unsigned_upload_preset"
+```
 
 ## Optional Firebase push config
 

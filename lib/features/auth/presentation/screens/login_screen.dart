@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/session/session_store.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
@@ -103,6 +104,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        Center(
+                          child: Container(
+                            width: 92,
+                            height: 92,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.colorSurfaceSoft,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.colorPrimary.withValues(
+                                  alpha: 0.24,
+                                ),
+                              ),
+                            ),
+                            child: Image.asset(
+                              'assets/images/branding/chamba_handshake_icon.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Text(
                           widget.role == 'worker'
                               ? 'Ingreso trabajador'

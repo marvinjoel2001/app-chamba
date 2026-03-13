@@ -49,8 +49,21 @@ class MobileBackendService {
     );
   }
 
-  static Future<Map<String, dynamic>> explore({required String userId}) {
-    return _api.get('/mobile/explore', queryParameters: {'userId': userId});
+  static Future<Map<String, dynamic>> explore({
+    required String userId,
+    double? latitude,
+    double? longitude,
+    double? radiusKm,
+  }) {
+    return _api.get(
+      '/mobile/explore',
+      queryParameters: _cleanQuery({
+        'userId': userId,
+        'lat': latitude,
+        'lng': longitude,
+        'radiusKm': radiusKm,
+      }),
+    );
   }
 
   static Future<Map<String, dynamic>> createRequest({
@@ -66,6 +79,7 @@ class MobileBackendService {
     required double longitude,
     String? scheduledAt,
     List<String>? photosBase64,
+    List<Map<String, String>>? photos,
   }) {
     final body = <String, dynamic>{
       'clientUserId': clientUserId,
@@ -78,6 +92,7 @@ class MobileBackendService {
       'longitude': longitude,
       'scheduledAt': scheduledAt,
       'photosBase64': photosBase64,
+      'photos': photos,
     };
     if (category != null && category.trim().isNotEmpty) {
       body['category'] = category;
@@ -116,11 +131,18 @@ class MobileBackendService {
 
   static Future<Map<String, dynamic>> uploadProfilePhoto({
     required String userId,
-    required String imageBase64,
+    String? imageBase64,
+    String? imageUrl,
+    String? imagePublicId,
   }) {
     return _api.post(
       '/mobile/profile/photo',
-      body: {'userId': userId, 'imageBase64': imageBase64},
+      body: {
+        'userId': userId,
+        'imageBase64': imageBase64,
+        'imageUrl': imageUrl,
+        'imagePublicId': imagePublicId,
+      },
     );
   }
 

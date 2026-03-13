@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
@@ -67,6 +68,18 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     try {
       final generatedTitle = 'Solicitud de ${priceType.toLowerCase()}';
       final coordinates = await _resolveCoordinates(address);
+      final uploadedPhotos = <Map<String, String>>[];
+      for (final image in _pendingImages) {
+        final uploaded = await CloudinaryUploadService.uploadImageBytes(
+          bytes: image.bytes,
+          fileName: image.fileName,
+          folder: 'chamba/requests',
+        );
+        uploadedPhotos.add({
+          'url': uploaded.secureUrl,
+          'publicId': uploaded.publicId,
+        });
+      }
 
       final response = await MobileBackendService.createRequest(
         clientUserId: user.id,
@@ -77,7 +90,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         address: address,
         latitude: coordinates.$1,
         longitude: coordinates.$2,
-        photosBase64: _pendingImages.map((item) => item.dataUri).toList(),
+        photos: uploadedPhotos,
       );
 
       final request = response['request'] as Map<String, dynamic>?;
@@ -157,8 +170,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     }
 
     final selected = await _imagePicker.pickMultiImage(
-      imageQuality: 82,
-      maxWidth: 1440,
+      imageQuality: 70,
+      maxWidth: 1080,
     );
     if (selected.isEmpty) {
       return;
@@ -168,26 +181,13 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     final toProcess = selected.take(remaining);
     for (final item in toProcess) {
       final bytes = await item.readAsBytes();
-      final dataUri =
-          'data:${_resolveMimeType(item.path)};base64,${base64Encode(bytes)}';
-      _pendingImages.add(_PendingImage(bytes: bytes, dataUri: dataUri));
+      _pendingImages.add(_PendingImage(bytes: bytes, fileName: item.name));
     }
 
     if (!mounted) {
       return;
     }
     setState(() {});
-  }
-
-  String _resolveMimeType(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (lower.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    return 'image/jpeg';
   }
 
   @override
@@ -373,8 +373,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 }
 
 class _PendingImage {
-  _PendingImage({required this.bytes, required this.dataUri});
+  _PendingImage({required this.bytes, required this.fileName});
 
   final Uint8List bytes;
-  final String dataUri;
+  final String fileName;
 }

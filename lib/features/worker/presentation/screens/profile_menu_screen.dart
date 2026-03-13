@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../auth/data/services/auth_service.dart';
@@ -34,8 +34,8 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
 
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1400,
+      imageQuality: 72,
+      maxWidth: 1080,
     );
     if (file == null) {
       return;
@@ -44,11 +44,15 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     setState(() => _updatingPhoto = true);
     try {
       final bytes = await file.readAsBytes();
-      final imageBase64 =
-          'data:${_resolveMimeType(file.path)};base64,${base64Encode(bytes)}';
+      final uploaded = await CloudinaryUploadService.uploadImageBytes(
+        bytes: bytes,
+        fileName: file.name,
+        folder: 'chamba/profile',
+      );
       final response = await MobileBackendService.uploadProfilePhoto(
         userId: user.id,
-        imageBase64: imageBase64,
+        imageUrl: uploaded.secureUrl,
+        imagePublicId: uploaded.publicId,
       );
 
       final updated = response['user'];
@@ -153,17 +157,6 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
       MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
       (_) => false,
     );
-  }
-
-  String _resolveMimeType(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (lower.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    return 'image/jpeg';
   }
 
   @override

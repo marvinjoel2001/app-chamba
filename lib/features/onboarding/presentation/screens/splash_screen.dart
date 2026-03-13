@@ -96,22 +96,16 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               children: [
                 const Spacer(),
-                Container(
-                  width: 240,
-                  height: 240,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppTheme.colorPrimary.withValues(alpha: 0.35),
-                      width: 8,
-                    ),
-                  ),
-                  child: const CircleAvatar(
-                    backgroundColor: AppTheme.colorSurfaceSoft,
-                    child: Icon(
-                      Icons.handshake,
-                      size: 84,
-                      color: AppTheme.colorHighlight,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      'assets/images/branding/chamba_splash_logo.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

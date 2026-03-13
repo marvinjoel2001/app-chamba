@@ -37,7 +37,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         color: AppTheme.colorSurfaceSoft,
                         border: Border.all(color: const Color(0xFFCBD4E9)),
                       ),
-                      child: const Icon(Icons.handshake, size: 48),
+                      padding: const EdgeInsets.all(16),
+                      child: Image.asset(
+                        'assets/images/branding/chamba_handshake_icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
@@ -160,5 +164,4 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
-
 

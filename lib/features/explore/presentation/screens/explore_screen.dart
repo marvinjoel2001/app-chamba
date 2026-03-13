@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
@@ -27,6 +28,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
+  LatLng? _currentUserLocation;
   double _currentZoom = 13;
 
   @override
@@ -51,13 +53,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
 
     try {
-      final response = await MobileBackendService.explore(userId: user.id);
+      final currentLocation = await _resolveCurrentLocation();
+      final response = await MobileBackendService.explore(
+        userId: user.id,
+        latitude: currentLocation?.latitude,
+        longitude: currentLocation?.longitude,
+      );
       final activeRequest = response['activeRequest'];
       if (activeRequest is Map<String, dynamic>) {
         SessionStore.activeRequestId = activeRequest['id'] as String?;
       }
 
       setState(() {
+        _currentUserLocation = currentLocation;
         _workers = (response['nearbyWorkers'] as List<dynamic>? ?? const []);
         _categories = (response['categories'] as List<dynamic>? ?? const []);
         _activeRequest = activeRequest is Map<String, dynamic>
@@ -73,7 +81,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  Future<LatLng?> _resolveCurrentLocation() async {
+    try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) {
+        return null;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return LatLng(position.latitude, position.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
   LatLng get _mapCenter {
+    if (_currentUserLocation != null) {
+      return _currentUserLocation!;
+    }
+
     if (_workers.isNotEmpty) {
       final first = _workers.first as Map<String, dynamic>;
       final lat = (first['latitude'] as num?)?.toDouble();
@@ -192,6 +232,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 MarkerLayer(
                                   markers: [
                                     ..._workerMarkers,
+                                    if (_currentUserLocation != null)
+                                      Marker(
+                                        point: _currentUserLocation!,
+                                        width: 60,
+                                        height: 60,
+                                        child: CircleAvatar(
+                                          radius: 26,
+                                          backgroundColor:
+                                              AppTheme.colorPrimary,
+                                          child: const Icon(
+                                            Icons.my_location,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
                                     Marker(
                                       point: _mapCenter,
                                       width: 60,
@@ -371,4 +426,3 @@ class _MapControl extends StatelessWidget {
     );
   }
 }
-
