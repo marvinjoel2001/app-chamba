@@ -18,29 +18,25 @@ class ChambaBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppTheme.colorBackground, AppTheme.colorBackgroundAccent],
-        ),
+        gradient: AppTheme.backgroundGradient,
       ),
       child: Stack(
         children: [
           if (showGrid) const _DotGrid(),
           Positioned(
-            top: -140,
-            right: -70,
+            top: -130,
+            left: -125,
             child: _GlowCircle(
-              size: 320,
-              color: AppTheme.colorPrimary.withValues(alpha: 0.10),
+              size: 240,
+              color: AppTheme.colorPrimary.withValues(alpha: 0.05),
             ),
           ),
           Positioned(
-            bottom: -150,
-            left: -100,
+            bottom: -140,
+            right: -130,
             child: _GlowCircle(
-              size: 340,
-              color: AppTheme.colorHighlight.withValues(alpha: 0.12),
+              size: 250,
+              color: AppTheme.colorHighlight.withValues(alpha: 0.05),
             ),
           ),
           child,
@@ -78,7 +74,7 @@ class GlassCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             border: Border.all(
               color: elevated
-                  ? Colors.white.withValues(alpha: 0.85)
+                  ? AppTheme.colorGlassBorder
                   : AppTheme.colorGlassBorder,
               width: 1,
             ),
@@ -212,7 +208,9 @@ class ChambaChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : AppTheme.colorPrimary,
+            color: selected
+                ? AppTheme.colorTextOnPurple
+                : AppTheme.colorPrimaryLight,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
@@ -262,9 +260,9 @@ class ChambaBottomNav extends StatelessWidget {
             height: 72,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.75),
+              color: AppTheme.colorGlassDarkSoft,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+              border: Border.all(color: AppTheme.colorGlassBorderSoft),
               boxShadow: AppTheme.shadowMd,
             ),
             child: Row(
@@ -312,8 +310,8 @@ class _BottomNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconColor = selected
         ? AppTheme.colorPrimary
-        : const Color(0xFFA78BCA);
-    const labelColor = Color(0xFFA78BCA);
+        : AppTheme.colorMuted;
+    const labelColor = AppTheme.colorMuted;
 
     return InkWell(
       borderRadius: BorderRadius.circular(100),

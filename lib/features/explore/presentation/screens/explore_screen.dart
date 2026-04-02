@@ -173,7 +173,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     children: [
                       CircleAvatar(
                         radius: 24,
-                        backgroundColor: const Color(0x1A6B2BBE),
+                        backgroundColor: AppTheme.colorPrimary.withValues(
+                          alpha: 0.16,
+                        ),
                         child: const Icon(Icons.work_history),
                       ),
                       const SizedBox(width: 10),
@@ -203,11 +205,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(28),
                       child: AppConfig.mapboxAccessToken.trim().isEmpty
-                          ? const ColoredBox(
-                              color: Color(0x22000000),
+                          ? ColoredBox(
+                              color: AppTheme.colorSurfaceSoft,
                               child: Center(
                                 child: Text(
                                   'Falta MAPBOX_ACCESS_TOKEN para mostrar el mapa',
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ),
                             )
@@ -257,7 +260,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                             AppTheme.colorHighlight,
                                         child: Icon(
                                           Icons.location_on,
-                                          color: Colors.black.withValues(
+                                          color: AppTheme.colorText.withValues(
                                             alpha: 0.75,
                                           ),
                                         ),
@@ -315,7 +318,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     width: 90,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFCFD6E8),
+                      color: AppTheme.colorGlassBorderSoft,
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
@@ -342,7 +345,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.add, color: Colors.black),
+                          icon: const Icon(
+                            Icons.add,
+                            color: AppTheme.colorText,
+                          ),
                         ),
                       ),
                     ],

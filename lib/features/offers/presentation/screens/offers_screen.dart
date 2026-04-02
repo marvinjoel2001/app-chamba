@@ -348,7 +348,7 @@ class _OffersScreenState extends State<OffersScreen> {
                                   child: OutlinedButton(
                                     style: OutlinedButton.styleFrom(
                                       side: const BorderSide(
-                                        color: Color(0xFFCBD4E9),
+                                        color: AppTheme.colorGlassBorderSoft,
                                       ),
                                       minimumSize: const Size.fromHeight(52),
                                     ),

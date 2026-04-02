@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../auth/presentation/screens/login_screen.dart';
+import '../../../auth/presentation/screens/register_screen.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 
@@ -35,7 +36,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppTheme.colorSurfaceSoft,
-                        border: Border.all(color: const Color(0xFFCBD4E9)),
+                        border: Border.all(color: AppTheme.colorGlassBorderSoft),
                       ),
                       padding: const EdgeInsets.all(16),
                       child: Image.asset(
@@ -61,38 +62,45 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _RoleCard(
-                        label: 'Necesito un\ntrabajador',
-                        icon: Icons.person_search,
-                        selected: selectedRole == 'client',
-                        onTap: () => setState(() => selectedRole = 'client'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _RoleCard(
-                        label: 'Soy\ntrabajador',
-                        icon: Icons.handyman,
-                        selected: selectedRole == 'worker',
-                        onTap: () => setState(() => selectedRole = 'worker'),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 8),
+                Text(
+                  'Inicia sesión si ya tienes cuenta o regístrate para empezar.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.colorMuted),
                 ),
                 const Spacer(),
                 ChambaPrimaryButton(
-                  label: 'Continuar',
+                  label: 'Iniciar sesión',
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => LoginScreen(role: selectedRole),
+                        builder: (_) => const LoginScreen(),
                       ),
                     );
                   },
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const RegisterScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52),
+                    side: const BorderSide(
+                      color: AppTheme.colorGlassBorderSoft,
+                      width: 1.2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('Crear cuenta'),
                 ),
                 const SizedBox(height: 24),
               ],
@@ -103,65 +111,3 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     );
   }
 }
-
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 218,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.colorPrimary.withValues(alpha: 0.12) : AppTheme.colorSurfaceSoft,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: selected
-                ? AppTheme.colorPrimary : const Color(0xFFCBD4E9),
-          ),
-          boxShadow: selected
-              ? const [
-                  BoxShadow(
-                    color: Color(0x336B2BBE),
-                    blurRadius: 22,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.18),
-              child: Icon(icon, size: 34, color: AppTheme.colorPrimaryDark),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-

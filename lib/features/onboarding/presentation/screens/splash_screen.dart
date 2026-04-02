@@ -101,7 +101,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   child: Container(
                     width: 280,
                     height: 280,
-                    color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: AppTheme.colorGlassHigh,
+                      border: Border.all(color: AppTheme.colorGlassBorderSoft),
+                    ),
                     padding: const EdgeInsets.all(12),
                     child: Image.asset(
                       'assets/images/branding/chamba_splash_logo.png',

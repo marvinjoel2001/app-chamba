@@ -28,6 +28,15 @@ class MobileBackendService {
     );
   }
 
+  static Future<Map<String, dynamic>> checkIdentifier({
+    required String identifier,
+  }) {
+    return _api.post(
+      '/auth/check-identifier',
+      body: {'identifier': identifier},
+    );
+  }
+
   static Future<Map<String, dynamic>> register({
     required String type,
     required String email,

@@ -6,13 +6,16 @@ import '../../../../core/push/push_notification_service.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
 class AuthService {
-  Future<void> login({required String email, required String password}) async {
-    if (email.isEmpty || password.isEmpty) {
+  Future<void> login({
+    required String identifier,
+    required String password,
+  }) async {
+    if (identifier.isEmpty || password.isEmpty) {
       throw Exception('Correo/teléfono y contraseña son obligatorios.');
     }
 
     final response = await MobileBackendService.login(
-      identifier: email.trim(),
+      identifier: identifier.trim(),
       password: password.trim(),
     );
 
@@ -23,6 +26,21 @@ class AuthService {
 
     await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
     unawaited(_syncPushTokenBestEffort());
+  }
+
+  Future<void> checkIdentifierExists({required String identifier}) async {
+    if (identifier.trim().isEmpty) {
+      throw Exception('Ingresa tu correo o teléfono.');
+    }
+
+    final response = await MobileBackendService.checkIdentifier(
+      identifier: identifier.trim(),
+    );
+
+    final exists = response['exists'] == true;
+    if (!exists) {
+      throw Exception('No encontramos una cuenta con ese correo o teléfono.');
+    }
   }
 
   Future<void> register({

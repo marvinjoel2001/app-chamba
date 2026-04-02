@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/session/session_store.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/session/session_store.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({required this.role, super.key});
-
-  final String role;
+  const RegisterScreen({super.key});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -25,6 +24,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  String _selectedRole = 'client';
 
   @override
   void dispose() {
@@ -69,7 +69,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
         builder: (_) => MainShellScreen(
-          role: SessionStore.currentUser?.type ?? widget.role,
+          role: SessionStore.currentUser?.type ?? _selectedRole,
         ),
       ),
       (route) => false,
@@ -109,18 +109,51 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          widget.role == 'worker'
+                          _selectedRole == 'worker'
                               ? 'Registro trabajador'
                               : 'Registro contratante',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Text('Quiero contratar'),
+                                selected: _selectedRole == 'client',
+                                onSelected: authState.isLoading
+                                    ? null
+                                    : (_) {
+                                        setState(() {
+                                          _selectedRole = 'client';
+                                        });
+                                      },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Text('Quiero trabajar'),
+                                selected: _selectedRole == 'worker',
+                                onSelected: authState.isLoading
+                                    ? null
+                                    : (_) {
+                                        setState(() {
+                                          _selectedRole = 'worker';
+                                        });
+                                      },
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _firstNameController,
-                          decoration: const InputDecoration(
+                          style: const TextStyle(color: AppTheme.colorText),
+                          decoration: AppTheme.glassInputDecoration(
                             labelText: 'Nombre',
-                            prefixIcon: Icon(Icons.person_outline),
+                            icon: Icons.person_outline,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -132,17 +165,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _lastNameController,
-                          decoration: const InputDecoration(
+                          style: const TextStyle(color: AppTheme.colorText),
+                          decoration: AppTheme.glassInputDecoration(
                             labelText: 'Apellido (opcional)',
-                            prefixIcon: Icon(Icons.badge_outlined),
+                            icon: Icons.badge_outlined,
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(
+                          style: const TextStyle(color: AppTheme.colorText),
+                          decoration: AppTheme.glassInputDecoration(
                             labelText: 'Correo',
-                            prefixIcon: Icon(Icons.alternate_email),
+                            icon: Icons.alternate_email,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -154,23 +189,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Telefono (opcional)',
-                            prefixIcon: Icon(Icons.phone_android_outlined),
+                          style: const TextStyle(color: AppTheme.colorText),
+                          decoration: AppTheme.glassInputDecoration(
+                            labelText: 'Teléfono (opcional)',
+                            icon: Icons.phone_android_outlined,
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: true,
-                          decoration: const InputDecoration(
+                          style: const TextStyle(color: AppTheme.colorText),
+                          decoration: AppTheme.glassInputDecoration(
                             labelText: 'Contraseña',
-                            prefixIcon: Icon(Icons.lock_outline),
+                            icon: Icons.lock_outline,
                           ),
                           validator: (value) {
                             final trimmed = value?.trim() ?? '';
                             if (trimmed.length < 4) {
-                              return 'Minimo 4 caracteres';
+                              return 'Mínimo 4 caracteres';
                             }
                             return null;
                           },
@@ -190,7 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   await ref
                                       .read(authControllerProvider.notifier)
                                       .register(
-                                        role: widget.role,
+                                        role: _selectedRole,
                                         email: _emailController.text,
                                         phone: _phoneController.text,
                                         firstName: _firstNameController.text,

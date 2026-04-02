@@ -292,7 +292,7 @@ class _RadarScreenState extends State<RadarScreen> {
                                   children: [
                                     TileLayer(
                                       urlTemplate:
-                                          'https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                          'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                                       userAgentPackageName:
                                           'com.example.mobile',
                                       additionalOptions: {
@@ -423,7 +423,7 @@ class _SummaryCard extends StatelessWidget {
             ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: Color(0xFF25D366))),
+          Text(subtitle, style: const TextStyle(color: AppTheme.colorSuccess)),
         ],
       ),
     );
@@ -444,7 +444,7 @@ class _MapControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: highlighted ? AppTheme.colorPrimary : Colors.white,
+      color: highlighted ? AppTheme.colorPrimary : AppTheme.colorSurfaceSoft,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -454,7 +454,9 @@ class _MapControl extends StatelessWidget {
           height: 46,
           child: Icon(
             icon,
-            color: highlighted ? Colors.white : AppTheme.colorText,
+            color: highlighted
+                ? AppTheme.colorTextOnPurple
+                : AppTheme.colorText,
           ),
         ),
       ),

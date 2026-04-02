@@ -152,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           const Text(
                             'Activo ahora',
-                            style: TextStyle(color: AppTheme.colorPrimary),
+                            style: TextStyle(color: AppTheme.colorSuccess),
                           ),
                         ],
                       ),
@@ -260,7 +260,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         backgroundColor: AppTheme.colorPrimary,
                         child: IconButton(
                           onPressed: _send,
-                          icon: const Icon(Icons.send),
+                          icon: const Icon(
+                            Icons.send,
+                            color: AppTheme.colorTextOnPurple,
+                          ),
                         ),
                       ),
                     ],

@@ -324,7 +324,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                             border: Border.all(
                               color: isSelected
                                   ? AppTheme.colorPrimary
-                                  : const Color(0xFFCBD4E9),
+                                  : AppTheme.colorGlassBorderSoft,
                               width: 2,
                             ),
                           ),
@@ -340,7 +340,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                                     child: Icon(
                                       Icons.check,
                                       size: 16,
-                                      color: Colors.black,
+                                      color: AppTheme.colorText,
                                     ),
                                   ),
                                 ),

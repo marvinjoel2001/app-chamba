@@ -100,7 +100,7 @@ class _RatingScreenState extends State<RatingScreen> {
                         width: 74,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFCFD6E8),
+                          color: AppTheme.colorGlassBorderSoft,
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
@@ -138,7 +138,7 @@ class _RatingScreenState extends State<RatingScreen> {
                               size: 46,
                               color: selected
                                   ? AppTheme.colorHighlight
-                                  : const Color(0xFF334566),
+                                  : AppTheme.colorMuted.withValues(alpha: 0.45),
                             ),
                           );
                         }),

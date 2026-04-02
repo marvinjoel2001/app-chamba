@@ -264,13 +264,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFE4E3),
+                          color: AppTheme.colorErrorSoft,
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: const Text(
                           'URGENTE',
                           style: TextStyle(
-                            color: Color(0xFF8C2622),
+                            color: AppTheme.colorError,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -411,14 +411,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: AppTheme.colorSuccessSoft,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
                           'Direccion confirmada: ${req['address'] ?? ''}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Color(0xFF166534),
+                            color: AppTheme.colorSuccess,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

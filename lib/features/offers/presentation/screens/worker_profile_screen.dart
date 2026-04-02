@@ -89,7 +89,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                       width: 74,
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFCFD6E8),
+                                        color: AppTheme.colorGlassBorderSoft,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),

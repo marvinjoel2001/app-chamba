@@ -43,11 +43,17 @@ class AuthController extends Notifier<AuthState> {
 
   AuthService get _authService => ref.watch(authServiceProvider);
 
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({
+    required String identifier,
+    required String password,
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      await _authService.login(email: email.trim(), password: password);
+      await _authService.login(
+        identifier: identifier.trim(),
+        password: password,
+      );
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,

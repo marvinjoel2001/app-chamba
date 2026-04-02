@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import 'request_status_screen.dart';
@@ -331,14 +332,15 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                                   });
                                                 },
                                           child: Container(
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black87,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.colorBackgroundAlt
+                                                  .withValues(alpha: 0.92),
                                               shape: BoxShape.circle,
                                             ),
                                             padding: const EdgeInsets.all(4),
                                             child: const Icon(
                                               Icons.close,
-                                              color: Colors.white,
+                                              color: AppTheme.colorText,
                                               size: 14,
                                             ),
                                           ),
