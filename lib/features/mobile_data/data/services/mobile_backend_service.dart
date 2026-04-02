@@ -113,6 +113,21 @@ class MobileBackendService {
     return _api.post('/mobile/requests', body: body);
   }
 
+  static Future<Map<String, dynamic>> previewRequestCategories({
+    String? title,
+    required String description,
+    String? category,
+  }) {
+    return _api.post(
+      '/mobile/request-categories/preview',
+      body: {
+        'title': title,
+        'description': description,
+        'category': category,
+      },
+    );
+  }
+
   static Future<Map<String, dynamic>> categories() {
     return _api.get('/mobile/categories');
   }
