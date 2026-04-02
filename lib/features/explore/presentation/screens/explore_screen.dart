@@ -25,6 +25,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final MapController _mapController = MapController();
   bool _loading = true;
   String? _error;
+  String? _locationBlockMessage;
+  bool _canOpenLocationSettings = false;
   List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
@@ -50,14 +52,27 @@ class _ExploreScreenState extends State<ExploreScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _locationBlockMessage = null;
+      _canOpenLocationSettings = false;
     });
 
     try {
-      final currentLocation = await _resolveCurrentLocation();
+      final currentLocation = await _resolveCurrentLocationRequired();
+      if (currentLocation == null) {
+        setState(() {
+          _workers = const [];
+          _categories = const [];
+          _activeRequest = null;
+          _currentUserLocation = null;
+          _loading = false;
+        });
+        return;
+      }
+
       final response = await MobileBackendService.explore(
         userId: user.id,
-        latitude: currentLocation?.latitude,
-        longitude: currentLocation?.longitude,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
       );
       final activeRequest = response['activeRequest'];
       if (activeRequest is Map<String, dynamic>) {
@@ -73,6 +88,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
             : null;
         _loading = false;
       });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _mapController.move(currentLocation, _currentZoom);
+      });
     } catch (error) {
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
@@ -81,10 +103,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  Future<LatLng?> _resolveCurrentLocation() async {
+  Future<LatLng?> _resolveCurrentLocationRequired() async {
     try {
       final isEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isEnabled) {
+        _locationBlockMessage =
+            'Activa la ubicación del teléfono para buscar trabajadores cercanos.';
+        _canOpenLocationSettings = true;
         return null;
       }
 
@@ -94,6 +119,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        _locationBlockMessage = permission == LocationPermission.deniedForever
+            ? 'El permiso de ubicación está bloqueado. Debes habilitarlo en ajustes para continuar.'
+            : 'Debes permitir la ubicación para usar esta pantalla.';
+        _canOpenLocationSettings =
+            permission == LocationPermission.deniedForever;
         return null;
       }
 
@@ -105,6 +135,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
       return LatLng(position.latitude, position.longitude);
     } catch (_) {
+      _locationBlockMessage =
+          'No se pudo obtener tu ubicación actual. Intenta nuevamente.';
       return null;
     }
   }
@@ -201,77 +233,124 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: AppConfig.mapboxAccessToken.trim().isEmpty
-                          ? ColoredBox(
-                              color: AppTheme.colorSurfaceSoft,
-                              child: Center(
-                                child: Text(
-                                  'Falta MAPBOX_ACCESS_TOKEN para mostrar el mapa',
+                  if (_locationBlockMessage != null)
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: GlassCard(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.location_off,
+                                  size: 34,
+                                  color: AppTheme.colorText,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _locationBlockMessage!,
+                                  textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
-                              ),
-                            )
-                          : FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: _mapCenter,
-                                initialZoom: _currentZoom,
-                                interactionOptions: const InteractionOptions(
-                                  flags: InteractiveFlag.all,
+                                const SizedBox(height: 14),
+                                ChambaPrimaryButton(
+                                  label: 'Permitir ubicación',
+                                  onPressed: _load,
                                 ),
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate:
-                                      'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
-                                  userAgentPackageName: 'com.example.mobile',
-                                  additionalOptions: {
-                                    'accessToken': AppConfig.mapboxAccessToken,
-                                  },
+                                if (_canOpenLocationSettings) ...[
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: Geolocator.openAppSettings,
+                                    child: const Text('Abrir ajustes'),
+                                  ),
+                                  TextButton(
+                                    onPressed: Geolocator.openLocationSettings,
+                                    child: const Text(
+                                      'Activar servicios de ubicación',
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: AppConfig.mapboxAccessToken.trim().isEmpty
+                            ? ColoredBox(
+                                color: AppTheme.colorSurfaceSoft,
+                                child: Center(
+                                  child: Text(
+                                    'Falta MAPBOX_ACCESS_TOKEN para mostrar el mapa',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
                                 ),
-                                MarkerLayer(
-                                  markers: [
-                                    ..._workerMarkers,
-                                    if (_currentUserLocation != null)
+                              )
+                            : FlutterMap(
+                                mapController: _mapController,
+                                options: MapOptions(
+                                  initialCenter: _mapCenter,
+                                  initialZoom: _currentZoom,
+                                  interactionOptions: const InteractionOptions(
+                                    flags: InteractiveFlag.all,
+                                  ),
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate:
+                                        'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                    userAgentPackageName: 'com.example.mobile',
+                                    additionalOptions: {
+                                      'accessToken':
+                                          AppConfig.mapboxAccessToken,
+                                    },
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                      ..._workerMarkers,
+                                      if (_currentUserLocation != null)
+                                        Marker(
+                                          point: _currentUserLocation!,
+                                          width: 60,
+                                          height: 60,
+                                          child: CircleAvatar(
+                                            radius: 26,
+                                            backgroundColor:
+                                                AppTheme.colorPrimary,
+                                            child: const Icon(
+                                              Icons.my_location,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
                                       Marker(
-                                        point: _currentUserLocation!,
+                                        point: _mapCenter,
                                         width: 60,
                                         height: 60,
                                         child: CircleAvatar(
                                           radius: 26,
                                           backgroundColor:
-                                              AppTheme.colorPrimary,
-                                          child: const Icon(
-                                            Icons.my_location,
-                                            color: Colors.white,
+                                              AppTheme.colorHighlight,
+                                          child: Icon(
+                                            Icons.location_on,
+                                            color: AppTheme.colorText
+                                                .withValues(alpha: 0.75),
                                           ),
                                         ),
                                       ),
-                                    Marker(
-                                      point: _mapCenter,
-                                      width: 60,
-                                      height: 60,
-                                      child: CircleAvatar(
-                                        radius: 26,
-                                        backgroundColor:
-                                            AppTheme.colorHighlight,
-                                        child: Icon(
-                                          Icons.location_on,
-                                          color: AppTheme.colorText.withValues(
-                                            alpha: 0.75,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -286,124 +365,126 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: Text(_error!, textAlign: TextAlign.center),
               ),
             ),
-          Positioned(
-            right: 12,
-            bottom: 300,
-            child: Column(
-              children: [
-                _MapControl(icon: Icons.add, onTap: _zoomIn),
-                const SizedBox(height: 12),
-                _MapControl(icon: Icons.remove, onTap: _zoomOut),
-                const SizedBox(height: 12),
-                _MapControl(
-                  icon: Icons.navigation,
-                  highlighted: true,
-                  onTap: () {
-                    _mapController.move(_mapCenter, _currentZoom);
-                    _load();
-                  },
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: GlassCard(
-              borderRadius: 32,
+          if (_locationBlockMessage == null)
+            Positioned(
+              right: 12,
+              bottom: 300,
               child: Column(
                 children: [
-                  Container(
-                    width: 90,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppTheme.colorGlassBorderSoft,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
+                  _MapControl(icon: Icons.add, onTap: _zoomIn),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _activeRequest == null
-                              ? 'Sin solicitudes activas'
-                              : 'Solicitud activa: ${_activeRequest!['title']}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: AppTheme.colorHighlight,
-                        child: IconButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const RequestFormScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.add,
-                            color: AppTheme.colorText,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _MapControl(icon: Icons.remove, onTap: _zoomOut),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    height: 48,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (var i = 0; i < _categories.length; i++) ...[
-                          ChambaChip(
-                            label: _categories[i].toString(),
-                            selected: i == 0,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (_categories.isEmpty)
-                          const ChambaChip(
-                            label: 'Sin categorias',
-                            selected: false,
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ChambaPrimaryButton(
-                          label: widget.role == 'worker'
-                              ? 'Ver solicitudes cercanas'
-                              : 'Estado solicitud',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => widget.role == 'worker'
-                                    ? const IncomingRequestScreen()
-                                    : const RequestStatusScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Trabajadores cercanos: ${_workers.length}'),
+                  _MapControl(
+                    icon: Icons.navigation,
+                    highlighted: true,
+                    onTap: () {
+                      _mapController.move(_mapCenter, _currentZoom);
+                      _load();
+                    },
                   ),
                 ],
               ),
             ),
-          ),
+          if (_locationBlockMessage == null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: GlassCard(
+                borderRadius: 32,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 90,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorGlassBorderSoft,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _activeRequest == null
+                                ? 'Sin solicitudes activas'
+                                : 'Solicitud activa: ${_activeRequest!['title']}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: AppTheme.colorHighlight,
+                          child: IconButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const RequestFormScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.add,
+                              color: AppTheme.colorText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 48,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          for (var i = 0; i < _categories.length; i++) ...[
+                            ChambaChip(
+                              label: _categories[i].toString(),
+                              selected: i == 0,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (_categories.isEmpty)
+                            const ChambaChip(
+                              label: 'Sin categorias',
+                              selected: false,
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChambaPrimaryButton(
+                            label: widget.role == 'worker'
+                                ? 'Ver solicitudes cercanas'
+                                : 'Estado solicitud',
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => widget.role == 'worker'
+                                      ? const IncomingRequestScreen()
+                                      : const RequestStatusScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Trabajadores cercanos: ${_workers.length}'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

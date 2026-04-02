@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
@@ -30,7 +31,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PendingImage> _pendingImages = [];
   bool _loading = false;
+  bool _checkingLocationPermission = true;
+  String? _locationBlockMessage;
+  bool _canOpenLocationSettings = false;
   static final http.Client _client = http.Client();
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureLocationPermissionRequired();
+  }
 
   @override
   void dispose() {
@@ -41,6 +51,15 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Future<void> _submit() async {
+    if (_locationBlockMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes permitir ubicación para continuar.'),
+        ),
+      );
+      return;
+    }
+
     final user = SessionStore.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(
@@ -117,6 +136,68 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _ensureLocationPermissionRequired() async {
+    setState(() {
+      _checkingLocationPermission = true;
+      _locationBlockMessage = null;
+      _canOpenLocationSettings = false;
+    });
+
+    try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _locationBlockMessage =
+              'Activa la ubicación del teléfono para crear una solicitud.';
+          _canOpenLocationSettings = true;
+          _checkingLocationPermission = false;
+        });
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationBlockMessage = permission == LocationPermission.deniedForever
+              ? 'El permiso de ubicación está bloqueado. Habilítalo en ajustes para continuar.'
+              : 'Debes permitir ubicación para usar esta pantalla.';
+          _canOpenLocationSettings =
+              permission == LocationPermission.deniedForever;
+          _checkingLocationPermission = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _locationBlockMessage = null;
+        _canOpenLocationSettings = false;
+        _checkingLocationPermission = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _locationBlockMessage =
+            'No se pudo validar la ubicación. Intenta nuevamente.';
+        _canOpenLocationSettings = false;
+        _checkingLocationPermission = false;
+      });
     }
   }
 
@@ -215,155 +296,213 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 ),
                 const SizedBox(height: 12),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: GlassCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Describe que necesitas...',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _descriptionController,
-                            minLines: 2,
-                            maxLines: null,
-                            textInputAction: TextInputAction.newline,
-                            keyboardType: TextInputType.multiline,
-                            decoration: const InputDecoration(
-                              hintText:
-                                  'Que buscas? Estoy buscando un trabajador para...',
-                              hintMaxLines: 3,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Precio propuesto',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _budgetController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              prefixText: 'Bs  ',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 10,
-                            children: ['Precio fijo', 'Por hora', 'Por dia']
-                                .map(
-                                  (option) => ChambaChip(
-                                    label: option,
-                                    selected: priceType == option,
-                                    onTap: () {
-                                      setState(() {
-                                        priceType = option;
-                                      });
-                                    },
+                  child: _checkingLocationPermission
+                      ? const Center(child: CircularProgressIndicator())
+                      : _locationBlockMessage != null
+                      ? Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            child: GlassCard(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.location_off,
+                                    size: 36,
+                                    color: AppTheme.colorText,
                                   ),
-                                )
-                                .toList(),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _addressController,
-                            decoration: const InputDecoration(
-                              labelText: 'Ubicacion',
-                              hintText: 'Av. Arce, Edificio Multicine',
-                              prefixIcon: Icon(Icons.location_on_outlined),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _locationBlockMessage!,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  ChambaPrimaryButton(
+                                    label: 'Permitir ubicación',
+                                    onPressed:
+                                        _ensureLocationPermissionRequired,
+                                  ),
+                                  if (_canOpenLocationSettings) ...[
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: Geolocator.openAppSettings,
+                                      child: const Text('Abrir ajustes'),
+                                    ),
+                                    TextButton(
+                                      onPressed:
+                                          Geolocator.openLocationSettings,
+                                      child: const Text(
+                                        'Activar servicios de ubicación',
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Fotos del trabajo (${_pendingImages.length}/5)',
+                        )
+                      : SingleChildScrollView(
+                          child: GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Describe que necesitas...',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _descriptionController,
+                                  minLines: 2,
+                                  maxLines: null,
+                                  textInputAction: TextInputAction.newline,
+                                  keyboardType: TextInputType.multiline,
+                                  decoration: const InputDecoration(
+                                    hintText:
+                                        'Que buscas? Estoy buscando un trabajador para...',
+                                    hintMaxLines: 3,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Precio propuesto',
                                   style: Theme.of(
                                     context,
                                   ).textTheme.titleMedium,
                                 ),
-                              ),
-                              TextButton.icon(
-                                onPressed: _loading ? null : _pickImages,
-                                icon: const Icon(
-                                  Icons.add_photo_alternate_outlined,
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _budgetController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    prefixText: 'Bs  ',
+                                  ),
                                 ),
-                                label: const Text('Agregar'),
-                              ),
-                            ],
-                          ),
-                          if (_pendingImages.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              height: 84,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _pendingImages.length,
-                                separatorBuilder: (_, itemIndex) =>
-                                    const SizedBox(width: 10),
-                                itemBuilder: (context, index) {
-                                  final image = _pendingImages[index];
-                                  return Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Image.memory(
-                                          image.bytes,
-                                          width: 84,
-                                          height: 84,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 0,
-                                        right: 0,
-                                        child: GestureDetector(
-                                          onTap: _loading
-                                              ? null
-                                              : () {
-                                                  setState(() {
-                                                    _pendingImages.removeAt(
-                                                      index,
-                                                    );
-                                                  });
-                                                },
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.colorBackgroundAlt
-                                                  .withValues(alpha: 0.92),
-                                              shape: BoxShape.circle,
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 10,
+                                  children:
+                                      ['Precio fijo', 'Por hora', 'Por dia']
+                                          .map(
+                                            (option) => ChambaChip(
+                                              label: option,
+                                              selected: priceType == option,
+                                              onTap: () {
+                                                setState(() {
+                                                  priceType = option;
+                                                });
+                                              },
                                             ),
-                                            padding: const EdgeInsets.all(4),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: AppTheme.colorText,
-                                              size: 14,
-                                            ),
-                                          ),
-                                        ),
+                                          )
+                                          .toList(),
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _addressController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Ubicacion',
+                                    hintText: 'Av. Arce, Edificio Multicine',
+                                    prefixIcon: Icon(
+                                      Icons.location_on_outlined,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Fotos del trabajo (${_pendingImages.length}/5)',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
                                       ),
-                                    ],
-                                  );
-                                },
-                              ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: _loading ? null : _pickImages,
+                                      icon: const Icon(
+                                        Icons.add_photo_alternate_outlined,
+                                      ),
+                                      label: const Text('Agregar'),
+                                    ),
+                                  ],
+                                ),
+                                if (_pendingImages.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    height: 84,
+                                    child: ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: _pendingImages.length,
+                                      separatorBuilder: (_, itemIndex) =>
+                                          const SizedBox(width: 10),
+                                      itemBuilder: (context, index) {
+                                        final image = _pendingImages[index];
+                                        return Stack(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: Image.memory(
+                                                image.bytes,
+                                                width: 84,
+                                                height: 84,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 0,
+                                              right: 0,
+                                              child: GestureDetector(
+                                                onTap: _loading
+                                                    ? null
+                                                    : () {
+                                                        setState(() {
+                                                          _pendingImages
+                                                              .removeAt(index);
+                                                        });
+                                                      },
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme
+                                                        .colorBackgroundAlt
+                                                        .withValues(
+                                                          alpha: 0.92,
+                                                        ),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  padding: const EdgeInsets.all(
+                                                    4,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.close,
+                                                    color: AppTheme.colorText,
+                                                    size: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 24),
+                                ChambaPrimaryButton(
+                                  label: _loading
+                                      ? 'Publicando...'
+                                      : 'Publicar solicitud',
+                                  icon: Icons.send,
+                                  onPressed: _loading ? null : _submit,
+                                ),
+                              ],
                             ),
-                          ],
-                          const SizedBox(height: 24),
-                          ChambaPrimaryButton(
-                            label: _loading
-                                ? 'Publicando...'
-                                : 'Publicar solicitud',
-                            icon: Icons.send,
-                            onPressed: _loading ? null : _submit,
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        ),
                 ),
               ],
             ),
