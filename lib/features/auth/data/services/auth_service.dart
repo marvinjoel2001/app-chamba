@@ -8,7 +8,7 @@ import '../../../mobile_data/data/services/mobile_backend_service.dart';
 class AuthService {
   Future<void> login({required String email, required String password}) async {
     if (email.isEmpty || password.isEmpty) {
-      throw Exception('Correo/telefono y clave son obligatorios.');
+      throw Exception('Correo/teléfono y contraseña son obligatorios.');
     }
 
     final response = await MobileBackendService.login(
@@ -36,7 +36,7 @@ class AuthService {
     if (email.trim().isEmpty ||
         firstName.trim().isEmpty ||
         password.trim().isEmpty) {
-      throw Exception('Nombre, correo y clave son obligatorios.');
+      throw Exception('Nombre, correo y contraseña son obligatorios.');
     }
 
     final response = await MobileBackendService.register(

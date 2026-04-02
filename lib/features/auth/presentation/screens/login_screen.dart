@@ -151,12 +151,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           controller: _passwordController,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            labelText: 'Clave',
+                            labelText: 'Contraseña',
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu clave';
+                              return 'Ingresa tu contraseña';
                             }
                             return null;
                           },

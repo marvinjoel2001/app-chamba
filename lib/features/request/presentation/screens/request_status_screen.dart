@@ -46,7 +46,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
     final normalized = message.toLowerCase();
     return normalized.contains('no request found') ||
         normalized.contains('requestid or clientuserid is required') ||
-        normalized.contains('api error 404');
+        normalized.contains('no se encontró la información solicitada');
   }
 
   Future<void> _load() async {

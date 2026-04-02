@@ -161,13 +161,73 @@ class ApiService {
         : _decodeBody(response.body);
 
     if (response.statusCode >= 400) {
-      final bodyMessage = payload['message']?.toString();
-      final reason = bodyMessage?.trim().isNotEmpty == true
-          ? bodyMessage!.trim()
-          : (response.reasonPhrase ?? 'unknown error');
-      throw Exception('API error ${response.statusCode}: $reason');
+      final bodyMessage = _extractBodyMessage(payload);
+      throw Exception(
+        _mapHttpErrorMessage(
+          statusCode: response.statusCode,
+          bodyMessage: bodyMessage,
+        ),
+      );
     }
 
     return payload;
+  }
+
+  String? _extractBodyMessage(Map<String, dynamic> payload) {
+    final message = payload['message']?.toString().trim();
+    if (message != null && message.isNotEmpty) {
+      return message;
+    }
+
+    final error = payload['error'];
+    if (error is String && error.trim().isNotEmpty) {
+      return error.trim();
+    }
+
+    return null;
+  }
+
+  String _mapHttpErrorMessage({
+    required int statusCode,
+    String? bodyMessage,
+  }) {
+    final message = bodyMessage?.trim();
+
+    if (statusCode == 401) {
+      final lower = (message ?? '').toLowerCase();
+      if (lower.contains('credencial')) {
+        return 'Correo/teléfono o contraseña incorrectos.';
+      }
+      return 'Tu sesión expiró o no tienes permisos. Inicia sesión nuevamente.';
+    }
+
+    if (statusCode == 409) {
+      final lower = (message ?? '').toLowerCase();
+      if (lower.contains('correo') ||
+          lower.contains('email') ||
+          lower.contains('telefono') ||
+          lower.contains('phone')) {
+        return 'El correo o teléfono ya está registrado.';
+      }
+      return message ?? 'El recurso ya existe. Verifica la información ingresada.';
+    }
+
+    if (statusCode == 400) {
+      return message ?? 'Revisa los datos ingresados e intenta nuevamente.';
+    }
+
+    if (statusCode == 403) {
+      return 'No tienes permisos para realizar esta acción.';
+    }
+
+    if (statusCode == 404) {
+      return 'No se encontró la información solicitada.';
+    }
+
+    if (statusCode >= 500) {
+      return 'Ocurrió un error en el servidor. Intenta nuevamente en unos minutos.';
+    }
+
+    return message ?? 'Ocurrió un error inesperado. Intenta nuevamente.';
   }
 }

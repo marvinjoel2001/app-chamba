@@ -164,7 +164,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _passwordController,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            labelText: 'Clave',
+                            labelText: 'Contraseña',
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                           validator: (value) {

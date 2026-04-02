@@ -90,7 +90,7 @@ class _OffersScreenState extends State<OffersScreen> {
     final normalized = message.toLowerCase();
     return normalized.contains('no request found') ||
         normalized.contains('requestid or clientuserid is required') ||
-        normalized.contains('api error 404');
+        normalized.contains('no se encontró la información solicitada');
   }
 
   Future<void> _syncActiveThreadForAcceptedOffer({
