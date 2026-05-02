@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../config/app_config.dart';
@@ -8,25 +9,72 @@ class RealtimeService {
   static final RealtimeService instance = RealtimeService._();
 
   io.Socket? _socket;
+  String? _connectedUserId;
 
   io.Socket get socket => _socket!;
 
+  bool get isConnected => _socket?.connected == true;
+
   void connect({String? userId}) {
+    final url = '${AppConfig.socketBaseUrl}${AppConfig.socketNamespace}';
+
+    // Si ya hay socket con el mismo userId y está conectado, solo re-emite join
+    if (_socket != null && _connectedUserId == userId && _socket!.connected) {
+      if (userId != null && userId.isNotEmpty) {
+        _socket!.emit('join.user', {'userId': userId});
+      }
+      return;
+    }
+
+    // Si hay socket con distinto userId (cambio de cuenta), lo destruimos
+    if (_socket != null && _connectedUserId != userId) {
+      _socket!.dispose();
+      _socket = null;
+      _connectedUserId = null;
+    }
+
+    // Crear socket nuevo si no existe
     _socket ??= io.io(
-      '${AppConfig.socketBaseUrl}${AppConfig.socketNamespace}',
+      url,
       io.OptionBuilder()
           .setTransports(['websocket'])
           .setQuery(userId == null || userId.isEmpty ? {} : {'userId': userId})
           .disableAutoConnect()
+          .enableReconnection()
+          .setReconnectionAttempts(10)
+          .setReconnectionDelay(2000)
           .build(),
     );
 
-    if (!(_socket!.connected)) {
-      _socket!.connect();
+    _connectedUserId = userId;
+
+    // Siempre re-emitir join.user al reconectar (cubre hot restart y reconexiones)
+    if (userId != null && userId.isNotEmpty) {
+      // Remover listener previo para no duplicar
+      _socket!.off('connect');
+      _socket!.on('connect', (_) {
+        _socket?.emit('join.user', {'userId': userId});
+        if (kDebugMode) {
+          print('[RealtimeService] Conectado → join.user $userId');
+        }
+      });
     }
 
-    if (userId != null && userId.isNotEmpty) {
+    // Conectar si no está conectado
+    if (!_socket!.connected) {
+      _socket!.connect();
+    } else if (userId != null && userId.isNotEmpty) {
+      // Ya conectado: emitir join inmediatamente
       _socket!.emit('join.user', {'userId': userId});
+    }
+
+    if (kDebugMode) {
+      _socket!.on('disconnect', (reason) =>
+          print('[RealtimeService] Socket desconectado: $reason'));
+      _socket!.on('connect_error', (err) =>
+          print('[RealtimeService] Error de conexión: $err'));
+      _socket!.on('connection.ready', (data) =>
+          print('[RealtimeService] connection.ready: $data'));
     }
   }
 
@@ -60,5 +108,6 @@ class RealtimeService {
   void dispose() {
     _socket?.dispose();
     _socket = null;
+    _connectedUserId = null;
   }
 }

@@ -23,13 +23,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
   Map<String, dynamic>? _request;
   int _offerLifetimeSeconds = 120;
   Timer? _ticker;
+  // Polling cada 8s como fallback cuando el socket no llega
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
-    _realtime.on('request.new', _onRequestUpdated);
+    _realtime.on('request.new', _onNewRequest);
     _realtime.on('offer.updated', _onRequestUpdated);
     _realtime.on('offer.accepted', _onRequestUpdated);
     _realtime.on('offer.rejected', _onOfferRejected);
@@ -37,23 +39,36 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       _tickOfferCountdown();
     });
+    // Polling de respaldo: refresca cada 8 segundos
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted && _request == null) {
+        _load();
+      }
+    });
     _load();
   }
 
   @override
   void dispose() {
-    _realtime.off('request.new', _onRequestUpdated);
+    _realtime.off('request.new', _onNewRequest);
     _realtime.off('offer.updated', _onRequestUpdated);
     _realtime.off('offer.accepted', _onRequestUpdated);
     _realtime.off('offer.rejected', _onOfferRejected);
     _realtime.off('offer.expired', _onOfferExpired);
     _ticker?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
+  }
+
+  // request.new no trae workerUserId — siempre recargar
+  void _onNewRequest(dynamic payload) {
+    _load();
   }
 
   void _onRequestUpdated(dynamic payload) {
     final userId = SessionStore.currentUser?.id;
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    // Si el payload trae workerUserId, verificar que sea para este worker
     if (map['workerUserId'] != null &&
         map['workerUserId'].toString() != userId) {
       return;
