@@ -241,6 +241,7 @@ class ChambaBottomNav extends StatelessWidget {
   static const _workerItems = [
     _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
     _NavItemData(icon: Icons.radar, label: 'Radar'),
+    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
     _NavItemData(icon: Icons.history, label: 'Historial'),
     _NavItemData(icon: Icons.person, label: 'Perfil'),
   ];

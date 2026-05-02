@@ -27,6 +27,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ? const [
             IncomingRequestScreen(),
             RadarScreen(),
+            MessagesScreen(),
             WorkerHistoryScreen(),
             ProfileMenuScreen(),
           ]
