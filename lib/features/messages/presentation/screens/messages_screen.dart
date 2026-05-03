@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
-import '../../../request/presentation/screens/incoming_request_screen.dart';
 import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
@@ -16,10 +16,9 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen> {
   final RealtimeService _realtime = RealtimeService.instance;
+
   String _formatDate(String? value) {
-    if (value == null || value.isEmpty) {
-      return '--';
-    }
+    if (value == null || value.isEmpty) return '--';
     final normalized = value.replaceFirst('T', ' ');
     return normalized.length > 16 ? normalized.substring(0, 16) : normalized;
   }
@@ -31,6 +30,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   void initState() {
     super.initState();
+    // Resetear badge al abrir la pantalla
+    UnreadMessagesNotifier.instance.reset();
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
     _realtime.on('message.new', _onMessageEvent);
@@ -44,6 +45,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _onMessageEvent(dynamic payload) {
+    // Recargar lista sin incrementar badge (ya estamos en la pantalla)
     _load();
   }
 
@@ -56,12 +58,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
       });
       return;
     }
-
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final response = await MobileBackendService.messages(userId: user.id);
       setState(() {
@@ -89,8 +89,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   Text(
                     'Mensajes',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                   const Spacer(),
                   IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
@@ -108,7 +108,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   final threadMap = thread as Map<String, dynamic>;
                   final counterpart =
                       threadMap['counterpart'] as Map<String, dynamic>? ?? {};
-
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: GlassCard(
@@ -118,10 +117,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           radius: 26,
                           backgroundImage:
                               counterpart['profilePhotoUrl'] == null
-                              ? null
-                              : NetworkImage(
-                                  counterpart['profilePhotoUrl'] as String,
-                                ),
+                                  ? null
+                                  : NetworkImage(
+                                      counterpart['profilePhotoUrl'] as String),
                           child: counterpart['profilePhotoUrl'] == null
                               ? Text(
                                   (counterpart['firstName'] ?? 'U')
@@ -135,8 +133,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               .trim(),
                         ),
                         subtitle: Text(
-                          threadMap['lastMessage']?.toString() ?? '',
-                        ),
+                            threadMap['lastMessage']?.toString() ?? ''),
                         trailing: Text(
                           _formatDate(threadMap['lastMessageAt']?.toString()),
                           textAlign: TextAlign.right,
@@ -161,17 +158,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     ),
                   );
                 }),
-              const SizedBox(height: 18),
-              ChambaPrimaryButton(
-                label: 'Abrir solicitud entrante demo',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const IncomingRequestScreen(),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
         ),

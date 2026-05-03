@@ -2,65 +2,106 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 
-class TrackingScreen extends StatefulWidget {
-  const TrackingScreen({super.key});
+class JobInProgressScreen extends StatefulWidget {
+  const JobInProgressScreen({required this.requestId, super.key});
+
+  final String requestId;
 
   @override
-  State<TrackingScreen> createState() => _TrackingScreenState();
+  State<JobInProgressScreen> createState() => _JobInProgressScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> {
+class _JobInProgressScreenState extends State<JobInProgressScreen> {
   final RealtimeService _realtime = RealtimeService.instance;
+  final MapController _mapController = MapController();
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _tracking;
   Timer? _pollTimer;
-  bool _confirmingArrival = false;
+  Timer? _locationTimer;
+  LatLng? _deviceLocation; // ubicación real del GPS
 
   @override
   void initState() {
     super.initState();
-    _realtime.on('job.worker_arrived', _onWorkerArrived);
+    _realtime.on('job.client_confirmed', _onClientConfirmed);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
+    // Actualizar ubicación GPS cada 5 segundos
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _updateDeviceLocation(),
+    );
     _load();
+    _updateDeviceLocation();
   }
 
   @override
   void dispose() {
-    _realtime.off('job.worker_arrived', _onWorkerArrived);
+    _realtime.off('job.client_confirmed', _onClientConfirmed);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
     _pollTimer?.cancel();
+    _locationTimer?.cancel();
     super.dispose();
   }
 
-  void _onWorkerArrived(dynamic _) {
-    _load();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡El trabajador ha llegado! Confirma su llegada.'),
-          backgroundColor: AppTheme.colorSuccess,
+  Future<void> _updateDeviceLocation() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever)
+        return;
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
         ),
       );
-    }
+      final loc = LatLng(pos.latitude, pos.longitude);
+
+      if (mounted) {
+        setState(() => _deviceLocation = loc);
+      }
+
+      // Sincronizar con el backend
+      final user = SessionStore.currentUser;
+      if (user != null) {
+        await MobileBackendService.updateWorkerLocation(
+          workerUserId: user.id,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        );
+      }
+    } catch (_) {}
   }
+
+  void _onClientConfirmed(dynamic _) => _load();
 
   void _onJobCompleted(dynamic _) {
     if (mounted) {
+      // Limpiar sesión del trabajo activo
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
+
       showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -71,14 +112,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
             style: TextStyle(color: AppTheme.colorSuccess),
           ),
           content: const Text(
-            'El trabajador marcó el trabajo como completado.',
+            'El trabajo ha sido marcado como completado. ¡Buen trabajo!',
             style: TextStyle(color: AppTheme.colorMuted),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
+                // Cerrar diálogo y volver al inicio (pop hasta la raíz)
+                Navigator.of(context).popUntil((route) => route.isFirst);
               },
               child: const Text('Aceptar'),
             ),
@@ -90,42 +131,16 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   void _onJobCancelled(dynamic _) {
     if (mounted) {
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El trabajo fue cancelado.')),
       );
-      Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _ensureActiveThread() async {
-    final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
-    final workerId = _tracking?['worker']?['id']?.toString();
-    if (user == null || requestId == null || workerId == null) return;
-
-    final response = await MobileBackendService.messages(userId: user.id);
-    final threads = response['threads'] as List<dynamic>? ?? const [];
-    for (final thread in threads) {
-      final map = thread as Map<String, dynamic>;
-      final counterpart = map['counterpart'] as Map<String, dynamic>? ?? {};
-      if (map['requestId']?.toString() == requestId &&
-          counterpart['id']?.toString() == workerId) {
-        SessionStore.activeThreadId = map['id']?.toString();
-        return;
-      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
   Future<void> _load() async {
-    final requestId = SessionStore.activeRequestId;
-    if (requestId == null) {
-      setState(() {
-        _error = 'No hay solicitud activa para rastrear.';
-        _loading = false;
-      });
-      return;
-    }
-    // Solo spinner en carga inicial
     if (_tracking == null) {
       setState(() {
         _loading = true;
@@ -133,40 +148,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
       });
     }
     try {
-      final response = await MobileBackendService.tracking(
-        requestId: requestId,
+      final res = await MobileBackendService.tracking(
+        requestId: widget.requestId,
       );
-      _tracking = response;
-      if (SessionStore.activeThreadId == null) {
-        await _ensureActiveThread();
+      if (mounted) {
+        setState(() {
+          _tracking = res;
+          _loading = false;
+        });
       }
-      if (!mounted) return;
-      setState(() => _loading = false);
-    } catch (error) {
-      setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+          _loading = false;
+        });
+      }
     }
   }
 
-  Future<void> _confirmArrival() async {
+  Future<void> _markArrived() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
-    if (user == null || requestId == null) return;
-
-    setState(() => _confirmingArrival = true);
+    if (user == null) return;
     try {
-      await MobileBackendService.clientConfirmArrival(
-        requestId: requestId,
-        clientUserId: user.id,
+      await MobileBackendService.workerMarkArrived(
+        requestId: widget.requestId,
+        workerUserId: user.id,
       );
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Llegada confirmada. El trabajador puede iniciar.'),
-          backgroundColor: AppTheme.colorSuccess,
+          content: Text('Llegada marcada. Esperando confirmación del cliente.'),
         ),
       );
     } catch (e) {
@@ -174,22 +187,134 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
-    } finally {
-      if (mounted) setState(() => _confirmingArrival = false);
+    }
+  }
+
+  Future<void> _completeJob() async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.colorBackgroundAccent,
+        title: const Text('Marcar como completado'),
+        content: const Text(
+          '¿Confirmas que el trabajo fue completado satisfactoriamente?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Confirmar',
+              style: TextStyle(color: AppTheme.colorSuccess),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await MobileBackendService.completeJob(
+        requestId: widget.requestId,
+        workerUserId: user.id,
+      );
+      if (!mounted) return;
+
+      // Limpiar sesión del trabajo activo
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
+
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppTheme.colorBackgroundAccent,
+          title: const Text(
+            '¡Trabajo completado!',
+            style: TextStyle(color: AppTheme.colorSuccess),
+          ),
+          content: const Text(
+            '¡Excelente trabajo!',
+            style: TextStyle(color: AppTheme.colorMuted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Cerrar diálogo y volver al inicio
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              child: const Text('Aceptar'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  /// Abre el chat directo con el cliente del trabajo en curso
+  Future<void> _openChat() async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+
+    String? threadId = SessionStore.activeThreadId;
+    final client = _tracking?['client'] as Map<String, dynamic>?;
+
+    if (threadId == null) {
+      try {
+        final response = await MobileBackendService.messages(userId: user.id);
+        final threads = response['threads'] as List<dynamic>? ?? [];
+        for (final t in threads) {
+          final map = t as Map<String, dynamic>;
+          if (map['requestId']?.toString() == widget.requestId) {
+            threadId = map['id']?.toString();
+            SessionStore.activeThreadId = threadId;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    if (threadId != null) {
+      final clientName =
+          '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'.trim();
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatScreen(
+            threadId: threadId!,
+            title: clientName.isEmpty ? 'Cliente' : clientName,
+            avatarUrl: client?['profilePhotoUrl'] as String?,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const MessagesScreen()));
     }
   }
 
   Future<void> _cancelJob() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
-    if (user == null || requestId == null) return;
-
+    if (user == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.colorBackgroundAccent,
         title: const Text('Cancelar trabajo'),
-        content: const Text('¿Estás seguro de que deseas cancelar?'),
+        content: const Text(
+          '¿Estás seguro de que deseas cancelar este trabajo?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -206,14 +331,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ),
     );
     if (confirmed != true) return;
-
     try {
       await MobileBackendService.cancelJob(
-        requestId: requestId,
+        requestId: widget.requestId,
         userId: user.id,
       );
       if (!mounted) return;
-      Navigator.of(context).pop();
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,21 +350,24 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final worker = _tracking?['worker'] as Map<String, dynamic>?;
+    final client = _tracking?['client'] as Map<String, dynamic>?;
     final workerArrived = _tracking?['workerArrived'] as bool? ?? false;
     final clientConfirmed =
         _tracking?['clientConfirmedArrival'] as bool? ?? false;
     final etaMinutes = _tracking?['etaMinutes'];
     final distanceKm = _tracking?['distanceKm'];
     final address = _tracking?['address']?.toString() ?? '';
-    final title = _tracking?['title']?.toString() ?? 'Servicio en curso';
+    final title = _tracking?['title']?.toString() ?? 'Trabajo en curso';
     final amount = _tracking?['agreedAmount'];
 
-    final workerLat = (worker?['latitude'] as num?)?.toDouble();
-    final workerLng = (worker?['longitude'] as num?)?.toDouble();
-    final mapCenter = workerLat != null && workerLng != null
-        ? LatLng(workerLat, workerLng)
-        : const LatLng(-16.5002, -68.1342);
+    final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
+    final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
+    // Prioridad: GPS del dispositivo → ubicación guardada en DB → fallback
+    final mapCenter =
+        _deviceLocation ??
+        (workerLat != null && workerLng != null
+            ? LatLng(workerLat, workerLng)
+            : const LatLng(-16.5002, -68.1342));
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -246,7 +375,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         children: [
           // ── MAPA ──────────────────────────────────────────────────────
           Positioned.fill(
-            bottom: 320,
+            bottom: 300,
             child: AppConfig.mapboxAccessToken.trim().isEmpty
                 ? Container(
                     color: AppTheme.colorBackgroundAccent,
@@ -259,6 +388,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   )
                 : FlutterMap(
+                    mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: 15,
@@ -272,32 +402,31 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           'accessToken': AppConfig.mapboxAccessToken,
                         },
                       ),
-                      // Marcador del worker (en movimiento)
                       MarkerLayer(
                         markers: [
+                          // Punto azul = ubicación actual del dispositivo
                           Marker(
                             point: mapCenter,
-                            width: 48,
-                            height: 48,
+                            width: 52,
+                            height: 52,
                             child: Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppTheme.colorPrimary,
+                                color: Colors.blue.shade600,
                                 border: Border.all(
                                   color: Colors.white,
                                   width: 3,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.colorPrimary.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                    blurRadius: 12,
+                                    color: Colors.blue.withValues(alpha: 0.5),
+                                    blurRadius: 14,
+                                    spreadRadius: 2,
                                   ),
                                 ],
                               ),
                               child: const Icon(
-                                Icons.engineering,
+                                Icons.navigation,
                                 color: Colors.white,
                                 size: 22,
                               ),
@@ -404,7 +533,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Handle
                         Center(
                           child: Container(
                             width: 40,
@@ -416,7 +544,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             ),
                           ),
                         ),
-                        // Status + monto
                         Row(
                           children: [
                             Container(
@@ -432,7 +559,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 workerArrived
                                     ? clientConfirmed
                                           ? 'EN TRABAJO'
-                                          : '¡LLEGÓ!'
+                                          : 'LLEGASTE'
                                     : 'EN CAMINO',
                                 style: const TextStyle(
                                   color: AppTheme.colorSuccess,
@@ -462,21 +589,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // Info del worker
                         Row(
                           children: [
                             CircleAvatar(
                               radius: 24,
                               backgroundColor: AppTheme.colorSurfaceSoft,
                               backgroundImage:
-                                  worker?['profilePhotoUrl'] != null
+                                  client?['profilePhotoUrl'] != null
                                   ? NetworkImage(
-                                      worker!['profilePhotoUrl'] as String,
+                                      client!['profilePhotoUrl'] as String,
                                     )
                                   : null,
-                              child: worker?['profilePhotoUrl'] == null
+                              child: client?['profilePhotoUrl'] == null
                                   ? Text(
-                                      (worker?['firstName'] ?? 'W')
+                                      (client?['firstName'] ?? 'C')
                                           .toString()
                                           .substring(0, 1),
                                       style: const TextStyle(
@@ -492,7 +618,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
+                                    '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'
                                         .trim(),
                                     style: const TextStyle(
                                       color: AppTheme.colorText,
@@ -527,7 +653,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Distancia
                         if (distanceKm != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -558,62 +683,71 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             ),
                           ),
                         const SizedBox(height: 16),
-                        // Botones
                         Row(
                           children: [
-                            // Confirmar llegada (solo si el worker llegó y no se confirmó aún)
                             Expanded(
                               flex: 3,
                               child: ChambaPrimaryButton(
                                 label: clientConfirmed
-                                    ? 'Llegada confirmada ✓'
+                                    ? 'TRABAJO TERMINADO'
                                     : workerArrived
-                                    ? 'CONFIRMAR LLEGADA'
-                                    : 'Esperando al trabajador...',
+                                    ? 'Esperando cliente...'
+                                    : 'LLEGUÉ AL SITIO',
                                 icon: clientConfirmed
                                     ? Icons.check_circle
                                     : workerArrived
-                                    ? Icons.where_to_vote
-                                    : Icons.hourglass_top,
-                                isYellow: workerArrived && !clientConfirmed,
+                                    ? Icons.hourglass_top
+                                    : Icons.location_on,
+                                isYellow: clientConfirmed,
                                 onPressed: workerArrived && !clientConfirmed
-                                    ? (_confirmingArrival
-                                          ? null
-                                          : _confirmArrival)
-                                    : null,
+                                    ? null
+                                    : clientConfirmed
+                                    ? _completeJob
+                                    : _markArrived,
                               ),
                             ),
                             const SizedBox(width: 10),
-                            // Chat
-                            _ActionIconButton(
-                              icon: Icons.chat_bubble_outline,
-                              color: AppTheme.colorPrimary,
-                              onTap: () async {
-                                if (SessionStore.activeThreadId == null) {
-                                  await _ensureActiveThread();
-                                }
-                                final threadId = SessionStore.activeThreadId;
-                                if (threadId == null) {
-                                  if (!context.mounted) return;
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const MessagesScreen(),
+                            // Chat directo con el cliente + badge de no leídos
+                            ValueListenableBuilder<int>(
+                              valueListenable: UnreadMessagesNotifier.instance,
+                              builder: (context, unread, _) {
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    _ActionIconButton(
+                                      icon: Icons.chat_bubble_outline,
+                                      color: AppTheme.colorPrimary,
+                                      onTap: () {
+                                        UnreadMessagesNotifier.instance.reset();
+                                        _openChat();
+                                      },
                                     ),
-                                  );
-                                  return;
-                                }
-                                if (!context.mounted) return;
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ChatScreen(
-                                      threadId: threadId,
-                                      title:
-                                          '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
-                                              .trim(),
-                                      avatarUrl:
-                                          worker?['profilePhotoUrl'] as String?,
-                                    ),
-                                  ),
+                                    if (unread > 0)
+                                      Positioned(
+                                        top: -4,
+                                        right: -4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 18,
+                                            minHeight: 18,
+                                          ),
+                                          decoration: const BoxDecoration(
+                                            color: AppTheme.colorError,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Text(
+                                            unread > 99 ? '99+' : '$unread',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 );
                               },
                             ),

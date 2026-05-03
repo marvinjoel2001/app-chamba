@@ -10,6 +10,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
+import '../../../tracking/presentation/screens/tracking_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({required this.role, super.key});
@@ -33,7 +34,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Map<String, dynamic>? _activeRequest;
   LatLng? _currentUserLocation;
   double _currentZoom = 13;
-  static const double _clientComposerBottomOffset = 0;
   static const double _workerPanelBottomOffset = 84;
 
   bool get _isClient => widget.role == 'client';
@@ -381,6 +381,101 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildClientComposer() {
+    // Si hay un trabajo asignado/en curso, mostrar banner prominente
+    final activeStatus = _activeRequest?['status']?.toString();
+    final isJobActive =
+        activeStatus == 'assigned' || activeStatus == 'completed';
+
+    if (isJobActive) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: GestureDetector(
+          onTap: () {
+            SessionStore.activeRequestId = _activeRequest?['id']?.toString();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const TrackingScreen()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1F0D),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppTheme.colorSuccess.withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.colorSuccess.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorSuccessSoft,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.directions_run,
+                    color: AppTheme.colorSuccess,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TRABAJO EN CURSO',
+                        style: TextStyle(
+                          color: AppTheme.colorSuccess,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _activeRequest?['title']?.toString() ?? 'Ver detalles',
+                        style: const TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Toca para ver el seguimiento',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.colorSuccess,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Estado normal: formulario para crear solicitud
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: GlassCard(
@@ -501,7 +596,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   urlTemplate:
                       'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                   userAgentPackageName: 'com.example.mobile',
-                  additionalOptions: {'accessToken': AppConfig.mapboxAccessToken},
+                  additionalOptions: {
+                    'accessToken': AppConfig.mapboxAccessToken,
+                  },
                 ),
                 MarkerLayer(
                   markers: [
@@ -654,38 +751,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 class _MapControl extends StatelessWidget {
-  const _MapControl({
-    required this.icon,
-    this.highlighted = false,
-    this.onTap,
-    this.customBackgroundColor,
-    this.customIconColor,
-    this.radius = 24,
-  });
+  const _MapControl({required this.icon, this.highlighted = false, this.onTap});
 
   final IconData icon;
   final bool highlighted;
   final VoidCallback? onTap;
-  final Color? customBackgroundColor;
-  final Color? customIconColor;
-  final double radius;
 
   @override
   Widget build(BuildContext context) {
     return CircleAvatar(
-      radius: radius,
-      backgroundColor: customBackgroundColor ??
-          (highlighted
-              ? AppTheme.colorPrimary
-              : AppTheme.colorSurfaceSoft.withOpacity(0.5)),
+      radius: 24,
+      backgroundColor: highlighted
+          ? AppTheme.colorPrimary
+          : AppTheme.colorSurfaceSoft.withOpacity(0.5),
       child: IconButton(
         onPressed: onTap,
         icon: Icon(
           icon,
-          color: customIconColor ??
-              (highlighted
-                  ? AppTheme.colorTextOnPurple
-                  : const Color.fromARGB(255, 255, 255, 255)),
+          color: highlighted
+              ? AppTheme.colorTextOnPurple
+              : const Color.fromARGB(255, 255, 255, 255),
         ),
       ),
     );

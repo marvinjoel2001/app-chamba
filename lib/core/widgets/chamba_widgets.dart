@@ -17,9 +17,7 @@ class ChambaBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: AppTheme.backgroundGradient,
-      ),
+      decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
       child: Stack(
         children: [
           if (showGrid) const _DotGrid(),
@@ -249,42 +247,131 @@ class ChambaBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = role == 'worker' ? _workerItems : _clientItems;
+    return _buildNav(context, items, currentIndex, onTap, 0, null);
+  }
+}
 
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-          child: Container(
-            height: 72,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.colorGlassDarkSoft,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.colorGlassBorderSoft),
-              boxShadow: AppTheme.shadowMd,
-            ),
-            child: Row(
-              children: List.generate(items.length, (index) {
-                final item = items[index];
-                final selected = index == currentIndex;
-                return Expanded(
-                  child: _BottomNavItem(
-                    icon: item.icon,
-                    label: item.label,
-                    selected: selected,
-                    onTap: () => onTap(index),
-                  ),
-                );
-              }),
-            ),
+/// Bottom nav con badge de mensajes no leídos
+class ChambaBottomNavWithBadge extends StatelessWidget {
+  const ChambaBottomNavWithBadge({
+    required this.role,
+    required this.currentIndex,
+    required this.unreadCount,
+    required this.messagesTabIndex,
+    required this.onTap,
+    super.key,
+  });
+
+  final String role;
+  final int currentIndex;
+  final int unreadCount;
+  final int messagesTabIndex;
+  final ValueChanged<int> onTap;
+
+  static const _clientItems = [
+    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
+    _NavItemData(icon: Icons.work, label: 'Ofertas'),
+    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
+    _NavItemData(icon: Icons.person, label: 'Perfil'),
+  ];
+  static const _workerItems = [
+    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
+    _NavItemData(icon: Icons.radar, label: 'Radar'),
+    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
+    _NavItemData(icon: Icons.history, label: 'Historial'),
+    _NavItemData(icon: Icons.person, label: 'Perfil'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final items = role == 'worker' ? _workerItems : _clientItems;
+    return _buildNav(
+      context,
+      items,
+      currentIndex,
+      onTap,
+      messagesTabIndex,
+      unreadCount,
+    );
+  }
+}
+
+Widget _buildNav(
+  BuildContext context,
+  List<_NavItemData> items,
+  int currentIndex,
+  ValueChanged<int> onTap,
+  int badgeIndex,
+  int? badgeCount,
+) {
+  return SafeArea(
+    top: false,
+    minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.colorGlassDarkSoft,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.colorGlassBorderSoft),
+            boxShadow: AppTheme.shadowMd,
+          ),
+          child: Row(
+            children: List.generate(items.length, (index) {
+              final item = items[index];
+              final selected = index == currentIndex;
+              final showBadge = index == badgeIndex && (badgeCount ?? 0) > 0;
+              return Expanded(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // SizedBox.expand garantiza que el item ocupe todo el Expanded
+                    SizedBox.expand(
+                      child: _BottomNavItem(
+                        icon: item.icon,
+                        label: item.label,
+                        selected: selected,
+                        onTap: () => onTap(index),
+                      ),
+                    ),
+                    if (showBadge)
+                      Positioned(
+                        top: 2,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.colorError,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            badgeCount! > 99 ? '99+' : '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _NavItemData {
@@ -309,17 +396,15 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = selected
-        ? AppTheme.colorPrimary
-        : AppTheme.colorMuted;
+    final iconColor = selected ? AppTheme.colorPrimary : AppTheme.colorMuted;
     const labelColor = AppTheme.colorMuted;
 
     return InkWell(
       borderRadius: BorderRadius.circular(100),
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -333,7 +418,7 @@ class _BottomNavItem extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 color: labelColor,
               ),
-              child: Text(label),
+              child: Text(label, textAlign: TextAlign.center),
             ),
           ],
         ),

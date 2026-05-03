@@ -120,11 +120,7 @@ class MobileBackendService {
   }) {
     return _api.post(
       '/mobile/request-categories/preview',
-      body: {
-        'title': title,
-        'description': description,
-        'category': category,
-      },
+      body: {'title': title, 'description': description, 'category': category},
     );
   }
 
@@ -369,6 +365,46 @@ class MobileBackendService {
         'stars': stars,
         'comment': comment,
       },
+    );
+  }
+
+  static Future<Map<String, dynamic>> workerMarkArrived({
+    required String requestId,
+    required String workerUserId,
+  }) {
+    return _api.post(
+      '/mobile/tracking/worker-arrived',
+      body: {'requestId': requestId, 'workerUserId': workerUserId},
+    );
+  }
+
+  static Future<Map<String, dynamic>> clientConfirmArrival({
+    required String requestId,
+    required String clientUserId,
+  }) {
+    return _api.post(
+      '/mobile/tracking/client-confirm',
+      body: {'requestId': requestId, 'clientUserId': clientUserId},
+    );
+  }
+
+  static Future<Map<String, dynamic>> completeJob({
+    required String requestId,
+    required String workerUserId,
+  }) {
+    return _api.post(
+      '/mobile/tracking/complete',
+      body: {'requestId': requestId, 'workerUserId': workerUserId},
+    );
+  }
+
+  static Future<Map<String, dynamic>> cancelJob({
+    required String requestId,
+    required String userId,
+  }) {
+    return _api.post(
+      '/mobile/tracking/cancel',
+      body: {'requestId': requestId, 'userId': userId},
     );
   }
 }
