@@ -155,7 +155,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
       _latitude = position.latitude;
       _longitude = position.longitude;
-      _resolvedAddress = await _reverseGeocode(position.latitude, position.longitude);
+      _resolvedAddress = await _reverseGeocode(
+        position.latitude,
+        position.longitude,
+      );
 
       if (!mounted) {
         return;
@@ -240,7 +243,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Future<void> _submit() async {
-    if (_locationBlockMessage != null || _latitude == null || _longitude == null) {
+    if (_locationBlockMessage != null ||
+        _latitude == null ||
+        _longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Necesitamos tu ubicacion actual para continuar.'),
@@ -251,9 +256,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
     final user = SessionStore.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesion expirada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sesion expirada.')));
       return;
     }
 
@@ -287,8 +292,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
       final response = await MobileBackendService.createRequest(
         clientUserId: user.id,
-        title:
-            widget.initialTitle?.trim().isNotEmpty == true
+        title: widget.initialTitle?.trim().isNotEmpty == true
             ? widget.initialTitle!.trim()
             : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
         description: description,
@@ -310,7 +314,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       }
 
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const RequestStatusScreen()),
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              RequestStatusScreen(latitude: _latitude!, longitude: _longitude!),
+        ),
       );
     } catch (error) {
       if (!mounted) {
@@ -392,7 +399,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               readOnly: true,
               enableInteractiveSelection: false,
               decoration: const InputDecoration(
-                hintText: 'Tu solicitud se analizara desde la pantalla anterior.',
+                hintText:
+                    'Tu solicitud se analizara desde la pantalla anterior.',
               ),
             ),
             const SizedBox(height: 16),
@@ -412,10 +420,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           category['name']?.toString().trim().isNotEmpty == true
                           ? category['name'].toString().trim()
                           : 'General';
-                      return ChambaChip(
-                        label: label,
-                        selected: entry.key == 0,
-                      );
+                      return ChambaChip(label: label, selected: entry.key == 0);
                     }).toList(),
             ),
             const SizedBox(height: 16),

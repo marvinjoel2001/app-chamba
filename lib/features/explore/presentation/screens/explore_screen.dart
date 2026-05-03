@@ -4,12 +4,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
+import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _promptController = TextEditingController();
+  final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   bool _analyzingPrompt = false;
   String? _error;
@@ -41,13 +44,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+    // Escuchar eventos de trabajo completado/cancelado para limpiar el banner
+    _realtime.on('job.completed', _onJobFinished);
+    _realtime.on('job.cancelled', _onJobFinished);
     _load();
   }
 
   @override
   void dispose() {
+    _realtime.off('job.completed', _onJobFinished);
+    _realtime.off('job.cancelled', _onJobFinished);
     _promptController.dispose();
     super.dispose();
+  }
+
+  void _onJobFinished(dynamic _) {
+    // Limpiar sesión y recargar para quitar el banner
+    SessionStore.activeRequestId = null;
+    SessionStore.activeThreadId = null;
+    if (mounted) {
+      setState(() => _activeRequest = null);
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -381,12 +399,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildClientComposer() {
-    // Si hay un trabajo asignado/en curso, mostrar banner prominente
     final activeStatus = _activeRequest?['status']?.toString();
-    final isJobActive =
-        activeStatus == 'assigned' || activeStatus == 'completed';
 
-    if (isJobActive) {
+    // Trabajo asignado (en curso) → banner verde → TrackingScreen
+    if (activeStatus == 'assigned') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: GestureDetector(
@@ -466,6 +482,101 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 const Icon(
                   Icons.chevron_right,
                   color: AppTheme.colorSuccess,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Solicitud buscando/negociando → banner morado → RequestStatusScreen
+    if (activeStatus == 'searching' || activeStatus == 'negotiating') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: GestureDetector(
+          onTap: () {
+            SessionStore.activeRequestId = _activeRequest?['id']?.toString();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => RequestStatusScreen(
+                  latitude: _currentUserLocation?.latitude,
+                  longitude: _currentUserLocation?.longitude,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1030),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppTheme.colorPrimary.withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.colorPrimary.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.radar,
+                    color: AppTheme.colorPrimary,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'SOLICITUD EN CURSO',
+                        style: TextStyle(
+                          color: AppTheme.colorPrimaryLight,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _activeRequest?['title']?.toString() ?? 'Ver solicitud',
+                        style: const TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Buscando trabajadores cerca de ti...',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.colorPrimaryLight,
                   size: 24,
                 ),
               ],
@@ -737,8 +848,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
               left: 0,
               right: 0,
               bottom: _isClient
-                  ? MediaQuery.of(context).viewInsets.bottom
-                  : _workerPanelBottomOffset,
+                  ? MediaQuery.of(context).viewInsets.bottom + 8
+                  : _workerPanelBottomOffset + 8,
               child: _isClient
                   ? _buildClientComposer()
                   : _buildWorkerPanel(context),

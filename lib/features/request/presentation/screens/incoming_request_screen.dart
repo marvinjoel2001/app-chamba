@@ -75,8 +75,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       _tickOfferCountdown();
     });
+    // Polling silencioso — no muestra spinner
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (mounted && _request == null) _load();
+      if (mounted && _request == null) _load(silent: true);
     });
 
     _initLocation();
@@ -104,8 +105,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever)
+          perm == LocationPermission.deniedForever) {
         return;
+      }
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -114,7 +116,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         ),
       );
       final loc = LatLng(pos.latitude, pos.longitude);
-      if (mounted) setState(() => _workerLocation = loc);
+      if (mounted) {
+        setState(() => _workerLocation = loc);
+        // Mover el mapa a la ubicación real del dispositivo
+        try {
+          _mapController.move(loc, 14);
+        } catch (_) {}
+      }
 
       final user = SessionStore.currentUser;
       if (user != null) {
@@ -146,21 +154,25 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  void _onNewRequest(dynamic payload) => _load();
+  void _onNewRequest(dynamic payload) => _load(silent: true);
 
   void _onRequestUpdated(dynamic payload) {
     final userId = SessionStore.currentUser?.id;
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
-    if (map['workerUserId'] != null && map['workerUserId'].toString() != userId)
+    if (map['workerUserId'] != null &&
+        map['workerUserId'].toString() != userId) {
       return;
-    _load();
+    }
+    _load(silent: true);
   }
 
   void _onOfferAccepted(dynamic payload) {
     final userId = SessionStore.currentUser?.id;
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
-    if (map['workerUserId'] != null && map['workerUserId'].toString() != userId)
+    if (map['workerUserId'] != null &&
+        map['workerUserId'].toString() != userId) {
       return;
+    }
     if (mounted) {
       setState(() => _showAcceptedBanner = true);
       _acceptedAnimCtrl.forward(from: 0);
@@ -168,7 +180,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         if (mounted) setState(() => _showAcceptedBanner = false);
       });
     }
-    _load();
+    _load(silent: true);
   }
 
   void _onOfferRejected(dynamic payload) {
@@ -182,7 +194,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         ),
       );
     }
-    _load();
+    _load(silent: true);
   }
 
   void _onOfferExpired(dynamic payload) {
@@ -194,7 +206,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         const SnackBar(content: Text('Tu oferta expiró. Puedes mejorarla.')),
       );
     }
-    _load();
+    _load(silent: true);
   }
 
   void _tickOfferCountdown() {
@@ -222,7 +234,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     return mapped;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
@@ -231,10 +243,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    // Solo mostrar spinner en la carga inicial, no en polling silencioso
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final response = await MobileBackendService.incomingRequest(
         workerUserId: user.id,
@@ -253,17 +268,21 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         });
       }
 
-      setState(() {
-        _request = mutableRequest;
-        _offerLifetimeSeconds =
-            (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _request = mutableRequest;
+          _offerLifetimeSeconds =
+              (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
+          _loading = false;
+        });
+      }
     } catch (error) {
-      setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = error.toString().replaceFirst('Exception: ', '');
+          _loading = false;
+        });
+      }
     }
   }
 
