@@ -268,6 +268,20 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         });
       }
 
+      // Cuando la oferta está aceptada, expandir el sheet para mostrar
+      // ambos botones (VER TRABAJO + CHATEAR) sin que queden tapados
+      if (offerStatus == 'accepted' && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _sheetCtrl.isAttached) {
+            _sheetCtrl.animateTo(
+              0.35,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+
       if (mounted) {
         setState(() {
           _request = mutableRequest;
@@ -476,8 +490,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             minChildSize: 0.12,
             maxChildSize: 0.85,
             snap: true,
-            snapSizes: const [0.12, 0.32, 0.85],
+            snapSizes: const [0.12, 0.32, 0.35, 0.85],
             builder: (context, scrollController) {
+              // Padding inferior = altura del nav bar para que el contenido
+              // no quede tapado cuando el sheet está en tamaño inicial
+              final navPadding =
+                  92.0 + MediaQuery.viewPaddingOf(context).bottom;
               return Container(
                 decoration: const BoxDecoration(
                   color: Color(0xFF0D1728),
@@ -485,7 +503,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 ),
                 child: Column(
                   children: [
-                    // Handle
                     Padding(
                       padding: const EdgeInsets.only(top: 10, bottom: 6),
                       child: Container(
@@ -497,14 +514,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ),
                       ),
                     ),
-                    // Contenido scrollable
                     Expanded(
                       child: _loading
                           ? const Center(child: CircularProgressIndicator())
                           : _error != null
                           ? Center(child: Text(_error!))
                           : req == null
-                          ? _buildEmptyState(scrollController)
+                          ? _buildEmptyState(
+                              scrollController,
+                              bottomPadding: navPadding,
+                            )
                           : _buildRequestCard(
                               scrollController,
                               req,
@@ -513,6 +532,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                               secondsRemaining,
                               hasPendingOffer,
                               isAcceptedOffer,
+                              bottomPadding: navPadding,
                             ),
                     ),
                   ],
@@ -604,10 +624,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
-  Widget _buildEmptyState(ScrollController sc) {
+  Widget _buildEmptyState(ScrollController sc, {double bottomPadding = 24}) {
     return ListView(
       controller: sc,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPadding),
       children: [
         const SizedBox(height: 16),
         const Icon(Icons.search_off, color: AppTheme.colorMuted, size: 48),
@@ -640,15 +660,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     String? offerStatus,
     int? secondsRemaining,
     bool hasPendingOffer,
-    bool isAcceptedOffer,
-  ) {
+    bool isAcceptedOffer, {
+    double bottomPadding = 24,
+  }) {
     final offerProgress = secondsRemaining == null
         ? null
         : (secondsRemaining / _offerLifetimeSeconds).clamp(0.0, 1.0).toDouble();
 
     return ListView(
       controller: sc,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 4, 16, bottomPadding),
       children: [
         // ── Card principal de la solicitud ──────────────────────────────
         Container(
@@ -865,6 +886,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             MaterialPageRoute<void>(
                               builder: (_) => CounterOfferScreen(
                                 requestId: req['id'] as String,
+                                originalBudget: (req['budget'] as num?)
+                                    ?.toDouble(),
+                                requestData: req,
                               ),
                             ),
                           );

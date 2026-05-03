@@ -424,6 +424,9 @@ class _OffersScreenState extends State<OffersScreen> {
                                     builder: (_) => CounterOfferScreen(
                                       requestId: _request?['id'] as String?,
                                       workerId: worker['id'] as String?,
+                                      originalBudget:
+                                          (_request?['budget'] as num?)
+                                              ?.toDouble(),
                                     ),
                                   ),
                                 );
