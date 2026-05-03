@@ -236,9 +236,28 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     final workerLat = (worker?['latitude'] as num?)?.toDouble();
     final workerLng = (worker?['longitude'] as num?)?.toDouble();
-    final mapCenter = workerLat != null && workerLng != null
+    final destLat = (_tracking?['destination']?['latitude'] as num?)
+        ?.toDouble();
+    final destLng = (_tracking?['destination']?['longitude'] as num?)
+        ?.toDouble();
+
+    // Posición del worker (se actualiza con el polling)
+    final workerPos = workerLat != null && workerLng != null
         ? LatLng(workerLat, workerLng)
         : const LatLng(-16.5002, -68.1342);
+
+    // Destino (ubicación del trabajo = donde está el cliente)
+    final destPos = destLat != null && destLng != null
+        ? LatLng(destLat, destLng)
+        : null;
+
+    // Centro: punto medio entre worker y destino
+    final mapCenter = destPos != null
+        ? LatLng(
+            (workerPos.latitude + destPos.latitude) / 2,
+            (workerPos.longitude + destPos.longitude) / 2,
+          )
+        : workerPos;
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -261,7 +280,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 : FlutterMap(
                     options: MapOptions(
                       initialCenter: mapCenter,
-                      initialZoom: 15,
+                      initialZoom: destPos != null ? 13 : 15,
                     ),
                     children: [
                       TileLayer(
@@ -272,11 +291,24 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           'accessToken': AppConfig.mapboxAccessToken,
                         },
                       ),
-                      // Marcador del worker (en movimiento)
+                      // Línea de ruta worker → destino
+                      if (destPos != null)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: [workerPos, destPos],
+                              color: AppTheme.colorSuccess.withValues(
+                                alpha: 0.8,
+                              ),
+                              strokeWidth: 4,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: [
+                          // Marcador del worker (en movimiento)
                           Marker(
-                            point: mapCenter,
+                            point: workerPos,
                             width: 48,
                             height: 48,
                             child: Container(
@@ -303,6 +335,37 @@ class _TrackingScreenState extends State<TrackingScreen> {
                               ),
                             ),
                           ),
+                          // Marcador del destino (tu ubicación = cliente)
+                          if (destPos != null)
+                            Marker(
+                              point: destPos,
+                              width: 52,
+                              height: 52,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppTheme.colorSuccess,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.colorSuccess.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      blurRadius: 14,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.home,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],

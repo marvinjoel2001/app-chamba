@@ -503,14 +503,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 ),
                 child: Column(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10, bottom: 6),
+                    // Handle conectado al scrollController para que arrastre
+                    GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        // Propagar el drag al scroll controller del sheet
+                        scrollController.position.moveTo(
+                          scrollController.offset - details.delta.dy,
+                          clamp: false,
+                        );
+                      },
                       child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppTheme.colorMuted.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(2),
+                        width: double.infinity,
+                        color: Colors.transparent,
+                        padding: const EdgeInsets.only(top: 10, bottom: 10),
+                        child: Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppTheme.colorMuted.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
                         ),
                       ),
                     ),

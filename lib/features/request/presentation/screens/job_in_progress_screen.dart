@@ -80,6 +80,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
       if (mounted) {
         setState(() => _deviceLocation = loc);
+        // Mover el mapa a la nueva posición del worker
+        try {
+          _mapController.move(loc, _mapController.camera.zoom);
+        } catch (_) {}
       }
 
       // Sincronizar con el backend
@@ -362,12 +366,30 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
     final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
     final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
-    // Prioridad: GPS del dispositivo → ubicación guardada en DB → fallback
-    final mapCenter =
+    final destLat = (_tracking?['destination']?['latitude'] as num?)
+        ?.toDouble();
+    final destLng = (_tracking?['destination']?['longitude'] as num?)
+        ?.toDouble();
+
+    // Worker: GPS del dispositivo → DB → fallback
+    final workerPos =
         _deviceLocation ??
         (workerLat != null && workerLng != null
             ? LatLng(workerLat, workerLng)
             : const LatLng(-16.5002, -68.1342));
+
+    // Destino (ubicación del trabajo)
+    final destPos = destLat != null && destLng != null
+        ? LatLng(destLat, destLng)
+        : null;
+
+    // Centro del mapa: punto medio entre worker y destino, o solo worker
+    final mapCenter = destPos != null
+        ? LatLng(
+            (workerPos.latitude + destPos.latitude) / 2,
+            (workerPos.longitude + destPos.longitude) / 2,
+          )
+        : workerPos;
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -391,7 +413,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                     mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
-                      initialZoom: 15,
+                      initialZoom: destPos != null ? 13 : 15,
                     ),
                     children: [
                       TileLayer(
@@ -402,11 +424,24 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                           'accessToken': AppConfig.mapboxAccessToken,
                         },
                       ),
+                      // Línea de ruta entre worker y destino
+                      if (destPos != null)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: [workerPos, destPos],
+                              color: AppTheme.colorPrimary.withValues(
+                                alpha: 0.8,
+                              ),
+                              strokeWidth: 4,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: [
-                          // Punto azul = ubicación actual del dispositivo
+                          // Marcador del worker (punto azul con navegación)
                           Marker(
-                            point: mapCenter,
+                            point: workerPos,
                             width: 52,
                             height: 52,
                             child: Container(
@@ -432,6 +467,36 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                               ),
                             ),
                           ),
+                          // Marcador del destino (pin morado)
+                          if (destPos != null)
+                            Marker(
+                              point: destPos,
+                              width: 48,
+                              height: 48,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppTheme.colorPrimary,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.colorPrimary.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      blurRadius: 12,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],
