@@ -71,6 +71,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _realtime.on('offer.accepted', _onOfferAccepted);
     _realtime.on('offer.rejected', _onOfferRejected);
     _realtime.on('offer.expired', _onOfferExpired);
+    _realtime.on('job.completed', _onJobFinished);
+    _realtime.on('job.cancelled', _onJobFinished);
 
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       _tickOfferCountdown();
@@ -91,6 +93,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _realtime.off('offer.accepted', _onOfferAccepted);
     _realtime.off('offer.rejected', _onOfferRejected);
     _realtime.off('offer.expired', _onOfferExpired);
+    _realtime.off('job.completed', _onJobFinished);
+    _realtime.off('job.cancelled', _onJobFinished);
     _ticker?.cancel();
     _pollTimer?.cancel();
     _acceptedAnimCtrl.dispose();
@@ -155,6 +159,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onNewRequest(dynamic payload) => _load(silent: true);
+
+  void _onJobFinished(dynamic _) {
+    // Trabajo completado o cancelado → limpiar solicitud de la pantalla
+    SessionStore.activeRequestId = null;
+    SessionStore.activeThreadId = null;
+    if (mounted) {
+      setState(() {
+        _request = null;
+      });
+    }
+  }
 
   void _onRequestUpdated(dynamic payload) {
     final userId = SessionStore.currentUser?.id;
@@ -256,6 +271,21 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       );
       final request = response['request'];
       final mutableRequest = _toMutableRequest(request);
+
+      // Si la solicitud está completada o cancelada, limpiar y no mostrar
+      final requestStatus = mutableRequest?['status']?.toString();
+      if (requestStatus == 'completed' || requestStatus == 'cancelled') {
+        SessionStore.activeRequestId = null;
+        SessionStore.activeThreadId = null;
+        if (mounted) {
+          setState(() {
+            _request = null;
+            _loading = false;
+          });
+        }
+        return;
+      }
+
       SessionStore.activeRequestId = mutableRequest?['id']?.toString();
 
       final offerStatus = (mutableRequest?['workerOffer'] as Map?)?['status']

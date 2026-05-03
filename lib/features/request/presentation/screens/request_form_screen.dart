@@ -405,7 +405,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Categorias sugeridas por IA',
+              'Categorias sugeridas',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -477,6 +477,51 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     ),
                   )
                   .toList(),
+            ),
+            const SizedBox(height: 8),
+            // Descripción dinámica del tipo de precio seleccionado
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                key: ValueKey(priceType),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.colorPrimary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: AppTheme.colorPrimaryLight,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        priceType == 'Precio fijo'
+                            ? 'Precio fijo: el monto indicado es el total que se pagará al finalizar todo el trabajo, sin importar el tiempo que tome.'
+                            : priceType == 'Por hora'
+                            ? 'Por hora: el monto indicado se pagará por cada hora de trabajo. El total dependerá del tiempo que dure el servicio.'
+                            : 'Por día: el monto indicado se pagará por cada día completo de trabajo realizado.',
+                        style: const TextStyle(
+                          color: AppTheme.colorPrimaryLight,
+                          fontSize: 11,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Row(

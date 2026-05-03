@@ -22,6 +22,7 @@ class TrackingScreen extends StatefulWidget {
 
 class _TrackingScreenState extends State<TrackingScreen> {
   final RealtimeService _realtime = RealtimeService.instance;
+  final MapController _mapController = MapController();
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _tracking;
@@ -278,6 +279,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   )
                 : FlutterMap(
+                    mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: destPos != null ? 13 : 15,
@@ -442,6 +444,37 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+
+          // ── CONTROLES DE MAPA ─────────────────────────────────────────
+          Positioned(
+            right: 12,
+            top: MediaQuery.of(context).padding.top + 12,
+            child: Column(
+              children: [
+                _MapBtn(
+                  icon: Icons.add,
+                  onTap: () {
+                    final z = (_mapController.camera.zoom + 1).clamp(3.0, 20.0);
+                    _mapController.move(_mapController.camera.center, z);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _MapBtn(
+                  icon: Icons.remove,
+                  onTap: () {
+                    final z = (_mapController.camera.zoom - 1).clamp(3.0, 20.0);
+                    _mapController.move(_mapController.camera.center, z);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _MapBtn(
+                  icon: Icons.center_focus_strong,
+                  highlighted: true,
+                  onTap: () => _mapController.move(mapCenter, 13),
+                ),
+              ],
             ),
           ),
 
@@ -724,6 +757,39 @@ class _ActionIconButton extends StatelessWidget {
           border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
         child: Icon(icon, color: color, size: 22),
+      ),
+    );
+  }
+}
+
+class _MapBtn extends StatelessWidget {
+  const _MapBtn({
+    required this.icon,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: highlighted ? AppTheme.colorPrimary : AppTheme.colorGlassDarkSoft,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(
+            icon,
+            color: highlighted ? Colors.white : AppTheme.colorText,
+            size: 20,
+          ),
+        ),
       ),
     );
   }
