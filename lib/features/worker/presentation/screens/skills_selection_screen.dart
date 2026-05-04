@@ -250,7 +250,10 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                      ),
                     ),
                     const Spacer(),
                     Text(

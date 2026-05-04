@@ -214,7 +214,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
         userId: user.id,
       );
       if (!mounted) return;
-      Navigator.of(context).pop();
+      // Limpiar sesión del cliente
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
+      // Volver al inicio (no solo pop — evita pantalla negra)
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -777,10 +781,10 @@ class _MapBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: highlighted ? AppTheme.colorPrimary : AppTheme.colorGlassDarkSoft,
-      borderRadius: BorderRadius.circular(12),
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        customBorder: const CircleBorder(),
         child: SizedBox(
           width: 40,
           height: 40,

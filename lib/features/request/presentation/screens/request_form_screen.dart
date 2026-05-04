@@ -501,7 +501,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   children: [
                     const Icon(
                       Icons.info_outline,
-                      color: AppTheme.colorPrimaryLight,
+                      color: AppTheme.colorTextOnPurple,
                       size: 14,
                     ),
                     const SizedBox(width: 6),
@@ -513,7 +513,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                             ? 'Por hora: el monto indicado se pagará por cada hora de trabajo. El total dependerá del tiempo que dure el servicio.'
                             : 'Por día: el monto indicado se pagará por cada día completo de trabajo realizado.',
                         style: const TextStyle(
-                          color: AppTheme.colorPrimaryLight,
+                          color: AppTheme.colorMuted,
                           fontSize: 11,
                           height: 1.4,
                         ),

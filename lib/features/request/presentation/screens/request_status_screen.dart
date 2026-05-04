@@ -418,7 +418,49 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 ],
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () async {
+                    final user = SessionStore.currentUser;
+                    final requestId = SessionStore.activeRequestId;
+                    if (user == null || requestId == null) {
+                      Navigator.of(context).pop();
+                      return;
+                    }
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        backgroundColor: AppTheme.colorBackgroundAccent,
+                        title: const Text('Cancelar solicitud'),
+                        content: const Text(
+                          '¿Estás seguro de que deseas cancelar esta solicitud?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('No'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              'Sí, cancelar',
+                              style: TextStyle(color: AppTheme.colorError),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
+                    try {
+                      await MobileBackendService.cancelJob(
+                        requestId: requestId,
+                        userId: user.id,
+                      );
+                    } catch (_) {}
+                    // Limpiar sesión independientemente del resultado
+                    SessionStore.activeRequestId = null;
+                    SessionStore.activeThreadId = null;
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  },
                   child: const Text(
                     'Cancelar solicitud',
                     style: TextStyle(color: AppTheme.colorMuted),

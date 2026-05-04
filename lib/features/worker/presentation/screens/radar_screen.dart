@@ -207,6 +207,13 @@ class _RadarScreenState extends State<RadarScreen> {
             children: [
               Row(
                 children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white,
+                    ),
+                  ),
                   Text(
                     'Radar de Trabajo',
                     style: Theme.of(context).textTheme.headlineSmall,

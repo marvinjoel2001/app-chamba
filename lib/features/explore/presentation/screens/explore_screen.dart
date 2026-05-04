@@ -108,13 +108,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
         SessionStore.activeRequestId = activeRequest['id'] as String?;
       }
 
+      // Si la solicitud activa está cancelada o completada, limpiarla
+      final activeStatus = (activeRequest as Map<String, dynamic>?)?['status']
+          ?.toString();
+      final cleanedRequest =
+          (activeStatus == 'cancelled' || activeStatus == 'completed')
+          ? null
+          : (activeRequest is Map<String, dynamic> ? activeRequest : null);
+
+      if (cleanedRequest == null) {
+        SessionStore.activeRequestId = null;
+      }
+
       setState(() {
         _currentUserLocation = currentLocation;
         _workers = (response['nearbyWorkers'] as List<dynamic>? ?? const []);
         _categories = (response['categories'] as List<dynamic>? ?? const []);
-        _activeRequest = activeRequest is Map<String, dynamic>
-            ? activeRequest
-            : null;
+        _activeRequest = cleanedRequest;
         _loading = false;
       });
 
