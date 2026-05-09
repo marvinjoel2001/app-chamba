@@ -9,7 +9,9 @@ import 'package:mobile/features/auth/presentation/screens/register_screen.dart';
 
 void main() {
   group('Widget – LoginScreen: validaciones de formulario', () {
-    testWidgets('muestra campo de correo/telefono y boton Siguiente', (tester) async {
+    testWidgets('muestra campo de correo/telefono y boton Siguiente', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: LoginScreen())),
       );
@@ -18,7 +20,9 @@ void main() {
       expect(find.text('Siguiente'), findsOneWidget);
     });
 
-    testWidgets('muestra error si campo vacio al presionar Siguiente', (tester) async {
+    testWidgets('muestra error si campo vacio al presionar Siguiente', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: LoginScreen())),
       );
@@ -117,7 +121,10 @@ void main() {
         const ProviderScope(child: MaterialApp(home: RegisterScreen())),
       );
       await tester.pump();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Nombre'), 'Juan');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Juan',
+      );
       await tester.pump();
       await tester.tap(find.text('Crear cuenta'));
       await tester.pump();
@@ -129,25 +136,51 @@ void main() {
         const ProviderScope(child: MaterialApp(home: RegisterScreen())),
       );
       await tester.pump();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Nombre'), 'Juan');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'juan@test.com');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), '123');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Juan',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Correo'),
+        'juan@test.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contraseña'),
+        '123',
+      );
       await tester.pump();
       await tester.tap(find.text('Crear cuenta'));
       await tester.pump();
       expect(find.text('Mínimo 4 caracteres'), findsOneWidget);
     });
 
-    testWidgets('puede ingresar todos los campos correctamente', (tester) async {
+    testWidgets('puede ingresar todos los campos correctamente', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: RegisterScreen())),
       );
       await tester.pump();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Nombre'), 'Juan');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Apellido (opcional)'), 'Perez');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'juan@test.com');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Teléfono (opcional)'), '70000000');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'pass1234');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Juan',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Apellido (opcional)'),
+        'Perez',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Correo'),
+        'juan@test.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Teléfono (opcional)'),
+        '70000000',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contraseña'),
+        'pass1234',
+      );
       await tester.pump();
       expect(find.text('Juan'), findsOneWidget);
       expect(find.text('juan@test.com'), findsOneWidget);
@@ -161,14 +194,25 @@ void main() {
       expect(find.text('Ya tengo cuenta'), findsOneWidget);
     });
 
-    testWidgets('campo apellido es opcional (no muestra error si vacio)', (tester) async {
+    testWidgets('campo apellido es opcional (no muestra error si vacio)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: RegisterScreen())),
       );
       await tester.pump();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Nombre'), 'Juan');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Correo'), 'juan@test.com');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'pass1234');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Juan',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Correo'),
+        'juan@test.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contraseña'),
+        'pass1234',
+      );
       await tester.pump();
       // No error for empty apellido
       expect(find.text('Ingresa tu apellido'), findsNothing);

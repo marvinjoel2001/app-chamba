@@ -11,8 +11,8 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
+import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
 class IncomingRequestScreen extends StatefulWidget {
@@ -36,6 +36,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   LatLng? _workerLocation;
   bool _available = true; // se actualiza desde la DB en _initLocation
   bool _togglingAvailability = false;
+
+  // El cliente hizo una contraoferta al worker
+  bool _clientCountered = false;
 
   // Animación banner oferta aceptada
   bool _showAcceptedBanner = false;
@@ -68,6 +71,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _realtime.connect(userId: userId);
     _realtime.on('request.new', _onNewRequest);
     _realtime.on('offer.updated', _onRequestUpdated);
+    _realtime.on('offer.client_counter', _onClientCounter);
     _realtime.on('offer.accepted', _onOfferAccepted);
     _realtime.on('offer.rejected', _onOfferRejected);
     _realtime.on('offer.expired', _onOfferExpired);
@@ -79,7 +83,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     });
     // Polling silencioso — no muestra spinner
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (mounted && _request == null) _load(silent: true);
+      if (mounted) _load(silent: true);
     });
 
     _initLocation();
@@ -90,6 +94,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   void dispose() {
     _realtime.off('request.new', _onNewRequest);
     _realtime.off('offer.updated', _onRequestUpdated);
+    _realtime.off('offer.client_counter', _onClientCounter);
     _realtime.off('offer.accepted', _onOfferAccepted);
     _realtime.off('offer.rejected', _onOfferRejected);
     _realtime.off('offer.expired', _onOfferExpired);
@@ -130,10 +135,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
       final user = SessionStore.currentUser;
       if (user != null) {
-        await MobileBackendService.updateWorkerLocation(
+        (await RequestDependencies.updateWorkerLocation(
           workerUserId: user.id,
           latitude: pos.latitude,
           longitude: pos.longitude,
+        )).fold(
+          onSuccess: (value) => value,
+          onFailure: (failure) => throw Exception(failure.message),
         );
       }
     } catch (_) {}
@@ -145,12 +153,25 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     setState(() {
       _togglingAvailability = true;
       _available = value;
+      if (!value) {
+        // Al marcar OCUPADO ocultamos inmediatamente solicitudes/ofertas.
+        _request = null;
+        _clientCountered = false;
+        _showAcceptedBanner = false;
+        _error = null;
+      }
     });
     try {
-      await MobileBackendService.setAvailability(
+      (await RequestDependencies.setAvailability(
         workerUserId: user.id,
         available: value,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
+      if (mounted && value) {
+        await _load(silent: true);
+      }
     } catch (_) {
       if (mounted) setState(() => _available = !value);
     } finally {
@@ -182,14 +203,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               SizedBox(width: 8),
               Text(
                 'El cliente canceló el trabajo',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
           backgroundColor: AppTheme.colorError,
           duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -201,6 +227,37 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (map['workerUserId'] != null &&
         map['workerUserId'].toString() != userId) {
       return;
+    }
+    _load(silent: true);
+  }
+
+  void _onClientCounter(dynamic payload) {
+    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    final eventRequestId = map['requestId']?.toString();
+    final newBudget = (map['newBudget'] as num?)?.toDouble();
+    final currentRequestId =
+        _request?['id']?.toString() ?? SessionStore.activeRequestId;
+    if (eventRequestId != null &&
+        currentRequestId != null &&
+        eventRequestId != currentRequestId) {
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _clientCountered = true;
+        final current = _request;
+        if (current != null &&
+            (eventRequestId == null ||
+                current['id']?.toString() == eventRequestId)) {
+          if (newBudget != null) {
+            current['budget'] = newBudget;
+          }
+          current['workerOffer'] = null;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El cliente envió una contraoferta')),
+      );
     }
     _load(silent: true);
   }
@@ -250,7 +307,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   void _tickOfferCountdown() {
     final request = _request;
-    if (!mounted || request == null) return;
+    if (!mounted || !_available || request == null) return;
     final offer = request['workerOffer'];
     if (offer is! Map<String, dynamic>) return;
     if (offer['status']?.toString() != 'pending') return;
@@ -282,6 +339,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
       return;
     }
+    if (!_available) {
+      if (mounted) {
+        setState(() {
+          _request = null;
+          _clientCountered = false;
+          _loading = false;
+          _error = null;
+        });
+      }
+      return;
+    }
     // Solo mostrar spinner en la carga inicial, no en polling silencioso
     if (!silent) {
       setState(() {
@@ -290,11 +358,57 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
     }
     try {
-      final response = await MobileBackendService.incomingRequest(
-        workerUserId: user.id,
-      );
+      final previousRequest = _request;
+      final previousRequestId = previousRequest?['id']?.toString();
+      final previousBudget = (previousRequest?['budget'] as num?)?.toDouble();
+      final previousOffer =
+          previousRequest?['workerOffer'] as Map<String, dynamic>?;
+      final previousOfferStatus = previousOffer?['status']?.toString();
+      final previousOfferAmount = (previousOffer?['amount'] as num?)
+          ?.toDouble();
+
+      final response =
+          (await RequestDependencies.getIncomingRequest(workerUserId: user.id))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       final request = response['request'];
       final mutableRequest = _toMutableRequest(request);
+      final newRequestId = mutableRequest?['id']?.toString();
+      final newBudget = (mutableRequest?['budget'] as num?)?.toDouble();
+      final newOffer = mutableRequest?['workerOffer'] as Map<String, dynamic>?;
+      final newOfferStatus = newOffer?['status']?.toString();
+
+      final isDifferentRequest =
+          previousRequestId != null &&
+          newRequestId != null &&
+          previousRequestId != newRequestId;
+      final budgetIncreased =
+          previousBudget != null &&
+          newBudget != null &&
+          newBudget > previousBudget;
+      final budgetAbovePreviousOffer =
+          previousOfferAmount != null &&
+          newBudget != null &&
+          newBudget > previousOfferAmount;
+      final lostPendingOffer =
+          previousOfferStatus == 'pending' && newOfferStatus != 'pending';
+
+      bool inferredClientCountered = _clientCountered;
+      if (mutableRequest == null || isDifferentRequest) {
+        inferredClientCountered = false;
+      } else if (newOfferStatus == 'pending' ||
+          newOfferStatus == 'accepted' ||
+          newOfferStatus == 'declined') {
+        inferredClientCountered = false;
+      } else if (lostPendingOffer &&
+          (budgetIncreased || budgetAbovePreviousOffer)) {
+        // Fallback por polling: si perdimos la oferta pendiente y subió el budget,
+        // tratamos el estado como contraoferta del cliente.
+        inferredClientCountered = true;
+      }
 
       // Si la solicitud está completada o cancelada, limpiar y no mostrar
       final requestStatus = mutableRequest?['status']?.toString();
@@ -341,6 +455,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           _request = mutableRequest;
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
+          _clientCountered = inferredClientCountered;
           _loading = false;
         });
       }
@@ -594,6 +709,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         hasPendingOffer,
                         isAcceptedOffer,
                         navPadding,
+                        _clientCountered,
                       ),
                   ],
                 ),
@@ -722,6 +838,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     bool hasPendingOffer,
     bool isAcceptedOffer,
     double bottomPadding,
+    bool clientCountered,
   ) {
     final offerProgress = secondsRemaining == null
         ? null
@@ -734,194 +851,119 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final currentBudget = (req['budget'] as num?)?.toDouble() ?? 0;
     final myOfferAmount = (workerOffer?['amount'] as num?)?.toDouble();
 
+    // Detectar oferta declinada
+    final isDeclinedOffer = offerStatus == 'declined';
+
     // El cliente mejoró su oferta si el budget actual es mayor que mi oferta
     final clientImproved =
         hasPendingOffer &&
+        !isDeclinedOffer &&
         myOfferAmount != null &&
         currentBudget > myOfferAmount;
 
-    // Color del precio según estado
-    final priceColor = clientImproved
-        ? AppTheme.colorSuccess
-        : hasPendingOffer
-        ? AppTheme.colorMuted
-        : AppTheme.colorText;
-
-    final borderColor = isAcceptedOffer
-        ? AppTheme.colorSuccess.withValues(alpha: 0.5)
-        : clientImproved
-        ? AppTheme.colorSuccess.withValues(alpha: 0.3)
-        : AppTheme.colorGlassBorderSoft;
+    final categoryLabel = req['category']?.toString().trim().isNotEmpty == true
+        ? req['category'].toString().trim()
+        : 'General';
+    final darkText = AppTheme.colorText;
+    final mutedText = AppTheme.colorMuted;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(12, 4, 12, bottomPadding),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF111C30),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xE6101E38), Color(0xCC132A52)],
+          ),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: AppTheme.colorPrimary.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.colorPrimary.withValues(alpha: 0.2),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Fila 1: precio + categoría + distancia + badge ────
+            // ── Fila 1: precio + categoría + distancia ────
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Precio actual (puede ser el del cliente mejorado)
                 Text(
                   'Bs ${currentBudget.toStringAsFixed(0)}',
                   style: TextStyle(
-                    color: priceColor,
-                    fontSize: 24,
+                    color: darkText,
+                    fontSize: 27,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                    horizontal: 10,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.colorPrimary,
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF7A5AF8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    req['priceType']?.toString() ??
-                        req['category']?.toString() ??
-                        'General',
+                    categoryLabel,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 if (distanceText != null) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 10),
                   const Icon(
                     Icons.location_on,
                     color: AppTheme.colorMuted,
-                    size: 12,
+                    size: 15,
                   ),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: 3),
                   Text(
                     distanceText,
-                    style: const TextStyle(
-                      color: AppTheme.colorMuted,
-                      fontSize: 12,
+                    style: TextStyle(
+                      color: mutedText,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
-                const Spacer(),
-                if (isAcceptedOffer)
-                  _StatusBadge(label: 'ACEPTADA', color: AppTheme.colorSuccess)
-                else if (clientImproved)
-                  _StatusBadge(
-                    label: '↑ MEJORADA',
-                    color: AppTheme.colorSuccess,
-                  )
-                else if (hasPendingOffer)
-                  _StatusBadge(
-                    label: 'ENVIADA',
-                    color: AppTheme.colorHighlight,
-                  ),
               ],
             ),
-
-            // ── Mi oferta (si existe) ──────────────────────────────
-            if (myOfferAmount != null && !isAcceptedOffer) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Text(
-                    'Precio original: Bs ${myOfferAmount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      color: AppTheme.colorMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                  if (clientImproved) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_upward,
-                      color: AppTheme.colorSuccess,
-                      size: 12,
-                    ),
-                    Text(
-                      ' El cliente subió su oferta',
-                      style: const TextStyle(
-                        color: AppTheme.colorSuccess,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
 
             const SizedBox(height: 8),
             // ── Descripción ───────────────────────────────────────
             Text(
               req['description']?.toString() ?? '',
-              style: const TextStyle(
-                color: AppTheme.colorText,
+              style: TextStyle(
+                color: darkText,
                 fontSize: 16,
-                fontWeight: FontWeight.w700,
-                height: 1.3,
+                fontWeight: FontWeight.w800,
+                height: 1.25,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-
-            // ── Estado de espera (oferta pendiente sin mejora) ────
-            if (hasPendingOffer && !clientImproved && !isAcceptedOffer) ...[
-              const SizedBox(height: 6),
-              const Text(
-                'Esperando que el cliente acepte tu oferta...',
-                style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
-              ),
-            ],
-
-            // ── Barra de tiempo ────────────────────────────────────
-            if (offerProgress != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        minHeight: 3,
-                        value: offerProgress,
-                        backgroundColor: AppTheme.colorPrimary.withValues(
-                          alpha: 0.14,
-                        ),
-                        color: offerProgress > 0.3
-                            ? AppTheme.colorPrimary
-                            : AppTheme.colorError,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${secondsRemaining}s',
-                    style: const TextStyle(
-                      color: AppTheme.colorMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            const SizedBox(height: 12),
-            const Divider(color: Color(0xFF1E2D45), height: 1, thickness: 1),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            Divider(
+              color: Colors.white.withValues(alpha: 0.12),
+              height: 1,
+              thickness: 1,
+            ),
+            const SizedBox(height: 10),
 
             // ── Botones según estado ───────────────────────────────
             if (isAcceptedOffer) ...[
@@ -929,6 +971,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 label: 'VER TRABAJO EN CURSO',
                 icon: Icons.directions_run,
                 isYellow: true,
+                compact: true,
                 onPressed: _openJobInProgress,
               ),
               const SizedBox(height: 8),
@@ -957,36 +1000,36 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   minimumSize: const Size(double.infinity, 44),
                 ),
               ),
-            ] else if (hasPendingOffer && !clientImproved) ...[
-              // Oferta enviada, esperando — solo mostrar info
+            ] else if (isDeclinedOffer) ...[
+              // ── Oferta declinada (no me interesa) ────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppTheme.colorHighlight.withValues(alpha: 0.08),
+                  color: AppTheme.colorMuted.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.colorHighlight.withValues(alpha: 0.3),
+                    color: AppTheme.colorMuted.withValues(alpha: 0.3),
                   ),
                 ),
                 child: const Column(
                   children: [
                     Icon(
-                      Icons.hourglass_top,
-                      color: AppTheme.colorHighlight,
+                      Icons.do_not_disturb,
+                      color: AppTheme.colorMuted,
                       size: 20,
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Tu oferta fue enviada',
+                      'Marcado como no interesado',
                       style: TextStyle(
-                        color: AppTheme.colorHighlight,
+                        color: AppTheme.colorMuted,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
                     Text(
-                      'Esperando respuesta del cliente',
+                      'Puedes reactivar tu oferta en cualquier momento',
                       style: TextStyle(
                         color: AppTheme.colorMuted,
                         fontSize: 11,
@@ -995,23 +1038,463 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ],
                 ),
               ),
+              // Volver a interesar → reactiva la oferta
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    _request = null;
-                    SessionStore.activeRequestId = null;
-                  });
+                onPressed: () async {
+                  final user = SessionStore.currentUser;
+                  if (user == null) return;
+                  (await RequestDependencies.reactivateOffer(
+                    requestId: req['id'] as String,
+                    workerUserId: user.id,
+                  )).fold(
+                    onSuccess: (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Oferta reactivada')),
+                        );
+                        _load(silent: true);
+                      }
+                    },
+                    onFailure: (failure) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        );
+                      }
+                    },
+                  );
                 },
                 style: TextButton.styleFrom(
                   minimumSize: const Size(double.infinity, 36),
                 ),
                 child: const Text(
+                  'Volver a interesar',
+                  style: TextStyle(color: AppTheme.colorPrimary, fontSize: 13),
+                ),
+              ),
+            ] else if (clientCountered) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFFEDD5)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFF1E7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.swap_horiz_rounded,
+                        color: Color(0xFFF97316),
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'CONTRAOFERTA RECIBIDA',
+                            style: TextStyle(
+                              color: Color(0xFFF97316),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'El cliente te contraofertó',
+                            style: TextStyle(
+                              color: Color(0xFF374151),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFEDD5),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Nueva oferta',
+                              style: TextStyle(
+                                color: Color(0xFFF97316),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Bs ${currentBudget.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (offerProgress != null) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    minHeight: 5,
+                    value: offerProgress,
+                    backgroundColor: AppTheme.colorPrimary.withValues(
+                      alpha: 0.15,
+                    ),
+                    color: offerProgress > 0.3
+                        ? AppTheme.colorPrimary
+                        : AppTheme.colorError,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChambaPrimaryButton(
+                      label: 'ACEPTAR',
+                      icon: Icons.check_circle,
+                      isYellow: true,
+                      compact: true,
+                      onPressed: () async {
+                        final user = SessionStore.currentUser;
+                        if (user == null) return;
+                        try {
+                          (await RequestDependencies.createCounterOffer(
+                            requestId: req['id'] as String,
+                            workerUserId: user.id,
+                            amount: currentBudget,
+                            message: 'Acepto el precio ofertado.',
+                          )).fold(
+                            onSuccess: (value) => value,
+                            onFailure: (failure) =>
+                                throw Exception(failure.message),
+                          );
+                          if (mounted) {
+                            setState(() => _clientCountered = false);
+                            await _load();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().replaceFirst('Exception: ', ''),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: ChambaPrimaryButton(
+                      label: 'OFERTAR',
+                      icon: Icons.payments,
+                      compact: true,
+                      onPressed: () async {
+                        final sent = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => CounterOfferScreen(
+                              requestId: req['id'] as String,
+                              originalBudget: currentBudget,
+                              requestData: req,
+                            ),
+                          ),
+                        );
+                        if (sent == true && mounted) {
+                          setState(() => _clientCountered = false);
+                          await _load(silent: true);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () async {
+                  final user = SessionStore.currentUser;
+                  if (user == null) return;
+                  (await RequestDependencies.declineOffer(
+                    requestId: req['id'] as String,
+                    workerUserId: user.id,
+                  )).fold(
+                    onSuccess: (_) {
+                      if (mounted) {
+                        setState(() => _clientCountered = false);
+                        _load(silent: true);
+                      }
+                    },
+                    onFailure: (failure) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        );
+                      }
+                    },
+                  );
+                },
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 30),
+                ),
+                child: const Text(
                   'No me interesa',
-                  style: TextStyle(color: AppTheme.colorMuted, fontSize: 13),
+                  style: TextStyle(
+                    color: AppTheme.colorText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ] else if (hasPendingOffer) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F1FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.watch_later_outlined,
+                        color: Color(0xFF2563EB),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'NEGOCIACIÓN EN CURSO',
+                            style: TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            secondsRemaining != null
+                                ? 'Tú ofertaste · expira en ${secondsRemaining}s'
+                                : 'Tú ofertaste',
+                            style: const TextStyle(
+                              color: Color(0xFF374151),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Tu oferta enviada',
+                              style: TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Bs ${(myOfferAmount ?? currentBudget).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (offerProgress != null) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    minHeight: 5,
+                    value: offerProgress,
+                    backgroundColor: AppTheme.colorPrimary.withValues(
+                      alpha: 0.15,
+                    ),
+                    color: offerProgress > 0.3
+                        ? AppTheme.colorPrimary
+                        : AppTheme.colorError,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChambaPrimaryButton(
+                      label: 'ACEPTAR',
+                      icon: Icons.check_circle,
+                      isYellow: true,
+                      compact: true,
+                      onPressed: () async {
+                        final user = SessionStore.currentUser;
+                        if (user == null) return;
+                        try {
+                          (await RequestDependencies.createCounterOffer(
+                            requestId: req['id'] as String,
+                            workerUserId: user.id,
+                            amount: currentBudget,
+                            message: 'Acepto el precio ofertado.',
+                          )).fold(
+                            onSuccess: (value) => value,
+                            onFailure: (failure) =>
+                                throw Exception(failure.message),
+                          );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Oferta enviada')),
+                          );
+                          await _load();
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                e.toString().replaceFirst('Exception: ', ''),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: ChambaPrimaryButton(
+                      label: 'OFERTAR',
+                      icon: Icons.payments,
+                      compact: true,
+                      onPressed: () async {
+                        final sent = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => CounterOfferScreen(
+                              requestId: req['id'] as String,
+                              originalBudget: currentBudget,
+                              requestData: req,
+                            ),
+                          ),
+                        );
+                        if (sent == true && mounted) {
+                          await _load(silent: true);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () async {
+                  final user = SessionStore.currentUser;
+                  if (user == null) return;
+                  (await RequestDependencies.declineOffer(
+                    requestId: req['id'] as String,
+                    workerUserId: user.id,
+                  )).fold(
+                    onSuccess: (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Oferta marcada como no interesada'),
+                          ),
+                        );
+                        _load(silent: true);
+                      }
+                    },
+                    onFailure: (failure) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        );
+                      }
+                    },
+                  );
+                },
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 30),
+                ),
+                child: const Text(
+                  'No me interesa',
+                  style: TextStyle(
+                    color: AppTheme.colorText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ] else ...[
-              // Sin oferta o cliente mejoró → mostrar botones de acción
+              // ── Sin oferta activa → mostrar botones de acción ──────
               if (clientImproved)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -1055,23 +1538,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       label: 'ACEPTAR',
                       icon: Icons.check_circle,
                       isYellow: true,
+                      compact: true,
                       onPressed: () async {
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
-                          await MobileBackendService.counterOffer(
+                          (await RequestDependencies.createCounterOffer(
                             requestId: req['id'] as String,
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
+                          )).fold(
+                            onSuccess: (value) => value,
+                            onFailure: (failure) =>
+                                throw Exception(failure.message),
                           );
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Oferta enviada')),
                           );
                           await _load();
                         } catch (e) {
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -1083,14 +1571,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: ChambaPrimaryButton(
                       label: 'OFERTAR',
                       icon: Icons.payments,
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
+                      compact: true,
+                      onPressed: () async {
+                        final sent = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
                               requestId: req['id'] as String,
                               originalBudget: currentBudget,
@@ -1098,55 +1587,55 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             ),
                           ),
                         );
+                        if (sent == true && mounted) {
+                          await _load(silent: true);
+                        }
                       },
                     ),
                   ),
                 ],
               ),
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    _request = null;
-                    SessionStore.activeRequestId = null;
-                  });
+                onPressed: () async {
+                  final user = SessionStore.currentUser;
+                  if (user == null) return;
+                  (await RequestDependencies.declineOffer(
+                    requestId: req['id'] as String,
+                    workerUserId: user.id,
+                  )).fold(
+                    onSuccess: (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Oferta marcada como no interesada'),
+                          ),
+                        );
+                        _load(silent: true);
+                      }
+                    },
+                    onFailure: (failure) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(failure.message)),
+                        );
+                      }
+                    },
+                  );
                 },
                 style: TextButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 36),
+                  minimumSize: const Size(double.infinity, 30),
                 ),
                 child: const Text(
                   'No me interesa',
-                  style: TextStyle(color: AppTheme.colorMuted, fontSize: 13),
+                  style: TextStyle(
+                    color: AppTheme.colorText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
         ),
       ),
     );

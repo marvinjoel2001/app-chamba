@@ -56,9 +56,9 @@ class EmptyRequestsScreen extends StatelessWidget {
                 Text(
                   'Parece que todo esta tranquilo por ahora. Te avisaremos en cuanto aparezca una nueva oportunidad cerca de ti.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.colorMuted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: AppTheme.colorMuted),
                 ),
                 const Spacer(),
                 ChambaPrimaryButton(

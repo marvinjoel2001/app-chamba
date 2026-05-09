@@ -1,23 +1,50 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../domain/entities/worker_category.dart';
+import '../../domain/usecases/worker_usecases.dart';
+import '../state/worker_dependencies.dart';
 
 class SkillsSelectionScreen extends StatefulWidget {
-  const SkillsSelectionScreen({this.forceToHomeAfterSave = false, super.key});
+  const SkillsSelectionScreen({
+    this.getWorkerCategoriesUseCase,
+    this.getWorkerSkillsUseCase,
+    this.createWorkerCategoryUseCase,
+    this.updateWorkerSkillsUseCase,
+    this.forceToHomeAfterSave = false,
+    super.key,
+  });
 
   final bool forceToHomeAfterSave;
+  final GetWorkerCategoriesUseCase? getWorkerCategoriesUseCase;
+  final GetWorkerSkillsUseCase? getWorkerSkillsUseCase;
+  final CreateWorkerCategoryUseCase? createWorkerCategoryUseCase;
+  final UpdateWorkerSkillsUseCase? updateWorkerSkillsUseCase;
 
   @override
   State<SkillsSelectionScreen> createState() => _SkillsSelectionScreenState();
 }
 
 class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
+  GetWorkerCategoriesUseCase get _getWorkerCategoriesUseCase =>
+      widget.getWorkerCategoriesUseCase ??
+      WorkerDependencies.getWorkerCategories;
+  GetWorkerSkillsUseCase get _getWorkerSkillsUseCase =>
+      widget.getWorkerSkillsUseCase ?? WorkerDependencies.getWorkerSkills;
+  CreateWorkerCategoryUseCase get _createWorkerCategoryUseCase =>
+      widget.createWorkerCategoryUseCase ??
+      WorkerDependencies.createWorkerCategory;
+  UpdateWorkerSkillsUseCase get _updateWorkerSkillsUseCase =>
+      widget.updateWorkerSkillsUseCase ?? WorkerDependencies.updateWorkerSkills;
+
   final Set<String> selected = <String>{};
   bool _loading = true;
+  bool _isOffline = false;
+  bool _shouldRedirectToLogin = false;
   List<(String, IconData)> _skills = const [
     ('Construccion', Icons.handyman),
     ('Electricidad', Icons.flash_on),
@@ -43,37 +70,49 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     }
 
     setState(() => _loading = true);
+    final categoriesResult = await _getWorkerCategoriesUseCase();
+    categoriesResult.fold(
+      onSuccess: (categories) {
+        final names = categories
+            .map((item) => item.name.trim())
+            .where((name) => name.isNotEmpty)
+            .toList(growable: false);
+        if (names.isNotEmpty) {
+          _skills = names.map((name) => (name, _resolveIcon(name))).toList();
+        }
+      },
+      onFailure: (_) {},
+    );
 
-    try {
-      final categoriesResponse = await MobileBackendService.categories();
-      final categories =
-          (categoriesResponse['categories'] as List<dynamic>? ?? const [])
-              .whereType<Map<String, dynamic>>()
-              .map((item) => item['name']?.toString().trim() ?? '')
-              .where((name) => name.isNotEmpty)
-              .toList();
-      if (categories.isNotEmpty) {
-        _skills = categories.map((name) => (name, _resolveIcon(name))).toList();
-      }
-
-      final response = await MobileBackendService.workerSkills(
-        workerUserId: user.id,
-      );
-      final values = (response['skills'] as List<dynamic>? ?? const [])
-          .map((item) => item.toString())
-          .toSet();
-      selected
-        ..clear()
-        ..addAll(values);
-    } catch (_) {
-      selected
-        ..clear()
-        ..addAll(const {'Construccion', 'Plomeria'});
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
+    final skillsResult = await _getWorkerSkillsUseCase(workerUserId: user.id);
+    skillsResult.fold(
+      onSuccess: (skills) {
+        selected
+          ..clear()
+          ..addAll(skills.map((item) => item.name));
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isOffline = false;
+          _shouldRedirectToLogin = false;
+          _loading = false;
+        });
+      },
+      onFailure: (failure) {
+        selected
+          ..clear()
+          ..addAll(const {'Construccion', 'Plomeria'});
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isOffline = failure is NetworkFailure;
+          _shouldRedirectToLogin = failure is UnauthorizedFailure;
+          _loading = false;
+        });
+      },
+    );
   }
 
   IconData _resolveIcon(String label) {
@@ -139,35 +178,26 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                           }
                           setDialogState(() => saving = true);
                           final name = controller.text.trim();
-                          try {
-                            final response =
-                                await MobileBackendService.createCategory(
-                                  name: name,
-                                );
-                            final category =
-                                response['category'] as Map<String, dynamic>?;
-                            if (!context.mounted) {
-                              return;
-                            }
-                            Navigator.of(
-                              context,
-                            ).pop(category?['name']?.toString().trim() ?? name);
-                          } catch (error) {
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  error.toString().replaceFirst(
-                                    'Exception: ',
-                                    '',
-                                  ),
-                                ),
-                              ),
-                            );
-                            setDialogState(() => saving = false);
-                          }
+                          final result = await _createWorkerCategoryUseCase(
+                            name: name,
+                          );
+                          result.fold(
+                            onSuccess: (WorkerCategory category) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              Navigator.of(context).pop(category.name);
+                            },
+                            onFailure: (failure) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(failure.message)),
+                              );
+                              setDialogState(() => saving = false);
+                            },
+                          );
                         },
                   child: Text(saving ? 'Guardando...' : 'Crear'),
                 ),
@@ -196,43 +226,42 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     }
 
     setState(() => _loading = true);
-
-    try {
-      await MobileBackendService.updateWorkerSkills(
-        workerUserId: user.id,
-        skills: selected.toList(),
-      );
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
-      );
-      if (widget.forceToHomeAfterSave) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => MainShellScreen(
-              role: SessionStore.currentUser?.type ?? 'worker',
-            ),
-          ),
-          (_) => false,
+    final result = await _updateWorkerSkillsUseCase(
+      workerUserId: user.id,
+      skills: selected.toList(),
+    );
+    result.fold(
+      onSuccess: (_) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
         );
-      } else {
-        Navigator.of(context).pop();
-      }
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+        if (widget.forceToHomeAfterSave) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(
+              builder: (_) => MainShellScreen(
+                role: SessionStore.currentUser?.type ?? 'worker',
+              ),
+            ),
+            (_) => false,
+          );
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      onFailure: (failure) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+    );
+    if (mounted) {
+      setState(() => _loading = false);
     }
   }
 
@@ -250,10 +279,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                      ),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                     ),
                     const Spacer(),
                     Text(
@@ -273,6 +299,16 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                if (_isOffline)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text('Sin conexión. Intenta nuevamente.'),
+                  ),
+                if (_shouldRedirectToLogin)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text('Sesión expirada. Inicia sesión nuevamente.'),
+                  ),
                 const Text(
                   'Paso 4 de 5',
                   style: TextStyle(color: AppTheme.colorMuted),

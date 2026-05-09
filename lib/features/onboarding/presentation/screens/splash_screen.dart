@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../../core/network/realtime_service.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import 'role_selection_screen.dart';
 
@@ -55,24 +55,28 @@ class _SplashScreenState extends State<SplashScreen> {
     RealtimeService.instance.connect(userId: user.id);
 
     if (user.type == 'worker') {
-      try {
-        final result = await MobileBackendService.workerSkills(
-          workerUserId: user.id,
+      final result = await WorkerDependencies.getWorkerSkills(
+        workerUserId: user.id,
+      );
+      var shouldOpenSkills = false;
+      result.fold(
+        onSuccess: (skills) {
+          shouldOpenSkills = skills.isEmpty;
+        },
+        onFailure: (_) {},
+      );
+      if (!mounted) {
+        return;
+      }
+      if (shouldOpenSkills) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                const SkillsSelectionScreen(forceToHomeAfterSave: true),
+          ),
         );
-        final skills = (result['skills'] as List<dynamic>? ?? const []);
-        if (!mounted) {
-          return;
-        }
-        if (skills.isEmpty) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  const SkillsSelectionScreen(forceToHomeAfterSave: true),
-            ),
-          );
-          return;
-        }
-      } catch (_) {}
+        return;
+      }
     }
 
     Navigator.of(context).pushReplacement(

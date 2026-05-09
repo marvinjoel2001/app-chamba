@@ -4,24 +4,47 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../domain/entities/worker_radar_summary.dart';
+import '../../domain/usecases/worker_usecases.dart';
+import '../state/worker_dependencies.dart';
 
 class RadarScreen extends StatefulWidget {
-  const RadarScreen({super.key});
+  const RadarScreen({
+    this.getWorkerRadarUseCase,
+    this.setWorkerAvailabilityUseCase,
+    this.updateWorkerLocationUseCase,
+    super.key,
+  });
+
+  final GetWorkerRadarUseCase? getWorkerRadarUseCase;
+  final SetWorkerAvailabilityUseCase? setWorkerAvailabilityUseCase;
+  final UpdateWorkerLocationUseCase? updateWorkerLocationUseCase;
 
   @override
   State<RadarScreen> createState() => _RadarScreenState();
 }
 
 class _RadarScreenState extends State<RadarScreen> {
+  GetWorkerRadarUseCase get _getWorkerRadarUseCase =>
+      widget.getWorkerRadarUseCase ?? WorkerDependencies.getWorkerRadar;
+  SetWorkerAvailabilityUseCase get _setWorkerAvailabilityUseCase =>
+      widget.setWorkerAvailabilityUseCase ??
+      WorkerDependencies.setWorkerAvailability;
+  UpdateWorkerLocationUseCase get _updateWorkerLocationUseCase =>
+      widget.updateWorkerLocationUseCase ??
+      WorkerDependencies.updateWorkerLocation;
+
   final MapController _mapController = MapController();
   bool available = true;
   bool _loading = true;
+  bool _isOffline = false;
+  bool _shouldRedirectToLogin = false;
   String? _error;
-  Map<String, dynamic>? _summary;
+  WorkerRadarSummary? _summary;
   LatLng? _workerLocation;
   double _workRadiusKm = 5;
   double _zoom = 13;
@@ -47,33 +70,39 @@ class _RadarScreenState extends State<RadarScreen> {
       _error = null;
     });
 
-    try {
-      final deviceLocation = await _syncDeviceLocation(user.id);
-      final response = await MobileBackendService.workerRadar(
-        workerUserId: user.id,
-      );
-      final summary = response['summary'] as Map<String, dynamic>?;
-      final location = response['location'] as Map<String, dynamic>?;
-      final latitude = (location?['latitude'] as num?)?.toDouble();
-      final longitude = (location?['longitude'] as num?)?.toDouble();
-
-      setState(() {
-        available = response['available'] as bool? ?? true;
-        _summary = summary;
-        _workRadiusKm = (location?['workRadiusKm'] as num?)?.toDouble() ?? 5;
-        _workerLocation =
-            deviceLocation ??
-            (latitude != null && longitude != null
-                ? LatLng(latitude, longitude)
-                : const LatLng(-16.5002, -68.1342));
-        _loading = false;
-      });
-    } catch (error) {
-      setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
-    }
+    final deviceLocation = await _syncDeviceLocation(user.id);
+    final result = await _getWorkerRadarUseCase(workerUserId: user.id);
+    result.fold(
+      onSuccess: (summary) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          available = summary.available;
+          _summary = summary;
+          _workRadiusKm = summary.workRadiusKm;
+          _workerLocation =
+              deviceLocation ??
+              (summary.latitude != null && summary.longitude != null
+                  ? LatLng(summary.latitude!, summary.longitude!)
+                  : const LatLng(-16.5002, -68.1342));
+          _isOffline = false;
+          _shouldRedirectToLogin = false;
+          _loading = false;
+        });
+      },
+      onFailure: (failure) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _error = failure.message;
+          _isOffline = failure is NetworkFailure;
+          _shouldRedirectToLogin = failure is UnauthorizedFailure;
+          _loading = false;
+        });
+      },
+    );
   }
 
   Future<void> _setAvailability(bool nextValue) async {
@@ -84,15 +113,25 @@ class _RadarScreenState extends State<RadarScreen> {
 
     setState(() => available = nextValue);
 
-    try {
-      await MobileBackendService.setAvailability(
-        workerUserId: user.id,
-        available: nextValue,
-      );
-      await _load();
-    } catch (_) {
-      setState(() => available = !nextValue);
-    }
+    final result = await _setWorkerAvailabilityUseCase(
+      workerUserId: user.id,
+      available: nextValue,
+    );
+    result.fold(
+      onSuccess: (data) async {
+        if (!mounted) {
+          return;
+        }
+        setState(() => available = data.available);
+        await _load();
+      },
+      onFailure: (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => available = !nextValue);
+      },
+    );
   }
 
   Future<LatLng?> _resolveCurrentLocation() async {
@@ -130,16 +169,12 @@ class _RadarScreenState extends State<RadarScreen> {
       return null;
     }
 
-    try {
-      await MobileBackendService.updateWorkerLocation(
-        workerUserId: workerUserId,
-        latitude: current.latitude,
-        longitude: current.longitude,
-      );
-      return current;
-    } catch (_) {
-      return null;
-    }
+    final result = await _updateWorkerLocationUseCase(
+      workerUserId: workerUserId,
+      latitude: current.latitude,
+      longitude: current.longitude,
+    );
+    return result.fold(onSuccess: (_) => current, onFailure: (_) => null);
   }
 
   Future<void> _updateLocationFromDevice() async {
@@ -209,10 +244,7 @@ class _RadarScreenState extends State<RadarScreen> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
                   Text(
                     'Radar de Trabajo',
@@ -222,6 +254,22 @@ class _RadarScreenState extends State<RadarScreen> {
                   IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                 ],
               ),
+              if (_isOffline)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Sin conexión. Mostrando último estado disponible.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              if (_shouldRedirectToLogin)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Tu sesión expiró. Inicia sesión nuevamente.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               if (_loading) const LinearProgressIndicator(),
               if (_error != null)
                 Padding(
@@ -376,7 +424,7 @@ class _RadarScreenState extends State<RadarScreen> {
                     child: _SummaryCard(
                       icon: Icons.work,
                       title: 'TRABAJOS',
-                      value: '${_summary?['jobsToday'] ?? 0}',
+                      value: '${_summary?.jobsToday ?? 0}',
                       subtitle: 'aceptados hoy',
                     ),
                   ),
@@ -385,8 +433,8 @@ class _RadarScreenState extends State<RadarScreen> {
                     child: _SummaryCard(
                       icon: Icons.paid,
                       title: 'GANANCIAS',
-                      value: 'Bs ${_summary?['earningsToday'] ?? 0}',
-                      subtitle: '${_summary?['nearbyRequests'] ?? 0} cercanas',
+                      value: 'Bs ${_summary?.earningsToday ?? 0}',
+                      subtitle: '${_summary?.nearbyRequests ?? 0} cercanas',
                     ),
                   ),
                 ],

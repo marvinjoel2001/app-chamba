@@ -20,14 +20,12 @@ class ApiService {
         : rawBaseUrl;
     final normalizedPath = path.startsWith('/') ? path : '/$path';
 
-    return Uri.parse('$normalizedBaseUrl$normalizedPath').replace(
-      queryParameters: _normalizeQueryParameters(queryParameters),
-    );
+    return Uri.parse(
+      '$normalizedBaseUrl$normalizedPath',
+    ).replace(queryParameters: _normalizeQueryParameters(queryParameters));
   }
 
-  Map<String, String>? _normalizeQueryParameters(
-    Map<String, dynamic>? raw,
-  ) {
+  Map<String, String>? _normalizeQueryParameters(Map<String, dynamic>? raw) {
     if (raw == null || raw.isEmpty) {
       return null;
     }
@@ -136,10 +134,7 @@ class ApiService {
   }
 
   Map<String, String> _jsonHeaders(Map<String, String>? headers) {
-    return {
-      'Content-Type': 'application/json',
-      ...?headers,
-    };
+    return {'Content-Type': 'application/json', ...?headers};
   }
 
   Map<String, dynamic> _decodeBody(String body) {
@@ -187,10 +182,7 @@ class ApiService {
     return null;
   }
 
-  String _mapHttpErrorMessage({
-    required int statusCode,
-    String? bodyMessage,
-  }) {
+  String _mapHttpErrorMessage({required int statusCode, String? bodyMessage}) {
     final message = bodyMessage?.trim();
 
     if (statusCode == 401) {
@@ -209,7 +201,8 @@ class ApiService {
           lower.contains('phone')) {
         return 'El correo o teléfono ya está registrado.';
       }
-      return message ?? 'El recurso ya existe. Verifica la información ingresada.';
+      return message ??
+          'El recurso ya existe. Verifica la información ingresada.';
     }
 
     if (statusCode == 400) {

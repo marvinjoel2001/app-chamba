@@ -6,7 +6,6 @@ import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../offers/presentation/screens/offers_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../worker/presentation/screens/wallet_screen.dart';
 import '../../../worker/presentation/screens/profile_menu_screen.dart';
@@ -25,8 +24,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
   final RealtimeService _realtime = RealtimeService.instance;
 
   // Worker: [Inicio(0), Billetera(1), Mensajes(2), Perfil(3)]
-  // Client: [Inicio(0), Ofertas(1), Mensajes(2), Perfil(3)]
-  int get _messagesTabIndex => 2;
+  // Client: [Inicio(0), Mensajes(1), Perfil(2)]
+  int get _messagesTabIndex => widget.role == 'worker' ? 2 : 1;
 
   @override
   void initState() {
@@ -60,10 +59,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ]
         : [
             ExploreScreen(role: widget.role),
-            const OffersScreen(),
             const MessagesScreen(),
             const ProfileMenuScreen(),
           ];
+
+    if (currentIndex >= pages.length) {
+      currentIndex = pages.length - 1;
+    }
 
     return Scaffold(
       body: IndexedStack(index: currentIndex, children: pages),

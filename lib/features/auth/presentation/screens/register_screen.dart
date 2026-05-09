@@ -5,8 +5,8 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 
@@ -43,15 +43,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     if (user.type == 'worker') {
-      try {
-        final result = await MobileBackendService.workerSkills(
-          workerUserId: user.id,
-        );
-        final skills = (result['skills'] as List<dynamic>? ?? const []);
-        if (!mounted) {
-          return;
-        }
-        if (skills.isEmpty) {
+      final result = await WorkerDependencies.getWorkerSkills(
+        workerUserId: user.id,
+      );
+      result.fold(
+        onSuccess: (skills) {
+          if (!mounted || skills.isNotEmpty) {
+            return;
+          }
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute<void>(
               builder: (_) =>
@@ -59,9 +58,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             (_) => false,
           );
-          return;
-        }
-      } catch (_) {}
+        },
+        onFailure: (_) {},
+      );
+      if (!mounted) {
+        return;
+      }
+      if (ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
     }
 
     RealtimeService.instance.connect(userId: user.id);

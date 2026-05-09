@@ -69,12 +69,18 @@ class RealtimeService {
     }
 
     if (kDebugMode) {
-      _socket!.on('disconnect', (reason) =>
-          print('[RealtimeService] Socket desconectado: $reason'));
-      _socket!.on('connect_error', (err) =>
-          print('[RealtimeService] Error de conexión: $err'));
-      _socket!.on('connection.ready', (data) =>
-          print('[RealtimeService] connection.ready: $data'));
+      _socket!.on(
+        'disconnect',
+        (reason) => print('[RealtimeService] Socket desconectado: $reason'),
+      );
+      _socket!.on(
+        'connect_error',
+        (err) => print('[RealtimeService] Error de conexión: $err'),
+      );
+      _socket!.on(
+        'connection.ready',
+        (data) => print('[RealtimeService] connection.ready: $data'),
+      );
     }
   }
 

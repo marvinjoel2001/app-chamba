@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../domain/entities/worker_job.dart';
+import '../../domain/usecases/worker_usecases.dart';
+import '../state/worker_dependencies.dart';
 
 enum _DateFilter { today, last3days, thisWeek, thisMonth, all }
 
@@ -26,16 +29,23 @@ extension _DateFilterLabel on _DateFilter {
 }
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key});
+  const WalletScreen({this.getWorkerHistoryUseCase, super.key});
+
+  final GetWorkerHistoryUseCase? getWorkerHistoryUseCase;
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
 class _WalletScreenState extends State<WalletScreen> {
+  GetWorkerHistoryUseCase get _getWorkerHistoryUseCase =>
+      widget.getWorkerHistoryUseCase ?? WorkerDependencies.getWorkerHistory;
+
   bool _loading = true;
+  bool _isOffline = false;
+  bool _shouldRedirectToLogin = false;
   String? _error;
-  List<dynamic> _allJobs = const [];
+  List<WorkerJob> _allJobs = const [];
   _DateFilter _filter = _DateFilter.thisWeek;
 
   @override
@@ -57,29 +67,37 @@ class _WalletScreenState extends State<WalletScreen> {
       _loading = true;
       _error = null;
     });
-    try {
-      final response = await MobileBackendService.workerHistory(
-        workerUserId: user.id,
-      );
-      setState(() {
-        _allJobs = (response['jobs'] as List<dynamic>? ?? const []);
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
-    }
+    final result = await _getWorkerHistoryUseCase(workerUserId: user.id);
+    result.fold(
+      onSuccess: (jobs) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _allJobs = jobs;
+          _isOffline = false;
+          _shouldRedirectToLogin = false;
+          _loading = false;
+        });
+      },
+      onFailure: (failure) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _error = failure.message;
+          _isOffline = failure is NetworkFailure;
+          _shouldRedirectToLogin = failure is UnauthorizedFailure;
+          _loading = false;
+        });
+      },
+    );
   }
 
   /// Filtra los trabajos según el período seleccionado (solo completados)
-  List<dynamic> get _filteredJobs {
+  List<WorkerJob> get _filteredJobs {
     // Solo mostrar trabajos completados en la billetera
-    final completed = _allJobs.where((item) {
-      final job = item as Map<String, dynamic>;
-      return job['requestStatus']?.toString() == 'completed';
-    }).toList();
+    final completed = _allJobs.where((job) => job.isCompleted).toList();
 
     if (_filter == _DateFilter.all) return completed;
 
@@ -103,30 +121,21 @@ class _WalletScreenState extends State<WalletScreen> {
         return _allJobs;
     }
 
-    return completed.where((item) {
-      final job = item as Map<String, dynamic>;
-      final raw = job['acceptedAt']?.toString();
-      if (raw == null) return false;
-      try {
-        final date = DateTime.parse(raw);
-        return date.isAfter(cutoff);
-      } catch (_) {
-        return false;
-      }
-    }).toList();
+    return completed
+        .where(
+          (job) => job.acceptedAt != null && job.acceptedAt!.isAfter(cutoff),
+        )
+        .toList();
   }
 
   double get _totalEarnings {
-    return _filteredJobs.fold(0.0, (sum, item) {
-      final job = item as Map<String, dynamic>;
-      return sum + ((job['amount'] as num?)?.toDouble() ?? 0);
-    });
+    return _filteredJobs.fold(0.0, (sum, job) => sum + job.amount);
   }
 
-  String _formatDate(String? value) {
-    if (value == null || value.isEmpty) return '--';
+  String _formatDate(DateTime? value) {
+    if (value == null) return '--';
     try {
-      final dt = DateTime.parse(value).toLocal();
+      final dt = value.toLocal();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final jobDay = DateTime(dt.year, dt.month, dt.day);
@@ -139,7 +148,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (diff == 1) return 'Ayer, $timeStr';
       return '${dt.day}/${dt.month}/${dt.year}, $timeStr';
     } catch (_) {
-      return value.length > 16 ? value.substring(0, 16) : value;
+      return '--';
     }
   }
 
@@ -282,6 +291,18 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
               ),
             ),
+            if (_isOffline)
+              const Padding(
+                padding: EdgeInsets.only(left: 16, right: 16, top: 8),
+                child: Text(
+                  'Sin conexión. Mostrando últimos datos sincronizados.',
+                ),
+              ),
+            if (_shouldRedirectToLogin)
+              const Padding(
+                padding: EdgeInsets.only(left: 16, right: 16, top: 8),
+                child: Text('Sesión expirada. Inicia sesión nuevamente.'),
+              ),
 
             const SizedBox(height: 16),
 
@@ -381,12 +402,12 @@ class _WalletScreenState extends State<WalletScreen> {
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, i) {
-                        final job = filtered[i] as Map<String, dynamic>;
-                        final title = job['title']?.toString() ?? 'Trabajo';
-                        final amount = (job['amount'] as num?)?.toDouble() ?? 0;
-                        final address = job['address']?.toString() ?? '';
-                        final category = job['category']?.toString();
-                        final date = _formatDate(job['acceptedAt']?.toString());
+                        final job = filtered[i];
+                        final title = job.title;
+                        final amount = job.amount;
+                        final address = job.address;
+                        final category = job.category;
+                        final date = _formatDate(job.acceptedAt);
 
                         return Container(
                           padding: const EdgeInsets.all(14),

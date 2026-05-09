@@ -13,7 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/request_dependencies.dart';
 
 class JobInProgressScreen extends StatefulWidget {
   const JobInProgressScreen({required this.requestId, super.key});
@@ -89,10 +89,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       // Sincronizar con el backend
       final user = SessionStore.currentUser;
       if (user != null) {
-        await MobileBackendService.updateWorkerLocation(
+        (await RequestDependencies.updateWorkerLocation(
           workerUserId: user.id,
           latitude: pos.latitude,
           longitude: pos.longitude,
+        )).fold(
+          onSuccess: (value) => value,
+          onFailure: (failure) => throw Exception(failure.message),
         );
       }
     } catch (_) {}
@@ -152,9 +155,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       });
     }
     try {
-      final res = await MobileBackendService.tracking(
-        requestId: widget.requestId,
-      );
+      final res =
+          (await RequestDependencies.getTracking(requestId: widget.requestId))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       if (mounted) {
         setState(() {
           _tracking = res;
@@ -175,9 +182,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final user = SessionStore.currentUser;
     if (user == null) return;
     try {
-      await MobileBackendService.workerMarkArrived(
+      (await RequestDependencies.workerMarkArrived(
         requestId: widget.requestId,
         workerUserId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       await _load();
       if (!mounted) return;
@@ -222,9 +232,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     );
     if (confirmed != true) return;
     try {
-      await MobileBackendService.completeJob(
+      (await RequestDependencies.completeJob(
         requestId: widget.requestId,
         workerUserId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       if (!mounted) return;
 
@@ -274,7 +287,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
     if (threadId == null) {
       try {
-        final response = await MobileBackendService.messages(userId: user.id);
+        final response =
+            (await RequestDependencies.getMessages(userId: user.id))
+                .fold(
+                  onSuccess: (value) => value,
+                  onFailure: (failure) => throw Exception(failure.message),
+                )
+                .payload;
         final threads = response['threads'] as List<dynamic>? ?? [];
         for (final t in threads) {
           final map = t as Map<String, dynamic>;
@@ -296,8 +315,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         MaterialPageRoute<void>(
           builder: (_) => ChatScreen(
             threadId: threadId!,
-            title: clientName.isEmpty ? 'Cliente' : clientName,
-            avatarUrl: client?['profilePhotoUrl'] as String?,
+            counterpartName: clientName.isEmpty ? 'Cliente' : clientName,
+            counterpartAvatarUrl: client?['profilePhotoUrl'] as String?,
           ),
         ),
       );
@@ -336,9 +355,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     );
     if (confirmed != true) return;
     try {
-      await MobileBackendService.cancelJob(
+      (await RequestDependencies.cancelJob(
         requestId: widget.requestId,
         userId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       if (!mounted) return;
       SessionStore.activeRequestId = null;

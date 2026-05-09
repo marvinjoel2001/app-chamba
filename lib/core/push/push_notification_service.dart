@@ -5,8 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../config/firebase_config.dart';
+import '../services/mobile_backend_service.dart';
 import '../../firebase_options.dart';
-import '../../features/mobile_data/data/services/mobile_backend_service.dart';
 import '../session/session_store.dart';
 
 @pragma('vm:entry-point')
@@ -79,7 +79,7 @@ class PushNotificationService {
     }
 
     final platform = _resolvePlatform();
-    await MobileBackendService.registerPushToken(
+    await MobileBackendService.instance.registerPushToken(
       userId: user.id,
       token: token.trim(),
       platform: platform,

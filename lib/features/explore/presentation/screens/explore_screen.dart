@@ -8,7 +8,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/explore_dependencies.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
@@ -98,11 +98,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
         return;
       }
 
-      final response = await MobileBackendService.explore(
-        userId: user.id,
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-      );
+      final response =
+          (await ExploreDependencies.explore(
+                userId: user.id,
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+              ))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       final activeRequest = response['activeRequest'];
       if (activeRequest is Map<String, dynamic>) {
         SessionStore.activeRequestId = activeRequest['id'] as String?;
@@ -286,9 +292,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
         return;
       }
 
-      final preview = await MobileBackendService.previewRequestCategories(
-        description: prompt,
-      );
+      final preview =
+          (await ExploreDependencies.previewRequestCategories(
+                description: prompt,
+              ))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
 
       if (!mounted) {
         return;

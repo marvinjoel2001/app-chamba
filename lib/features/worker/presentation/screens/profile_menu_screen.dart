@@ -7,28 +7,38 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../auth/data/services/auth_service.dart';
-import '../../../explore/presentation/screens/explore_screen.dart';
-import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../../auth/presentation/state/auth_dependencies.dart';
 import '../../../onboarding/presentation/screens/role_selection_screen.dart';
-import '../../../offers/presentation/screens/offers_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
-import '../../../request/presentation/screens/empty_requests_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
-import 'radar_screen.dart';
+import '../../domain/usecases/worker_usecases.dart';
+import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
 import 'worker_history_screen.dart';
 
 class ProfileMenuScreen extends StatefulWidget {
-  const ProfileMenuScreen({super.key});
+  const ProfileMenuScreen({
+    this.uploadWorkerProfilePhotoUseCase,
+    this.deleteWorkerProfilePhotoUseCase,
+    super.key,
+  });
+
+  final UploadWorkerProfilePhotoUseCase? uploadWorkerProfilePhotoUseCase;
+  final DeleteWorkerProfilePhotoUseCase? deleteWorkerProfilePhotoUseCase;
 
   @override
   State<ProfileMenuScreen> createState() => _ProfileMenuScreenState();
 }
 
 class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
+  UploadWorkerProfilePhotoUseCase get _uploadWorkerProfilePhotoUseCase =>
+      widget.uploadWorkerProfilePhotoUseCase ??
+      WorkerDependencies.uploadWorkerProfilePhoto;
+  DeleteWorkerProfilePhotoUseCase get _deleteWorkerProfilePhotoUseCase =>
+      widget.deleteWorkerProfilePhotoUseCase ??
+      WorkerDependencies.deleteWorkerProfilePhoto;
+
   final ImagePicker _imagePicker = ImagePicker();
   bool _updatingPhoto = false;
 
@@ -57,24 +67,33 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
         fileName: file.name,
         folder: 'chamba/profile',
       );
-      final response = await MobileBackendService.uploadProfilePhoto(
+      final result = await _uploadWorkerProfilePhotoUseCase(
         userId: user.id,
         imageUrl: uploaded.secureUrl,
         imagePublicId: uploaded.publicId,
       );
-
-      final updated = response['user'];
-      if (updated is Map<String, dynamic>) {
-        SessionStore.currentUser = SessionUser.fromJson(updated);
-        unawaited(SessionStore.persistCurrentUser());
-      }
-
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Foto actualizada')));
+      result.fold(
+        onSuccess: (_) {
+          SessionStore.currentUser = user.copyWith(
+            profilePhotoUrl: uploaded.secureUrl,
+          );
+          unawaited(SessionStore.persistCurrentUser());
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Foto actualizada')));
+        },
+        onFailure: (failure) {
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(failure.message)));
+        },
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -98,37 +117,29 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     }
 
     setState(() => _updatingPhoto = true);
-    try {
-      final response = await MobileBackendService.deleteProfilePhoto(
-        userId: user.id,
-      );
-      final updated = response['user'];
-      if (updated is Map<String, dynamic>) {
-        SessionStore.currentUser = SessionUser.fromJson(updated);
-      } else {
+    final result = await _deleteWorkerProfilePhotoUseCase(userId: user.id);
+    result.fold(
+      onSuccess: (_) {
         SessionStore.currentUser = user.copyWith(clearProfilePhotoUrl: true);
-      }
-      unawaited(SessionStore.persistCurrentUser());
-
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Foto eliminada')));
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _updatingPhoto = false);
-      }
+        unawaited(SessionStore.persistCurrentUser());
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Foto eliminada')));
+      },
+      onFailure: (failure) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+    );
+    if (mounted) {
+      setState(() => _updatingPhoto = false);
     }
   }
 
@@ -197,7 +208,8 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
       return;
     }
 
-    await AuthService().logout();
+    final result = await AuthDependencies.logout();
+    result.fold(onSuccess: (_) {}, onFailure: (_) {});
 
     if (!mounted) {
       return;
@@ -328,18 +340,6 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                   },
                 ),
                 _NavTile(
-                  title: 'Radar y ubicación',
-                  subtitle: 'Activa disponibilidad y actualiza tu posición',
-                  icon: Icons.radar,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const RadarScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _NavTile(
                   title: 'Mis habilidades',
                   subtitle: 'Ajusta los servicios que ofreces',
                   icon: Icons.grid_view_rounded,
@@ -376,57 +376,9 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                     );
                   },
                 ),
-                _NavTile(
-                  title: 'Ofertas recibidas',
-                  subtitle: 'Compara propuestas y acepta la mejor',
-                  icon: Icons.local_offer_outlined,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const OffersScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _NavTile(
-                  title: 'Mensajes',
-                  subtitle: 'Habla con trabajadores y clientes',
-                  icon: Icons.chat_bubble_outline,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const MessagesScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _NavTile(
-                  title: 'Mapa y categorías',
-                  subtitle: 'Explora servicios y zonas cercanas',
-                  icon: Icons.map_outlined,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ExploreScreen(role: 'client'),
-                      ),
-                    );
-                  },
-                ),
               ],
               const SizedBox(height: 8),
               const _SectionTitle(label: 'Soporte'),
-              _NavTile(
-                title: 'Pantalla sin solicitudes',
-                subtitle: 'Vista alternativa cuando no hay resultados',
-                icon: Icons.inbox_outlined,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const EmptyRequestsScreen(),
-                    ),
-                  );
-                },
-              ),
               _NavTile(
                 title: 'Calificar servicio',
                 subtitle: 'Registro rápido de una evaluación',

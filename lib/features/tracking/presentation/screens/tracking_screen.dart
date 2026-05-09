@@ -9,9 +9,10 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/tracking_dependencies.dart';
 
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
@@ -104,14 +105,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final workerId = _tracking?['worker']?['id']?.toString();
     if (user == null || requestId == null || workerId == null) return;
 
-    final response = await MobileBackendService.messages(userId: user.id);
-    final threads = response['threads'] as List<dynamic>? ?? const [];
+    final result = await MessagesDependencies.getActiveThreads(userId: user.id);
+    final threads = result.fold(
+      onSuccess: (value) => value,
+      onFailure: (failure) => [],
+    );
     for (final thread in threads) {
-      final map = thread as Map<String, dynamic>;
-      final counterpart = map['counterpart'] as Map<String, dynamic>? ?? {};
-      if (map['requestId']?.toString() == requestId &&
-          counterpart['id']?.toString() == workerId) {
-        SessionStore.activeThreadId = map['id']?.toString();
+      if (thread.jobId == requestId && thread.workerId == workerId) {
+        SessionStore.activeThreadId = thread.id;
         return;
       }
     }
@@ -134,9 +135,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
       });
     }
     try {
-      final response = await MobileBackendService.tracking(
-        requestId: requestId,
-      );
+      final response =
+          (await TrackingDependencies.getTracking(requestId: requestId))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       _tracking = response;
       if (SessionStore.activeThreadId == null) {
         await _ensureActiveThread();
@@ -158,9 +163,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     setState(() => _confirmingArrival = true);
     try {
-      await MobileBackendService.clientConfirmArrival(
+      (await TrackingDependencies.clientConfirmArrival(
         requestId: requestId,
         clientUserId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       await _load();
       if (!mounted) return;
@@ -209,9 +217,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (confirmed != true) return;
 
     try {
-      await MobileBackendService.cancelJob(
+      (await TrackingDependencies.cancelJob(
         requestId: requestId,
         userId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       if (!mounted) return;
       // Limpiar sesión del cliente
@@ -707,10 +718,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   MaterialPageRoute<void>(
                                     builder: (_) => ChatScreen(
                                       threadId: threadId,
-                                      title:
+                                      counterpartName:
                                           '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
                                               .trim(),
-                                      avatarUrl:
+                                      counterpartAvatarUrl:
                                           worker?['profilePhotoUrl'] as String?,
                                     ),
                                   ),

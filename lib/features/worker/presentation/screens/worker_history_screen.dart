@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../../domain/entities/worker_job.dart';
+import '../../domain/usecases/worker_usecases.dart';
+import '../state/worker_dependencies.dart';
 
 class WorkerHistoryScreen extends StatefulWidget {
-  const WorkerHistoryScreen({super.key});
+  const WorkerHistoryScreen({this.getWorkerHistoryUseCase, super.key});
+
+  final GetWorkerHistoryUseCase? getWorkerHistoryUseCase;
 
   @override
   State<WorkerHistoryScreen> createState() => _WorkerHistoryScreenState();
 }
 
 class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
+  GetWorkerHistoryUseCase get _getWorkerHistoryUseCase =>
+      widget.getWorkerHistoryUseCase ?? WorkerDependencies.getWorkerHistory;
+
   bool _loading = true;
+  bool _isOffline = false;
+  bool _shouldRedirectToLogin = false;
   String? _error;
-  List<dynamic> _jobs = const [];
+  List<WorkerJob> _jobs = const [];
 
   @override
   void initState() {
@@ -24,10 +34,10 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
     _load();
   }
 
-  String _formatDate(String? value) {
-    if (value == null || value.isEmpty) return '--';
+  String _formatDate(DateTime? value) {
+    if (value == null) return '--';
     try {
-      final dt = DateTime.parse(value).toLocal();
+      final dt = value.toLocal();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final jobDay = DateTime(dt.year, dt.month, dt.day);
@@ -38,8 +48,7 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
       if (diff == 1) return 'Ayer, $timeStr';
       return '${dt.day}/${dt.month}/${dt.year}, $timeStr';
     } catch (_) {
-      final normalized = value.replaceFirst('T', ' ');
-      return normalized.length > 16 ? normalized.substring(0, 16) : normalized;
+      return '--';
     }
   }
 
@@ -56,20 +65,31 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
       _loading = true;
       _error = null;
     });
-    try {
-      final response = await MobileBackendService.workerHistory(
-        workerUserId: user.id,
-      );
-      setState(() {
-        _jobs = (response['jobs'] as List<dynamic>? ?? const []);
-        _loading = false;
-      });
-    } catch (error) {
-      setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
-    }
+    final result = await _getWorkerHistoryUseCase(workerUserId: user.id);
+    result.fold(
+      onSuccess: (jobs) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _jobs = jobs;
+          _isOffline = false;
+          _shouldRedirectToLogin = false;
+          _loading = false;
+        });
+      },
+      onFailure: (failure) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _error = failure.message;
+          _isOffline = failure is NetworkFailure;
+          _shouldRedirectToLogin = failure is UnauthorizedFailure;
+          _loading = false;
+        });
+      },
+    );
   }
 
   @override
@@ -84,10 +104,7 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
                   Text(
                     'Historial',
@@ -99,6 +116,16 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                   IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                 ],
               ),
+              if (_isOffline)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text('Sin conexión. Intenta nuevamente.'),
+                ),
+              if (_shouldRedirectToLogin)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text('Sesión expirada. Inicia sesión nuevamente.'),
+                ),
               const SizedBox(height: 12),
               if (_loading)
                 const Center(child: CircularProgressIndicator())
@@ -107,16 +134,9 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
               else if (_jobs.isEmpty)
                 const Text('Aun no tienes trabajos en tu historial.')
               else
-                ..._jobs.map((item) {
-                  final job = item as Map<String, dynamic>;
-                  final client = job['client'] as Map<String, dynamic>? ?? {};
-                  final title = job['title']?.toString() ?? 'Trabajo';
-                  final clientName =
-                      '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'
-                          .trim();
-                  final requestStatus = job['requestStatus']?.toString() ?? '';
-                  final isCancelled = requestStatus == 'cancelled';
-                  final amount = job['amount'] ?? 0;
+                ..._jobs.map((job) {
+                  final isCancelled = job.isCancelled;
+                  final amount = job.amount;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -129,7 +149,7 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  title,
+                                  job.title,
                                   style: Theme.of(context).textTheme.titleLarge
                                       ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
@@ -137,7 +157,7 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                               const SizedBox(width: 8),
                               // Monto — rojo si cancelado, morado si completado
                               Text(
-                                'Bs $amount',
+                                'Bs ${amount.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   color: isCancelled
                                       ? AppTheme.colorError
@@ -183,25 +203,25 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${job['category'] ?? 'General'} · ${job['address'] ?? ''}',
+                            '${job.category} · ${job.address}',
                             style: const TextStyle(color: AppTheme.colorMuted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Cliente: ${clientName.isEmpty ? 'Cliente' : clientName}',
+                            'Cliente: ${job.clientFullName}',
                             style: const TextStyle(color: AppTheme.colorMuted),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _formatDate(job['acceptedAt']?.toString()),
+                            _formatDate(job.acceptedAt),
                             style: const TextStyle(
                               color: AppTheme.colorMuted,
                               fontSize: 12,
                             ),
                           ),
-                          if (job['threadId'] != null && !isCancelled) ...[
+                          if (job.threadId != null && !isCancelled) ...[
                             const SizedBox(height: 10),
                             SizedBox(
                               width: double.infinity,
@@ -210,13 +230,10 @@ class _WorkerHistoryScreenState extends State<WorkerHistoryScreen> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
                                       builder: (_) => ChatScreen(
-                                        threadId: job['threadId'] as String,
-                                        title: clientName.isEmpty
-                                            ? 'Cliente'
-                                            : clientName,
-                                        avatarUrl:
-                                            client['profilePhotoUrl']
-                                                as String?,
+                                        threadId: job.threadId!,
+                                        counterpartName: job.clientFullName,
+                                        counterpartAvatarUrl:
+                                            job.clientProfilePhotoUrl,
                                       ),
                                     ),
                                   );

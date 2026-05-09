@@ -91,6 +91,7 @@ class ChambaPrimaryButton extends StatefulWidget {
     required this.onPressed,
     this.icon,
     this.isYellow = false,
+    this.compact = false,
     super.key,
   });
 
@@ -98,6 +99,7 @@ class ChambaPrimaryButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool isYellow;
+  final bool compact;
 
   @override
   State<ChambaPrimaryButton> createState() => _ChambaPrimaryButtonState();
@@ -109,6 +111,12 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
+    final minHeight = widget.compact ? 44.0 : 52.0;
+    final horizontalPadding = widget.compact ? 12.0 : 16.0;
+    final verticalPadding = widget.compact ? 10.0 : 13.0;
+    final iconSize = widget.compact ? 20.0 : 24.0;
+    final textSize = widget.compact ? 14.0 : 16.0;
+    final iconGap = widget.compact ? 8.0 : 10.0;
 
     final decoration = BoxDecoration(
       borderRadius: BorderRadius.circular(16),
@@ -144,20 +152,23 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
           duration: const Duration(milliseconds: 150),
           opacity: enabled ? 1 : 0.6,
           child: Container(
-            constraints: const BoxConstraints(minHeight: 52),
+            constraints: BoxConstraints(minHeight: minHeight),
             decoration: decoration,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: verticalPadding,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (widget.icon != null) ...[
-                  Icon(widget.icon, color: foreground),
-                  const SizedBox(width: 10),
+                  Icon(widget.icon, color: foreground, size: iconSize),
+                  SizedBox(width: iconGap),
                 ],
                 Text(
                   widget.label,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: textSize,
                     fontWeight: FontWeight.w700,
                     color: foreground,
                   ),
@@ -232,7 +243,6 @@ class ChambaBottomNav extends StatelessWidget {
 
   static const _clientItems = [
     _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.work, label: 'Ofertas'),
     _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
     _NavItemData(icon: Icons.person, label: 'Perfil'),
   ];
@@ -269,7 +279,6 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
 
   static const _clientItems = [
     _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.work, label: 'Ofertas'),
     _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
     _NavItemData(icon: Icons.person, label: 'Perfil'),
   ];

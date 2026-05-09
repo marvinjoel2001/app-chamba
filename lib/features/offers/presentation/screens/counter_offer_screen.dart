@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/offers_dependencies.dart';
 
 class CounterOfferScreen extends StatefulWidget {
   const CounterOfferScreen({
@@ -87,18 +87,34 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       ).showSnackBar(const SnackBar(content: Text('No hay solicitud activa.')));
       return;
     }
+    // Validación: Worker debe ofertar MAYOR que el precio base del cliente
+    final basePriceInt = _base.toInt();
+    final selectedInt = _selectedAmount.toInt();
+    if (selectedInt <= basePriceInt) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tu oferta debe ser mayor al presupuesto del cliente (Bs $basePriceInt)',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
-      await MobileBackendService.counterOffer(
+      (await OffersDependencies.counterOffer(
         requestId: requestId,
         workerUserId: widget.workerId ?? user.id,
         amount: _selectedAmount,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Contraoferta enviada correctamente')),
       );
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

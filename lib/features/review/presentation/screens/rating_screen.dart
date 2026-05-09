@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/review_dependencies.dart';
 
 class RatingScreen extends StatefulWidget {
   const RatingScreen({super.key});
@@ -29,7 +29,9 @@ class _RatingScreenState extends State<RatingScreen> {
 
     if (user == null || requestId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay servicio finalizado para calificar.')),
+        const SnackBar(
+          content: Text('No hay servicio finalizado para calificar.'),
+        ),
       );
       return;
     }
@@ -37,15 +39,21 @@ class _RatingScreenState extends State<RatingScreen> {
     setState(() => _loading = true);
 
     try {
-      final offers = await MobileBackendService.offers(
-        requestId: requestId,
-        clientUserId: user.id,
-      );
+      final offers =
+          (await ReviewDependencies.getOffers(
+                requestId: requestId,
+                clientUserId: user.id,
+              ))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       final offerList = offers['offers'] as List<dynamic>? ?? const [];
       final accepted = offerList.cast<Map<String, dynamic>>().firstWhere(
-            (item) => item['status'] == 'accepted',
-            orElse: () => <String, dynamic>{},
-          );
+        (item) => item['status'] == 'accepted',
+        orElse: () => <String, dynamic>{},
+      );
 
       final worker = accepted['worker'] as Map<String, dynamic>?;
       final workerId = worker?['id'] as String?;
@@ -53,12 +61,15 @@ class _RatingScreenState extends State<RatingScreen> {
         throw Exception('No se encontro trabajador aceptado.');
       }
 
-      await MobileBackendService.createReview(
+      (await ReviewDependencies.createReview(
         requestId: requestId,
         workerUserId: workerId,
         clientUserId: user.id,
         stars: stars,
         comment: _commentController.text.trim(),
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
 
       if (!mounted) {
@@ -75,7 +86,9 @@ class _RatingScreenState extends State<RatingScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     } finally {
       if (mounted) {
@@ -114,17 +127,16 @@ class _RatingScreenState extends State<RatingScreen> {
                       const SizedBox(height: 14),
                       Text(
                         'Como fue tu Chamba?',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.displaySmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Tu opinion ayuda a mejorar la comunidad y califica el desempeno del trabajador.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: AppTheme.colorMuted,
-                            ),
+                          color: AppTheme.colorMuted,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -148,7 +160,8 @@ class _RatingScreenState extends State<RatingScreen> {
                         controller: _commentController,
                         maxLines: 4,
                         decoration: const InputDecoration(
-                          hintText: 'Escribe aqui tu experiencia con el servicio...',
+                          hintText:
+                              'Escribe aqui tu experiencia con el servicio...',
                         ),
                       ),
                       const SizedBox(height: 18),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/offers_dependencies.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
   const WorkerProfileScreen({this.workerId, super.key});
@@ -39,7 +39,13 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     });
 
     try {
-      final response = await MobileBackendService.workerProfile(widget.workerId!);
+      final response =
+          (await OffersDependencies.getWorkerProfile(widget.workerId!))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       setState(() {
         _profile = response;
         _loading = false;
@@ -73,85 +79,105 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       icon: const Icon(Icons.arrow_back),
                     ),
                     const Spacer(),
-                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                    IconButton(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh),
+                    ),
                   ],
                 ),
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : _error != null
-                          ? Center(child: Text(_error!))
-                          : SingleChildScrollView(
-                              child: GlassCard(
-                                child: Column(
+                      ? Center(child: Text(_error!))
+                      : SingleChildScrollView(
+                          child: GlassCard(
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 74,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorGlassBorderSoft,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                CircleAvatar(
+                                  radius: 85,
+                                  backgroundImage:
+                                      worker?['profilePhotoUrl'] == null
+                                      ? null
+                                      : NetworkImage(
+                                          worker!['profilePhotoUrl'] as String,
+                                        ),
+                                  child: worker?['profilePhotoUrl'] == null
+                                      ? Text(
+                                          (worker?['firstName'] ?? 'W')
+                                              .toString()
+                                              .substring(0, 1),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
+                                      .trim(),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .displaySmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${worker?['averageRating'] ?? 0} - ${worker?['completedJobs'] ?? 0} trabajos',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(color: AppTheme.colorMuted),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 10,
                                   children: [
-                                    Container(
-                                      width: 74,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.colorGlassBorderSoft,
-                                        borderRadius: BorderRadius.circular(10),
+                                    for (final skill in skills)
+                                      ChambaChip(
+                                        label: skill.toString(),
+                                        selected: true,
                                       ),
-                                    ),
-                                    const SizedBox(height: 18),
-                                    CircleAvatar(
-                                      radius: 85,
-                                      backgroundImage: worker?['profilePhotoUrl'] == null
-                                          ? null
-                                          : NetworkImage(worker!['profilePhotoUrl'] as String),
-                                      child: worker?['profilePhotoUrl'] == null
-                                          ? Text((worker?['firstName'] ?? 'W').toString().substring(0, 1))
-                                          : null,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'.trim(),
-                                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${worker?['averageRating'] ?? 0} - ${worker?['completedJobs'] ?? 0} trabajos',
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                            color: AppTheme.colorMuted,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 10,
-                                      children: [
-                                        for (final skill in skills)
-                                          ChambaChip(label: skill.toString(), selected: true),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      worker?['bio']?.toString() ?? '',
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context).textTheme.titleLarge,
-                                    ),
-                                    const SizedBox(height: 20),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        'Galeria de trabajos',
-                                        style: Theme.of(context).textTheme.headlineSmall,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        for (final imageUrl in gallery.take(3)) ...[
-                                          Expanded(child: _GalleryItem(url: imageUrl.toString())),
-                                          const SizedBox(width: 8),
-                                        ],
-                                      ],
-                                    ),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  worker?['bio']?.toString() ?? '',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 20),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Galeria de trabajos',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineSmall,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    for (final imageUrl in gallery.take(3)) ...[
+                                      Expanded(
+                                        child: _GalleryItem(
+                                          url: imageUrl.toString(),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
+                          ),
+                        ),
                 ),
               ],
             ),

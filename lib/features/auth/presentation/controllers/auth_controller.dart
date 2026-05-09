@@ -1,10 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/services/auth_service.dart';
-
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
-});
+import '../state/auth_dependencies.dart';
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
   AuthController.new,
@@ -41,31 +37,33 @@ class AuthController extends Notifier<AuthState> {
     return const AuthState();
   }
 
-  AuthService get _authService => ref.watch(authServiceProvider);
-
   Future<void> login({
     required String identifier,
     required String password,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
-    try {
-      await _authService.login(
-        identifier: identifier.trim(),
-        password: password,
-      );
-      state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: true,
-        clearError: true,
-      );
-    } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: false,
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
-      );
-    }
+    final result = await AuthDependencies.login(
+      identifier: identifier.trim(),
+      password: password,
+    );
+
+    result.fold(
+      onSuccess: (_) {
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: true,
+          clearError: true,
+        );
+      },
+      onFailure: (failure) {
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: false,
+          errorMessage: failure.message,
+        );
+      },
+    );
   }
 
   Future<void> register({
@@ -78,32 +76,36 @@ class AuthController extends Notifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
-    try {
-      await _authService.register(
-        role: role,
-        email: email.trim(),
-        phone: phone,
-        firstName: firstName.trim(),
-        lastName: lastName?.trim(),
-        password: password,
-      );
-      state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: true,
-        clearError: true,
-      );
-    } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: false,
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
-      );
-    }
+    final result = await AuthDependencies.register(
+      role: role,
+      email: email.trim(),
+      phone: phone,
+      firstName: firstName.trim(),
+      lastName: lastName?.trim(),
+      password: password,
+    );
+
+    result.fold(
+      onSuccess: (_) {
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: true,
+          clearError: true,
+        );
+      },
+      onFailure: (failure) {
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: false,
+          errorMessage: failure.message,
+        );
+      },
+    );
   }
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true, clearError: true);
-    await _authService.logout();
+    await AuthDependencies.logout();
     state = const AuthState();
   }
 }

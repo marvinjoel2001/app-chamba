@@ -11,7 +11,7 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
 
 class RequestFormScreen extends StatefulWidget {
@@ -22,6 +22,8 @@ class RequestFormScreen extends StatefulWidget {
     this.initialLatitude,
     this.initialLongitude,
     this.initialAddress,
+    this.preselectedCategory,
+    this.preselectedWorkerId,
     super.key,
   });
 
@@ -31,6 +33,8 @@ class RequestFormScreen extends StatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
   final String? initialAddress;
+  final String? preselectedCategory;
+  final String? preselectedWorkerId;
 
   @override
   State<RequestFormScreen> createState() => _RequestFormScreenState();
@@ -290,21 +294,27 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         });
       }
 
-      final response = await MobileBackendService.createRequest(
-        clientUserId: user.id,
-        title: widget.initialTitle?.trim().isNotEmpty == true
-            ? widget.initialTitle!.trim()
-            : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
-        description: description,
-        category: _primaryCategoryName,
-        aiCategories: _suggestedCategories,
-        budget: budget,
-        priceType: priceType,
-        address: _resolvedAddress ?? 'Ubicacion actual',
-        latitude: _latitude!,
-        longitude: _longitude!,
-        photos: uploadedPhotos,
-      );
+      final response =
+          (await RequestDependencies.createRequest(
+                clientUserId: user.id,
+                title: widget.initialTitle?.trim().isNotEmpty == true
+                    ? widget.initialTitle!.trim()
+                    : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
+                description: description,
+                category: _primaryCategoryName,
+                aiCategories: _suggestedCategories,
+                budget: budget,
+                priceType: priceType,
+                address: _resolvedAddress ?? 'Ubicacion actual',
+                latitude: _latitude!,
+                longitude: _longitude!,
+                photos: uploadedPhotos,
+              ))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
 
       final request = response['request'] as Map<String, dynamic>?;
       SessionStore.activeRequestId = request?['id'] as String?;

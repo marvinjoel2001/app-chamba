@@ -9,7 +9,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../mobile_data/data/services/mobile_backend_service.dart';
+import '../state/request_dependencies.dart';
 import '../../../../../features/offers/presentation/screens/offers_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
@@ -121,10 +121,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     }
 
     try {
-      final response = await MobileBackendService.requestStatus(
-        requestId: SessionStore.activeRequestId,
-        clientUserId: user.id,
-      );
+      final response =
+          (await RequestDependencies.getRequestStatus(
+                requestId: SessionStore.activeRequestId,
+                clientUserId: user.id,
+              ))
+              .fold(
+                onSuccess: (value) => value,
+                onFailure: (failure) => throw Exception(failure.message),
+              )
+              .payload;
       final request = response['request'] as Map<String, dynamic>?;
       if (request != null) {
         SessionStore.activeRequestId = request['id'] as String?;
@@ -450,9 +456,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     );
                     if (confirmed != true) return;
                     try {
-                      await MobileBackendService.cancelJob(
+                      (await RequestDependencies.cancelJob(
                         requestId: requestId,
                         userId: user.id,
+                      )).fold(
+                        onSuccess: (value) => value,
+                        onFailure: (failure) =>
+                            throw Exception(failure.message),
                       );
                     } catch (_) {}
                     // Limpiar sesión independientemente del resultado
