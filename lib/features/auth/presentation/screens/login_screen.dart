@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/app_permissions_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/auth_dependencies.dart';
 import '../../../worker/presentation/state/worker_dependencies.dart';
@@ -41,40 +43,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
+    Widget nextScreen = MainShellScreen(
+      role: SessionStore.currentUser?.type ?? 'client',
+    );
+
     if (user.type == 'worker') {
       final result = await WorkerDependencies.getWorkerSkills(
         workerUserId: user.id,
       );
       result.fold(
         onSuccess: (skills) {
-          if (!mounted || skills.isNotEmpty) {
-            return;
+          if (skills.isEmpty) {
+            nextScreen = const SkillsSelectionScreen(
+              forceToHomeAfterSave: true,
+            );
           }
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  const SkillsSelectionScreen(forceToHomeAfterSave: true),
-            ),
-            (_) => false,
-          );
         },
         onFailure: (_) {},
       );
-      if (!mounted) {
-        return;
-      }
-      if (ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
     }
+
+    if (!mounted) return;
 
     RealtimeService.instance.connect(userId: user.id);
 
+    final allPermissionsGranted =
+        await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
+    if (!mounted) return;
+
+    final destination = allPermissionsGranted
+        ? nextScreen
+        : RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
+
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            MainShellScreen(role: SessionStore.currentUser?.type ?? 'client'),
-      ),
+      MaterialPageRoute<void>(builder: (_) => destination),
       (route) => false,
     );
   }

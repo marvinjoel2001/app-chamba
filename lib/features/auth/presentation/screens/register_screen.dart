@@ -9,6 +9,7 @@ import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
+import 'terms_and_conditions_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -25,6 +26,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   String _selectedRole = 'client';
+  bool _acceptedTerms = false;
 
   @override
   void dispose() {
@@ -42,41 +44,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
+    Widget nextScreen = MainShellScreen(
+      role: SessionStore.currentUser?.type ?? _selectedRole,
+    );
+
     if (user.type == 'worker') {
       final result = await WorkerDependencies.getWorkerSkills(
         workerUserId: user.id,
       );
       result.fold(
         onSuccess: (skills) {
-          if (!mounted || skills.isNotEmpty) {
-            return;
+          if (skills.isEmpty) {
+            nextScreen = const SkillsSelectionScreen(
+              forceToHomeAfterSave: true,
+            );
           }
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  const SkillsSelectionScreen(forceToHomeAfterSave: true),
-            ),
-            (_) => false,
-          );
         },
         onFailure: (_) {},
       );
-      if (!mounted) {
-        return;
-      }
-      if (ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
     }
+
+    if (!mounted) return;
 
     RealtimeService.instance.connect(userId: user.id);
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => MainShellScreen(
-          role: SessionStore.currentUser?.type ?? _selectedRole,
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => nextScreen),
       (route) => false,
     );
   }
@@ -217,12 +210,61 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Checkbox(
+                              value: _acceptedTerms,
+                              onChanged: authState.isLoading
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _acceptedTerms = value ?? false;
+                                      });
+                                    },
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: Text(
+                                  'Acepto los Términos y Condiciones de Chamba',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: AppTheme.colorText,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: authState.isLoading
+                                ? null
+                                : () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const TermsAndConditionsScreen(),
+                                      ),
+                                    );
+                                  },
+                            icon: const Icon(
+                              Icons.description_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Ver Términos y Condiciones'),
+                          ),
+                        ),
                         const SizedBox(height: 18),
                         ChambaPrimaryButton(
                           label: authState.isLoading
                               ? 'Registrando...'
                               : 'Crear cuenta',
-                          onPressed: authState.isLoading
+                          onPressed: authState.isLoading || !_acceptedTerms
                               ? null
                               : () async {
                                   if (!_formKey.currentState!.validate()) {

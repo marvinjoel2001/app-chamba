@@ -1,0 +1,448 @@
+================================================================================
+                                    ⚡ CHAMBA
+                        TÉRMINOS Y CONDICIONES DE USO
+                       Plataforma Digital de Conexión Laboral
+                              República de Bolivia
+                          Versión 1.0 — Vigente desde 2026
+================================================================================
+
+AVISO LEGAL IMPORTANTE
+━━━━━━━━━━━━━━━━━━━━━━
+Al presionar el botón "Acepto los Términos y Condiciones" durante el registro
+o inicio de sesión en la aplicación móvil Chamba, el Usuario declara haber
+leído, comprendido y aceptado voluntariamente la totalidad de los presentes
+Términos y Condiciones de Uso.
+
+Dicha aceptación digital constituye una manifestación de voluntad válida y
+vinculante conforme a lo establecido en:
+
+  - Ley N° 164 — Ley General de Telecomunicaciones, Tecnologías de
+    Información y Comunicación (Bolivia, 2011) y su Reglamento.
+  - Código Civil Boliviano (Ley N° 12760), Artículos 450 y siguientes
+    relativos a la formación y validez de los contratos.
+  - Decreto Supremo N° 1793 — Reglamento de Comercio Electrónico (Bolivia).
+
+Si el Usuario no está de acuerdo con estos Términos, deberá abstenerse de
+utilizar la Plataforma.
+
+================================================================================
+1. IDENTIFICACIÓN DEL OPERADOR DE LA PLATAFORMA
+================================================================================
+
+Razón social      : Chamba Technologies
+Nombre comercial  : CHAMBA
+Plataforma        : Aplicación móvil Chamba (iOS y Android)
+País de operación : República de Bolivia
+Ciudad principal  : Santa Cruz de la Sierra, Bolivia
+Correo de contacto: soporte@chamba.app
+Sitio web         : www.chamba.app
+
+================================================================================
+2. DEFINICIONES
+================================================================================
+
+Para los efectos de estos Términos y Condiciones, se entenderá por:
+
+"Chamba" o "la Plataforma": Aplicación móvil y servicios digitales operados
+por Chamba Technologies, cuya función exclusiva es intermediar tecnológicamente
+entre Clientes y Prestadores de Servicios.
+
+"Usuario": Toda persona natural mayor de 18 años que se registre y utilice
+la Plataforma, ya sea en calidad de Cliente o de Prestador de Servicios.
+
+"Cliente" o "Contratante": Usuario que publica una Solicitud de trabajo
+buscando contratar a alguien que realice un servicio específico.
+
+"Prestador de Servicios" o "Trabajador": Usuario que ofrece sus habilidades
+y servicios a través de la Plataforma para ser contratado por Clientes.
+
+"Solicitud": Publicación realizada por un Cliente describiendo un trabajo,
+precio ofrecido, ubicación y fecha requerida.
+
+"Oferta" o "Contraoferta": Propuesta de precio enviada por un Prestador de
+Servicios en respuesta a una Solicitud publicada.
+
+"Trato": Acuerdo económico alcanzado directamente entre un Cliente y un
+Prestador de Servicios a través de la Plataforma, sobre precio, fecha y
+condiciones del servicio a realizar.
+
+"Comisión": Porcentaje sobre el valor del Trato que Chamba cobra por el uso
+de la Plataforma como servicio de intermediación tecnológica.
+
+================================================================================
+3. NATURALEZA JURÍDICA DE CHAMBA — INTERMEDIARIA TECNOLÓGICA
+================================================================================
+
+3.1 Chamba es EXCLUSIVAMENTE una plataforma tecnológica de intermediación.
+Su función es conectar digitalmente a Clientes con Prestadores de Servicios.
+Chamba NO presta servicios laborales, de construcción, transporte, limpieza,
+ni ningún otro servicio de naturaleza material u operativa.
+
+3.2 Chamba NO es empleador, contratante directo, agencia de empleo, ni parte
+en ninguna relación laboral, civil o comercial que se genere entre un Cliente
+y un Prestador de Servicios.
+
+3.3 La relación entre Chamba y el Prestador de Servicios es exclusivamente
+de uso de plataforma tecnológica de naturaleza mercantil. No constituye ni
+podrá interpretarse como relación laboral, de dependencia o subordinación
+conforme a la Ley General del Trabajo de Bolivia (D.L. N° 13114) ni a su
+Decreto Reglamentario.
+
+3.4 Los Prestadores de Servicios actúan de manera completamente independiente,
+autónoma y por cuenta propia. Son los únicos responsables de la calidad,
+ejecución, seguridad y resultado de los servicios que prestan.
+
+3.5 Chamba no garantiza la continuidad, frecuencia ni volumen de trabajo que
+un Prestador de Servicios pueda obtener a través de la Plataforma.
+
+================================================================================
+4. REQUISITOS PARA EL REGISTRO
+================================================================================
+
+4.1 Para utilizar la Plataforma el Usuario debe:
+
+  a) Ser persona natural mayor de 18 años.
+  b) Residir o encontrarse en el territorio boliviano.
+  c) Contar con un número de celular activo y válido en Bolivia.
+  d) Proporcionar información veraz, completa y actualizada al registrarse.
+  e) Aceptar los presentes Términos y Condiciones.
+
+4.2 El registro se realiza mediante verificación del número de celular a través
+de un código OTP (contraseña de un solo uso) enviado por SMS o WhatsApp.
+Este número de celular verificado constituye la identidad digital del Usuario
+dentro de la Plataforma.
+
+4.3 Cada persona natural podrá registrar únicamente una cuenta de Usuario.
+La creación de cuentas múltiples o falsas es motivo de baja inmediata.
+
+4.4 El Usuario es el único responsable de mantener la confidencialidad de
+su cuenta y de todas las actividades realizadas desde la misma.
+
+================================================================================
+5. FUNCIONAMIENTO DE LA PLATAFORMA
+================================================================================
+
+5.1 PUBLICACIÓN DE SOLICITUDES (CLIENTES)
+El Cliente puede publicar Solicitudes de trabajo describiendo en lenguaje
+natural el servicio que necesita, el precio que ofrece pagar, la ubicación
+del trabajo y la fecha requerida. La Plataforma utiliza tecnología de
+Inteligencia Artificial para clasificar la Solicitud y notificar a los
+Prestadores de Servicios con habilidades afines que se encuentren cercanos
+a la ubicación indicada.
+
+5.2 SISTEMA DE NEGOCIACIÓN DE PRECIO
+Los Prestadores de Servicios notificados podrán aceptar el precio ofrecido
+por el Cliente o enviar una Contraoferta con un precio distinto. El Cliente
+puede seleccionar la oferta que prefiera. El Trato se perfecciona cuando el
+Cliente selecciona a un Prestador de Servicios y ambas partes lo confirman
+dentro de la Plataforma.
+
+5.3 GEOLOCALIZACIÓN
+La Plataforma utiliza la ubicación GPS del dispositivo del Usuario para
+mostrar solicitudes y trabajadores cercanos. Una hora antes del inicio del
+trabajo confirmado, la ubicación del Prestador de Servicios se comparte en
+tiempo real con el Cliente hasta que aquel llegue al lugar de trabajo. El
+Usuario autoriza expresamente el uso de su ubicación al aceptar estos Términos.
+
+5.4 SISTEMA DE CALIFICACIONES
+Al finalizar cada servicio, el Cliente y el Prestador de Servicios se
+califican mutuamente con una puntuación de 1 a 5 estrellas y comentario
+opcional. Estas calificaciones son públicas, permanentes y forman parte del
+perfil de cada Usuario.
+
+================================================================================
+6. EXONERACIÓN DE RESPONSABILIDAD DE CHAMBA
+================================================================================
+
+6.1 El Usuario acepta y reconoce expresamente que Chamba queda exonerada de
+toda responsabilidad civil, laboral, penal o de cualquier otra naturaleza en
+los siguientes supuestos:
+
+  a) ACCIDENTES Y DAÑOS FÍSICOS: Accidentes, lesiones, daños físicos o
+     materiales que ocurran durante la ejecución del servicio, ya sea que
+     afecten al Prestador, al Cliente o a terceros. El Prestador de Servicios
+     asume exclusivamente todo riesgo derivado del ejercicio de su actividad.
+
+  b) INCUMPLIMIENTO DE PAGO: El Cliente no realice el pago acordado. Chamba
+     no actúa como garante ni como cobrador de las obligaciones económicas
+     pactadas entre las partes.
+
+  c) CALIDAD DEL SERVICIO: Defectos, fallas, errores o daños derivados de la
+     calidad del servicio prestado por el Trabajador. Chamba no verifica ni
+     certifica las habilidades declaradas por los Prestadores de Servicios.
+
+  d) DISPUTAS ENTRE USUARIOS: Conflictos, litigios o reclamaciones que surjan
+     entre el Cliente y el Prestador de Servicios, durante o después de la
+     ejecución del servicio.
+
+  e) INFORMACIÓN FALSA: Datos, descripciones o imágenes inexactas publicadas
+     por cualquier Usuario en la Plataforma.
+
+  f) FALLAS TÉCNICAS: Interrupciones del servicio, errores del sistema,
+     fallas de conectividad a internet, o fallos de proveedores terceros
+     (Google Maps, servicios de notificaciones push, servidores de nube, etc.).
+
+  g) FUERZA MAYOR: Situaciones de fuerza mayor o caso fortuito que impidan
+     el funcionamiento normal de la Plataforma (desastres naturales, cortes
+     masivos de energía, pandemias, disposiciones gubernamentales, etc.).
+
+  h) USO INDEBIDO: Daños derivados del uso incorrecto, fraudulento o
+     contrario a estos Términos de la Plataforma por parte del Usuario.
+
+6.2 En ningún caso Chamba será responsable por daños indirectos, lucro
+cesante, daño emergente, pérdida de datos o cualquier daño consecuente.
+
+6.3 La responsabilidad máxima de Chamba ante cualquier Usuario, en cualquier
+circunstancia, se limitará al valor de las comisiones efectivamente cobradas
+a dicho Usuario en los 30 días calendario anteriores al evento reclamado.
+
+================================================================================
+7. OBLIGACIONES DEL USUARIO
+================================================================================
+
+7.1 OBLIGACIONES GENERALES DE TODOS LOS USUARIOS:
+
+  a) Proporcionar información veraz y mantenerla actualizada en todo momento.
+  b) Usar la Plataforma únicamente para los fines lícitos previstos en
+     estos Términos.
+  c) No utilizar la Plataforma para actividades fraudulentas, ilegales o
+     contrarias al orden público y las buenas costumbres.
+  d) No acosar, amenazar, insultar ni discriminar a otros Usuarios.
+  e) No intentar manipular, hackear o interferir con el funcionamiento
+     técnico de la Plataforma.
+  f) No crear cuentas falsas ni suplantar la identidad de otras personas.
+
+7.2 OBLIGACIONES ESPECÍFICAS DEL CLIENTE:
+
+  a) Publicar Solicitudes que describan trabajos lícitos y reales.
+  b) Honrar el Trato acordado, pagando al Prestador el precio pactado.
+  c) Proporcionar las condiciones mínimas de seguridad necesarias para
+     la realización del trabajo en el lugar indicado.
+  d) Calificar honestamente al Prestador de Servicios al finalizar el trabajo.
+  e) Notificar con anticipación razonable si necesita cancelar un Trato
+     confirmado.
+
+7.3 OBLIGACIONES ESPECÍFICAS DEL PRESTADOR DE SERVICIOS:
+
+  a) Registrar únicamente habilidades y experiencias que efectivamente posee.
+  b) Cumplir puntual y responsablemente con los trabajos que acepte.
+  c) Respetar el precio acordado una vez confirmado el Trato.
+  d) Tratar a los Clientes con respeto y profesionalismo.
+  e) Contar con las habilitaciones, licencias o permisos que su oficio
+     requiera según la normativa boliviana vigente, siendo el único
+     responsable ante las autoridades competentes.
+  f) Cumplir con sus obligaciones tributarias personales ante el Servicio
+     de Impuestos Nacionales (SIN) derivadas de sus ingresos.
+  g) Mantener actualizada su disponibilidad en la Plataforma.
+  h) Notificar con anticipación razonable si no podrá presentarse a un
+     trabajo confirmado.
+
+================================================================================
+8. COMISIONES Y PAGOS
+================================================================================
+
+8.1 El uso de la Plataforma por parte del Prestador de Servicios está sujeto
+al pago de una comisión sobre el valor de cada Trato completado exitosamente.
+
+8.2 El porcentaje de comisión vigente será informado claramente al Usuario
+dentro de la Plataforma antes de la aceptación de cada Trato.
+
+8.3 Chamba se reserva el derecho de modificar el porcentaje de comisión con
+un previo aviso de al menos 15 días calendario.
+
+8.4 La comisión se descontará automáticamente en los pagos procesados
+digitalmente a través de la Plataforma. En pagos en efectivo acordados entre
+las partes, la comisión podrá cobrarse mediante cargo a la cuenta del Usuario.
+
+8.5 Los precios pactados entre Clientes y Prestadores son acordados
+libremente entre ellos. Chamba no fija ni regula los precios de los servicios.
+
+================================================================================
+9. PRIVACIDAD Y PROTECCIÓN DE DATOS PERSONALES
+================================================================================
+
+9.1 Chamba recopila y trata los datos personales de sus Usuarios conforme
+a la normativa boliviana aplicable y a su Política de Privacidad, disponible
+en www.chamba.app/privacidad.
+
+9.2 Los datos recopilados incluyen: nombre completo, número de celular,
+fotografía de perfil, ubicación GPS, historial de servicios y calificaciones.
+
+9.3 Chamba NO venderá, cederá ni comercializará los datos personales de sus
+Usuarios a terceros sin su consentimiento expreso, salvo requerimiento de
+autoridad competente boliviana.
+
+9.4 Al aceptar estos Términos, el Usuario autoriza expresamente a Chamba a:
+
+  a) Compartir su nombre, foto de perfil y calificación con otros Usuarios
+     dentro de la Plataforma para facilitar la intermediación.
+  b) Usar su ubicación GPS para mostrar Solicitudes y Trabajadores cercanos.
+  c) Compartir su ubicación en tiempo real con el Cliente contratante durante
+     la hora previa al inicio del trabajo confirmado.
+  d) Enviar notificaciones push al dispositivo del Usuario.
+  e) Utilizar datos anonimizados y agregados para mejorar el servicio.
+
+9.5 El Usuario puede solicitar la eliminación de su cuenta y datos personales
+escribiendo a soporte@chamba.app. La eliminación será efectiva en un plazo
+máximo de 30 días hábiles, excepto los datos que deban conservarse por
+obligaciones legales.
+
+================================================================================
+10. SISTEMA DE CALIFICACIONES Y SUSPENSIÓN DE CUENTAS
+================================================================================
+
+10.1 Las calificaciones son públicas, permanentes y no pueden ser eliminadas
+salvo que contengan contenido ilegal, ofensivo o claramente falso, a criterio
+de Chamba.
+
+10.2 Chamba se reserva el derecho de suspender temporalmente o dar de baja
+definitiva la cuenta de cualquier Usuario, con o sin previo aviso según la
+gravedad del caso, ante:
+
+  a) Incumplimientos reiterados de los presentes Términos y Condiciones.
+  b) Calificaciones promedio consistentemente bajas (menor a 2 estrellas).
+  c) Reportes fundados de mal comportamiento, fraude o abuso.
+  d) Uso fraudulento de la Plataforma.
+  e) Suplantación de identidad o información falsa en el perfil.
+  f) Cualquier actividad ilícita realizada a través de la Plataforma.
+
+10.3 El Usuario podrá solicitar la revisión de una suspensión contactando a
+soporte@chamba.app dentro de los 10 días hábiles siguientes a la notificación.
+
+10.4 El Usuario podrá solicitar la baja voluntaria de su cuenta en cualquier
+momento, sin penalización, perdiendo el acceso a su historial y reputación
+acumulada dentro de la Plataforma.
+
+================================================================================
+11. PROPIEDAD INTELECTUAL
+================================================================================
+
+11.1 La marca "Chamba", el logotipo, el diseño de la aplicación, el código
+fuente, los algoritmos y todo el contenido propio de la Plataforma son
+propiedad exclusiva de Chamba Technologies y están protegidos por la
+normativa boliviana e internacional de propiedad intelectual.
+
+11.2 El Usuario no podrá copiar, reproducir, distribuir, modificar ni crear
+obras derivadas de ningún elemento de la Plataforma sin autorización expresa
+y por escrito de Chamba.
+
+11.3 El Usuario conserva la propiedad de las fotografías e información que
+suba a su perfil, pero otorga a Chamba una licencia no exclusiva para usar
+dicho contenido dentro de la Plataforma con fines de prestación del servicio.
+
+================================================================================
+12. MODIFICACIONES A LOS TÉRMINOS Y CONDICIONES
+================================================================================
+
+12.1 Chamba se reserva el derecho de modificar los presentes Términos y
+Condiciones en cualquier momento.
+
+12.2 Las modificaciones serán notificadas al Usuario mediante notificación
+push en la aplicación y/o al correo electrónico registrado, con un mínimo de
+15 días calendario de anticipación a su entrada en vigencia.
+
+12.3 El uso continuado de la Plataforma tras el vencimiento del plazo de
+notificación implica la aceptación tácita de los nuevos términos.
+
+12.4 Si el Usuario no acepta las modificaciones, podrá solicitar la baja de
+su cuenta sin penalización antes de la entrada en vigencia de los nuevos
+términos.
+
+================================================================================
+13. VALIDEZ DEL CONTRATO ELECTRÓNICO Y ACEPTACIÓN DIGITAL
+================================================================================
+
+13.1 De conformidad con la Ley N° 164 de Bolivia y el Decreto Supremo N° 1793
+(Reglamento de Comercio Electrónico), los contratos celebrados por medios
+electrónicos tienen plena validez y eficacia jurídica en la República de
+Bolivia cuando se cumplen los requisitos de identificación y consentimiento.
+
+13.2 La aceptación de estos Términos mediante el botón "Acepto los Términos
+y Condiciones" dentro de la aplicación Chamba constituye:
+
+  a) Una manifestación válida, libre e informada de voluntad del Usuario.
+  b) Un contrato electrónico vinculante entre el Usuario y Chamba.
+  c) El equivalente legal de una firma manuscrita para todos los efectos
+     jurídicos contemplados en la normativa boliviana vigente.
+
+13.3 Al momento de la aceptación, Chamba registrará y conservará:
+
+  a) Nombre completo del Usuario.
+  b) Número de celular verificado mediante OTP.
+  c) Fecha y hora exacta de la aceptación.
+  d) Versión de los Términos y Condiciones aceptada.
+  e) Dirección IP del dispositivo utilizado.
+
+13.4 Este registro digital constituye prueba suficiente del consentimiento
+del Usuario y podrá ser presentado ante autoridades judiciales o
+administrativas bolivianas competentes como medio de prueba.
+
+13.5 El Usuario reconoce que la aceptación digital de estos Términos produce
+los mismos efectos legales que un contrato firmado de manera manuscrita, de
+conformidad con el ordenamiento jurídico boliviano.
+
+================================================================================
+14. RESOLUCIÓN DE DISPUTAS Y JURISDICCIÓN
+================================================================================
+
+14.1 MEDIACIÓN PREVIA: Ante cualquier disputa, controversia o reclamación
+derivada de estos Términos o del uso de la Plataforma, las partes se
+comprometen a intentar una solución amigable mediante comunicación directa
+con el equipo de soporte de Chamba (soporte@chamba.app) por un plazo de
+30 días calendario desde que se notifica el problema.
+
+14.2 JURISDICCIÓN: Si no se alcanza un acuerdo en la mediación, la
+controversia será sometida a los tribunales ordinarios competentes del
+departamento de Santa Cruz de la Sierra, República de Bolivia, a cuya
+jurisdicción ambas partes se someten expresamente, renunciando a cualquier
+otro fuero que pudiera corresponderles.
+
+14.3 LEY APLICABLE: Los presentes Términos y Condiciones se rigen e
+interpretan conforme a las leyes vigentes de la República de Bolivia.
+
+14.4 En los casos en que exista una normativa específica de protección al
+consumidor aplicable, se estará a lo que dicha normativa disponga en favor
+del Usuario.
+
+================================================================================
+15. DISPOSICIONES FINALES
+================================================================================
+
+15.1 Si alguna cláusula o disposición de estos Términos fuera declarada nula,
+inválida o inaplicable por autoridad judicial o administrativa competente,
+las demás disposiciones conservarán su plena vigencia y eficacia.
+
+15.2 La omisión de Chamba en exigir el cumplimiento estricto de alguna
+disposición no constituirá renuncia a su derecho de exigirlo en el futuro.
+
+15.3 Estos Términos y Condiciones constituyen el acuerdo completo entre
+Chamba y el Usuario respecto al uso de la Plataforma, y reemplazan cualquier
+comunicación, acuerdo o entendimiento verbal o escrito anterior sobre la
+misma materia.
+
+15.4 El Usuario no podrá ceder ni transferir sus derechos u obligaciones
+derivados de estos Términos a terceros sin autorización previa y escrita
+de Chamba.
+
+15.5 Para cualquier consulta, duda o reclamación relacionada con estos
+Términos, el Usuario puede contactar a Chamba a través de:
+
+  Correo    : soporte@chamba.app
+  WhatsApp  : (disponible en la app)
+  Dirección : Santa Cruz de la Sierra, Bolivia
+
+================================================================================
+                          FIN DE LOS TÉRMINOS Y CONDICIONES
+                    CHAMBA — Encuentra trabajo. Encuentra trabajadores.
+              Versión 1.0  |  Bolivia  |  Vigente desde enero 2026
+================================================================================
+
+DECLARACIÓN DE ACEPTACIÓN (para uso en pantalla de la app):
+
+"He leído y acepto los Términos y Condiciones de uso de la plataforma Chamba.
+Entiendo que al presionar ACEPTAR estoy celebrando un contrato electrónico
+válido conforme a la Ley N° 164 de Bolivia y sus reglamentos."
+
+                              [ ACEPTO LOS TÉRMINOS ]
+
+================================================================================

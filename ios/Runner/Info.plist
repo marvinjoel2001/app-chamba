@@ -55,6 +55,14 @@
 	<string>Main</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Necesitamos tu ubicación para mostrar tu posición actual en el mapa y encontrar trabajos cercanos.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

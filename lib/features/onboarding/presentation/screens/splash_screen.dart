@@ -54,6 +54,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
     RealtimeService.instance.connect(userId: user.id);
 
+    Widget nextScreen = MainShellScreen(role: user.type);
+
     if (user.type == 'worker') {
       final result = await WorkerDependencies.getWorkerSkills(
         workerUserId: user.id,
@@ -69,19 +71,13 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
       if (shouldOpenSkills) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                const SkillsSelectionScreen(forceToHomeAfterSave: true),
-          ),
-        );
-        return;
+        nextScreen = const SkillsSelectionScreen(forceToHomeAfterSave: true);
       }
     }
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => MainShellScreen(role: user.type)),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => nextScreen));
   }
 
   @override

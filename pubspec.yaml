@@ -45,11 +45,21 @@ dependencies:
   geolocator: ^14.0.2
   image_picker: ^1.2.0
   shared_preferences: ^2.5.3
+  package_info_plus: ^8.0.2
+  permission_handler: ^12.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/icon/icon.png"
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -69,6 +79,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/branding/
+    - assets/legal/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -100,8 +111,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: assets/images/branding/chamba_favicon.png
