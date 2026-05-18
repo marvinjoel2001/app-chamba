@@ -15,6 +15,8 @@ abstract class AuthRepository {
     required String role,
     required String email,
     String? phone,
+    String? countryCode,
+    String? ciNumber,
     required String firstName,
     String? lastName,
     required String password,

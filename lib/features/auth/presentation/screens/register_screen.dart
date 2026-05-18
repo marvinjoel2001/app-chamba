@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
@@ -24,8 +25,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _ciController = TextEditingController();
   final _passwordController = TextEditingController();
   String _selectedRole = 'client';
+  String _countryCode = '+591';
   bool _acceptedTerms = false;
 
   @override
@@ -34,6 +37,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _ciController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -185,14 +189,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        TextFormField(
+                        IntlPhoneField(
                           controller: _phoneController,
+                          initialCountryCode: 'BO',
+                          onChanged: (phone) {
+                            _countryCode = phone.countryCode;
+                          },
                           style: const TextStyle(color: AppTheme.colorText),
                           decoration: AppTheme.glassInputDecoration(
                             labelText: 'Teléfono (opcional)',
                             icon: Icons.phone_android_outlined,
                           ),
                         ),
+                        if (_selectedRole == 'worker') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _ciController,
+                            style: const TextStyle(color: AppTheme.colorText),
+                            decoration: AppTheme.glassInputDecoration(
+                              labelText: 'Número de Carnet (CI)',
+                              icon: Icons.badge_outlined,
+                            ),
+                            validator: (value) {
+                              if (_selectedRole == 'worker' && (value == null || value.trim().isEmpty)) {
+                                return 'Ingresa tu número de carnet';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
@@ -277,6 +302,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                         role: _selectedRole,
                                         email: _emailController.text,
                                         phone: _phoneController.text,
+                                        countryCode: _countryCode,
+                                        ciNumber: _selectedRole == 'worker' ? _ciController.text : null,
                                         firstName: _firstNameController.text,
                                         lastName: _lastNameController.text,
                                         password: _passwordController.text,

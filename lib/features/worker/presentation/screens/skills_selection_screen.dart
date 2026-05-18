@@ -5,6 +5,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import 'verification_checkpoint_screen.dart';
 import '../../domain/entities/worker_category.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
@@ -225,6 +226,23 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
       return;
     }
 
+    // Validar que se seleccionen entre 1 y 5 categorías
+    if (selected.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona al menos 1 habilidad')),
+      );
+      return;
+    }
+
+    if (selected.length > 5) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona máximo 5 habilidades')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     final result = await _updateWorkerSkillsUseCase(
       workerUserId: user.id,
@@ -239,11 +257,10 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
           SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
         );
         if (widget.forceToHomeAfterSave) {
+          // Redirigir al checkpoint de verificación
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute<void>(
-              builder: (_) => MainShellScreen(
-                role: SessionStore.currentUser?.type ?? 'worker',
-              ),
+              builder: (_) => const VerificationCheckpointScreen(),
             ),
             (_) => false,
           );
@@ -291,11 +308,6 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                       onPressed: _load,
                       icon: const Icon(Icons.refresh),
                     ),
-                    IconButton(
-                      onPressed: _loading ? null : _createCategoryFromDialog,
-                      tooltip: 'Nueva categoria',
-                      icon: const Icon(Icons.add_circle_outline),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -310,12 +322,12 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                     child: Text('Sesión expirada. Inicia sesión nuevamente.'),
                   ),
                 const Text(
-                  'Paso 4 de 5',
+                  'Paso 2 de 5',
                   style: TextStyle(color: AppTheme.colorMuted),
                 ),
                 const SizedBox(height: 8),
                 LinearProgressIndicator(
-                  value: 0.8,
+                  value: 0.4,
                   backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.2),
                   color: AppTheme.colorPrimary,
                   borderRadius: BorderRadius.circular(20),
@@ -324,9 +336,16 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                 const SizedBox(height: 22),
                 if (_loading) const LinearProgressIndicator(),
                 Text(
-                  'En que eres bueno?',
+                  '¿Qué habilidades tienes?',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Puedes cambiar esto después desde tu perfil',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.colorMuted,
                   ),
                 ),
                 const SizedBox(height: 16),
