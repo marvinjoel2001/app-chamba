@@ -11,6 +11,11 @@ class SessionUser {
     required this.email,
     this.phone,
     this.profilePhotoUrl,
+    this.verificationStatus,
+    this.idPhotoUrl,
+    this.facePhotoUrl,
+    this.idPhotoVerified,
+    this.facePhotoVerified,
   });
 
   final String id;
@@ -20,6 +25,11 @@ class SessionUser {
   final String email;
   final String? phone;
   final String? profilePhotoUrl;
+  final String? verificationStatus;
+  final String? idPhotoUrl;
+  final String? facePhotoUrl;
+  final bool? idPhotoVerified;
+  final bool? facePhotoVerified;
 
   String get fullName {
     final ln = (lastName ?? '').trim();
@@ -34,6 +44,11 @@ class SessionUser {
     String? email,
     String? phone,
     String? profilePhotoUrl,
+    String? verificationStatus,
+    String? idPhotoUrl,
+    String? facePhotoUrl,
+    bool? idPhotoVerified,
+    bool? facePhotoVerified,
     bool clearProfilePhotoUrl = false,
   }) {
     return SessionUser(
@@ -46,6 +61,11 @@ class SessionUser {
       profilePhotoUrl: clearProfilePhotoUrl
           ? null
           : profilePhotoUrl ?? this.profilePhotoUrl,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      idPhotoUrl: idPhotoUrl ?? this.idPhotoUrl,
+      facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
+      idPhotoVerified: idPhotoVerified ?? this.idPhotoVerified,
+      facePhotoVerified: facePhotoVerified ?? this.facePhotoVerified,
     );
   }
 
@@ -58,6 +78,11 @@ class SessionUser {
       'email': email,
       'phone': phone,
       'profilePhotoUrl': profilePhotoUrl,
+      'verificationStatus': verificationStatus,
+      'idPhotoUrl': idPhotoUrl,
+      'facePhotoUrl': facePhotoUrl,
+      'idPhotoVerified': idPhotoVerified,
+      'facePhotoVerified': facePhotoVerified,
     };
   }
 
@@ -70,6 +95,11 @@ class SessionUser {
       email: json['email'] as String? ?? '',
       phone: json['phone'] as String?,
       profilePhotoUrl: json['profilePhotoUrl'] as String?,
+      verificationStatus: json['verificationStatus'] as String?,
+      idPhotoUrl: json['idPhotoUrl'] as String?,
+      facePhotoUrl: json['facePhotoUrl'] as String?,
+      idPhotoVerified: json['idPhotoVerified'] as bool?,
+      facePhotoVerified: json['facePhotoVerified'] as bool?,
     );
   }
 }

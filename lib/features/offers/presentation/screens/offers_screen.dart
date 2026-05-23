@@ -70,6 +70,15 @@ class _OffersScreenState extends State<OffersScreen> {
   void _tickCountdown() {
     if (!mounted || _offers.isEmpty) return;
 
+    // Solo procesar si hay ofertas pendientes con countdown
+    final hasPendingOffers = _offers.any((o) {
+      final offer = o as Map<String, dynamic>;
+      final status = offer['status']?.toString() ?? '';
+      final remaining = (offer['secondsRemaining'] as num?)?.toInt();
+      return status == 'pending' && remaining != null && remaining > 0;
+    });
+    if (!hasPendingOffers) return;
+
     setState(() {
       _offers = _offers
           .map(
@@ -471,12 +480,36 @@ class _OffersScreenState extends State<OffersScreen> {
                           ),
                         )
                       else
-                        ...offers.map(
-                          (offer) => _buildWorkerOfferCard(
-                            offer,
-                            isBestOffer:
-                                offer['id']?.toString() == cheapestOfferId,
-                          ),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: offers.length,
+                          itemBuilder: (context, index) {
+                            final offer = offers[index];
+                            final secondsRemaining =
+                                (offer['secondsRemaining'] as num?)?.toInt();
+                            return _WorkerOfferCard(
+                              offer: offer,
+                              isBestOffer:
+                                  offer['id']?.toString() == cheapestOfferId,
+                              offerLifetimeSeconds: _offerLifetimeSeconds,
+                              expandedOfferId: _expandedOfferId,
+                              onToggleExpand: (offerId) {
+                                setState(() {
+                                  _expandedOfferId =
+                                      _expandedOfferId == offerId
+                                          ? null
+                                          : offerId;
+                                });
+                              },
+                              onAcceptOffer: _acceptOffer,
+                              requestDescription:
+                                  _request?['description']?.toString(),
+                              formattedCountdown:
+                                  _formatCountdown(secondsRemaining),
+                              formattedPublishedAgo: _formatPublishedAgo(),
+                            );
+                          },
                         ),
                       const SizedBox(height: 16),
                       const Row(
@@ -707,23 +740,89 @@ class _OffersScreenState extends State<OffersScreen> {
     );
   }
 
-  Widget _buildWorkerOfferCard(
-    Map<String, dynamic> item, {
-    bool isBestOffer = false,
-  }) {
-    final offerId = item['id']?.toString() ?? '';
-    final worker = item['worker'] as Map<String, dynamic>? ?? {};
+  // Widget extraído como clase privada al final del archivo
+}
+
+class _OfferAdjustButton extends StatelessWidget {
+  const _OfferAdjustButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+    this.isPrimary = false,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: enabled
+              ? (isPrimary ? AppTheme.colorPrimary : const Color(0xFF2A3B59))
+              : const Color(0xFF3A475A),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: enabled ? Colors.white : const Color(0xFF8A97A8),
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkerOfferCard extends StatelessWidget {
+  const _WorkerOfferCard({
+    required this.offer,
+    required this.isBestOffer,
+    required this.offerLifetimeSeconds,
+    required this.expandedOfferId,
+    required this.onToggleExpand,
+    required this.onAcceptOffer,
+    required this.requestDescription,
+    required this.formattedCountdown,
+    required this.formattedPublishedAgo,
+  });
+
+  final Map<String, dynamic> offer;
+  final bool isBestOffer;
+  final int offerLifetimeSeconds;
+  final String? expandedOfferId;
+  final ValueChanged<String> onToggleExpand;
+  final void Function({
+    required Map<String, dynamic> item,
+    required Map<String, dynamic> worker,
+  }) onAcceptOffer;
+  final String? requestDescription;
+  final String formattedCountdown;
+  final String formattedPublishedAgo;
+
+  @override
+  Widget build(BuildContext context) {
+    final offerId = offer['id']?.toString() ?? '';
+    final worker = offer['worker'] as Map<String, dynamic>? ?? {};
     final workerId = worker['id']?.toString();
     final workerName =
         '${worker['firstName'] ?? ''} ${worker['lastName'] ?? ''}'.trim();
     final rating = (worker['averageRating'] as num?)?.toDouble() ?? 0;
     final distance = (worker['distanceKm'] as num?)?.toDouble();
-    final amount = (item['amount'] as num?)?.toDouble() ?? 0;
-    final secondsRemaining = (item['secondsRemaining'] as num?)?.toInt();
-    final expanded = _expandedOfferId == offerId;
+    final amount = (offer['amount'] as num?)?.toDouble() ?? 0;
+    final secondsRemaining = (offer['secondsRemaining'] as num?)?.toInt();
+    final expanded = expandedOfferId == offerId;
     final progress = secondsRemaining == null
         ? 1.0
-        : (secondsRemaining / _offerLifetimeSeconds).clamp(0.0, 1.0).toDouble();
+        : (secondsRemaining / offerLifetimeSeconds)
+            .clamp(0.0, 1.0)
+            .toDouble();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -740,11 +839,7 @@ class _OffersScreenState extends State<OffersScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          setState(() {
-            _expandedOfferId = expanded ? null : offerId;
-          });
-        },
+        onTap: () => onToggleExpand(offerId),
         child: Column(
           children: [
             ClipRRect(
@@ -860,7 +955,7 @@ class _OffersScreenState extends State<OffersScreen> {
                         ),
                       ),
                     Text(
-                      'Expira en ${_formatCountdown(secondsRemaining)}',
+                      'Expira en $formattedCountdown',
                       style: const TextStyle(
                         color: AppTheme.colorMuted,
                         fontSize: 14,
@@ -872,7 +967,7 @@ class _OffersScreenState extends State<OffersScreen> {
                       'Bs ${amount.toStringAsFixed(0)}',
                       style: const TextStyle(
                         color: AppTheme.colorHighlight,
-                        fontSize: 46 / 2,
+                        fontSize: 23,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -919,8 +1014,7 @@ class _OffersScreenState extends State<OffersScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _request?['description']?.toString() ??
-                          'Sin descripción.',
+                      requestDescription ?? 'Sin descripción.',
                       style: const TextStyle(
                         color: AppTheme.colorMuted,
                         fontSize: 16,
@@ -984,7 +1078,7 @@ class _OffersScreenState extends State<OffersScreen> {
                                     ),
                                   ),
                                   Text(
-                                    _formatPublishedAgo(),
+                                    formattedPublishedAgo,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 17,
@@ -1046,7 +1140,10 @@ class _OffersScreenState extends State<OffersScreen> {
                       child: ElevatedButton.icon(
                         onPressed: workerId == null
                             ? null
-                            : () => _acceptOffer(item: item, worker: worker),
+                            : () => onAcceptOffer(
+                                  item: offer,
+                                  worker: worker,
+                                ),
                         icon: const Icon(
                           Icons.check_circle,
                           color: Colors.white,
@@ -1072,43 +1169,6 @@ class _OffersScreenState extends State<OffersScreen> {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OfferAdjustButton extends StatelessWidget {
-  const _OfferAdjustButton({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-    this.isPrimary = false,
-  });
-
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
-  final bool isPrimary;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: enabled
-              ? (isPrimary ? AppTheme.colorPrimary : const Color(0xFF2A3B59))
-              : const Color(0xFF3A475A),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          icon,
-          color: enabled ? Colors.white : const Color(0xFF8A97A8),
-          size: 24,
         ),
       ),
     );

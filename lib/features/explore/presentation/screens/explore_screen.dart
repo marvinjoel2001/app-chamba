@@ -666,20 +666,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
           const SizedBox(height: 12),
           SizedBox(
             height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (var i = 0; i < _categories.length; i++) ...[
-                  ChambaChip(
-                    label: _categories[i].toString(),
-                    selected: i == 0,
+            child: _categories.isEmpty
+                ? const ChambaChip(label: 'Sin categorias', selected: false)
+                : ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    itemBuilder: (context, i) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChambaChip(
+                          label: _categories[i].toString(),
+                          selected: i == 0,
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 8),
-                ],
-                if (_categories.isEmpty)
-                  const ChambaChip(label: 'Sin categorias', selected: false),
-              ],
-            ),
           ),
           const SizedBox(height: 8),
           ChambaPrimaryButton(

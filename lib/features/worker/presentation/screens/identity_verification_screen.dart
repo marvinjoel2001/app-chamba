@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import '../../../../core/services/mobile_backend_service.dart';
+import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
@@ -316,17 +320,38 @@ class _IdentityVerificationScreenState
       return;
     }
 
+    final currentUser = SessionStore.currentUser;
+    if (currentUser == null || currentUser.type != 'worker') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se encontro sesion de trabajador')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implementar la subida a backend y Cloudinary
-      // Por ahora, simulamos el proceso
+      final idBytes = await _idPhoto!.readAsBytes();
+      final faceBytes = await _facePhoto!.readAsBytes();
+      final idPhotoDataUri = 'data:image/jpeg;base64,${base64Encode(idBytes)}';
+      final facePhotoDataUri =
+          'data:image/jpeg;base64,${base64Encode(faceBytes)}';
 
-      await Future.delayed(const Duration(seconds: 2));
+      final response = await MobileBackendService.instance
+          .submitWorkerVerification(
+            workerUserId: currentUser.id,
+            idPhotoBase64: idPhotoDataUri,
+            facePhotoBase64: facePhotoDataUri,
+          );
+
+      final userJson = response['user'];
+      if (userJson is Map<String, dynamic>) {
+        await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verificación enviada correctamente')),
+          const SnackBar(content: Text('Verificacion enviada correctamente')),
         );
 
         Navigator.of(context).pushAndRemoveUntil(
@@ -339,7 +364,7 @@ class _IdentityVerificationScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al enviar verificación')),
+          SnackBar(content: Text('Error al enviar verificacion: $e')),
         );
       }
     } finally {
@@ -349,3 +374,4 @@ class _IdentityVerificationScreenState
     }
   }
 }
+

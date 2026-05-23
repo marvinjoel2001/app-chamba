@@ -174,6 +174,21 @@ class MobileBackendService {
     return _api.post('/mobile/profile/photo/delete', body: {'userId': userId});
   }
 
+  Future<Map<String, dynamic>> submitWorkerVerification({
+    required String workerUserId,
+    required String idPhotoBase64,
+    required String facePhotoBase64,
+  }) {
+    return _api.post(
+      '/mobile/worker/verification',
+      body: {
+        'workerUserId': workerUserId,
+        'idPhotoBase64': idPhotoBase64,
+        'facePhotoBase64': facePhotoBase64,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> deleteRequestPhoto({
     required String requestPhotoId,
     required String clientUserId,

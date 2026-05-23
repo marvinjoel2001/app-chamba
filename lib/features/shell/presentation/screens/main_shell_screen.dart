@@ -31,11 +31,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
   void initState() {
     super.initState();
     _realtime.on('message.new', _onMessageNew);
+    _realtime.on('user.verification.updated', _onVerificationUpdated);
   }
 
   @override
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
+    _realtime.off('user.verification.updated', _onVerificationUpdated);
     super.dispose();
   }
 
@@ -46,6 +48,63 @@ class _MainShellScreenState extends State<MainShellScreen> {
     if (senderUserId == myId) return;
     if (currentIndex == _messagesTabIndex) return;
     UnreadMessagesNotifier.instance.increment();
+  }
+
+  Future<void> _onVerificationUpdated(dynamic payload) async {
+    final currentUser = SessionStore.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    final data = payload is Map
+        ? Map<String, dynamic>.from(payload as Map)
+        : <String, dynamic>{};
+    final nextVerificationStatus =
+        data['verificationStatus']?.toString() ?? currentUser.verificationStatus;
+    final hasIdDecision = data.containsKey('idPhotoVerified');
+    final hasFaceDecision = data.containsKey('facePhotoVerified');
+
+    final updatedUser = SessionUser(
+      id: currentUser.id,
+      type: currentUser.type,
+      firstName: currentUser.firstName,
+      lastName: currentUser.lastName,
+      email: currentUser.email,
+      phone: currentUser.phone,
+      profilePhotoUrl: currentUser.profilePhotoUrl,
+      verificationStatus: nextVerificationStatus,
+      idPhotoUrl: data['idPhotoUrl']?.toString() ?? currentUser.idPhotoUrl,
+      facePhotoUrl: data['facePhotoUrl']?.toString() ?? currentUser.facePhotoUrl,
+      idPhotoVerified: hasIdDecision
+          ? data['idPhotoVerified'] as bool?
+          : currentUser.idPhotoVerified,
+      facePhotoVerified: hasFaceDecision
+          ? data['facePhotoVerified'] as bool?
+          : currentUser.facePhotoVerified,
+    );
+
+    await SessionStore.setCurrentUser(updatedUser);
+
+    final message =
+        data['message']?.toString().trim().isNotEmpty == true
+        ? data['message'].toString().trim()
+        : nextVerificationStatus == 'verified'
+        ? 'Tu perfil fue verificado correctamente.'
+        : 'Tu estado de verificacion fue actualizado.';
+
+    if (!mounted) {
+      return;
+    }
+
+    final color = nextVerificationStatus == 'verified'
+        ? Colors.green.shade600
+        : Colors.blueGrey.shade700;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+      ),
+    );
   }
 
   @override
