@@ -108,6 +108,7 @@ class SessionStore {
   const SessionStore._();
 
   static const _keySessionUser = 'session_user';
+  static const _workerBgEnabledKey = 'worker_bg_enabled';
 
   static SessionUser? currentUser;
   static String? activeRequestId;
@@ -155,5 +156,6 @@ class SessionStore {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keySessionUser);
+    await prefs.remove(_workerBgEnabledKey);
   }
 }

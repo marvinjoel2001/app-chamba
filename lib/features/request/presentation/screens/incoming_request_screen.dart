@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
@@ -169,6 +170,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
+      await WorkerBackgroundService.setEnabled(value);
       if (mounted && value) {
         await _load(silent: true);
       }

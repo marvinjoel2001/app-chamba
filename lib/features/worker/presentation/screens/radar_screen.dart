@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../domain/entities/worker_radar_summary.dart';
@@ -123,6 +124,7 @@ class _RadarScreenState extends State<RadarScreen> {
           return;
         }
         setState(() => available = data.available);
+        await WorkerBackgroundService.setEnabled(data.available);
         await _load();
       },
       onFailure: (_) {
