@@ -473,4 +473,47 @@ class MobileBackendService {
       body: {'requestId': requestId, 'workerUserId': workerUserId},
     );
   }
+
+  // --- Disputes / Soporte ---
+
+  Future<Map<String, dynamic>> createDispute({
+    required String requestId,
+    required String reportedBy,
+    String? reportedUser,
+    required String reason,
+    String? description,
+  }) {
+    return _api.post(
+      '/mobile/disputes',
+      body: {
+        'requestId': requestId,
+        'reportedBy': reportedBy,
+        'reportedUser': reportedUser,
+        'reason': reason,
+        'description': description,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getDisputeMessages({
+    required String disputeId,
+  }) {
+    return _api.get('/mobile/disputes/$disputeId/messages');
+  }
+
+  Future<Map<String, dynamic>> sendDisputeMessage({
+    required String disputeId,
+    required String senderType,
+    String? senderId,
+    required String content,
+  }) {
+    return _api.post(
+      '/mobile/disputes/$disputeId/messages',
+      body: {
+        'senderType': senderType,
+        'senderId': senderId,
+        'content': content,
+      },
+    );
+  }
 }

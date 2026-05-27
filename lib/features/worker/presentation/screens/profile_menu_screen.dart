@@ -16,6 +16,7 @@ import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
 import 'worker_history_screen.dart';
+import '../../../support/presentation/screens/support_screen.dart';
 
 class ProfileMenuScreen extends StatefulWidget {
   const ProfileMenuScreen({
@@ -379,6 +380,18 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
               ],
               const SizedBox(height: 8),
               const _SectionTitle(label: 'Soporte'),
+              _NavTile(
+                title: 'Soporte',
+                subtitle: 'Reporta un problema o contacta con soporte',
+                icon: Icons.support_agent,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SupportScreen(),
+                    ),
+                  );
+                },
+              ),
               _NavTile(
                 title: 'Calificar servicio',
                 subtitle: 'Registro rápido de una evaluación',

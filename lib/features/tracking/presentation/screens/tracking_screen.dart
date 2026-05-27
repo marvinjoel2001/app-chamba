@@ -13,6 +13,7 @@ import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../state/tracking_dependencies.dart';
+import '../../../support/presentation/screens/support_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
@@ -731,12 +732,34 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        TextButton(
-                          onPressed: _cancelJob,
-                          child: const Text(
-                            'Cancelar trabajo',
-                            style: TextStyle(color: AppTheme.colorError),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: _cancelJob,
+                              child: const Text(
+                                'Cancelar trabajo',
+                                style: TextStyle(color: AppTheme.colorError),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => SupportScreen(
+                                      requestId: SessionStore.activeRequestId,
+                                      reportedUserId: worker?['id']?.toString(),
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.flag_outlined, size: 16, color: AppTheme.colorMuted),
+                              label: const Text(
+                                'Reportar problema',
+                                style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

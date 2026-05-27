@@ -11,6 +11,7 @@ import '../../../request/presentation/state/request_dependencies.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../state/offers_dependencies.dart';
 import 'worker_profile_screen.dart';
+import '../../../support/presentation/screens/support_screen.dart';
 
 class OffersScreen extends StatefulWidget {
   const OffersScreen({super.key});
@@ -427,6 +428,19 @@ class _OffersScreenState extends State<OffersScreen> {
                     IconButton(
                       onPressed: _load,
                       icon: const Icon(Icons.refresh, size: 34),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => SupportScreen(
+                              requestId: SessionStore.activeRequestId,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.flag_outlined, size: 22, color: AppTheme.colorMuted),
+                      tooltip: 'Reportar problema',
                     ),
                   ],
                 ),
