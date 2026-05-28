@@ -79,6 +79,7 @@ class AppTheme {
   static InputDecoration glassInputDecoration({
     required String labelText,
     required IconData icon,
+    Widget? suffixIcon,
   }) {
     const subtleDarkBorder = Color.fromRGBO(255, 255, 255, 0.12);
     const focusedDarkBorder = Color.fromRGBO(139, 92, 246, 0.85);
@@ -89,6 +90,7 @@ class AppTheme {
       floatingLabelStyle: const TextStyle(color: colorPrimaryLight),
       hintStyle: const TextStyle(color: colorMuted),
       prefixIcon: Icon(icon, color: colorMuted),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: colorGlassInputSoft,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),

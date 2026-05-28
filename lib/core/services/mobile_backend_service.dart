@@ -477,7 +477,7 @@ class MobileBackendService {
   // --- Disputes / Soporte ---
 
   Future<Map<String, dynamic>> createDispute({
-    required String requestId,
+    String? requestId,
     required String reportedBy,
     String? reportedUser,
     required String reason,

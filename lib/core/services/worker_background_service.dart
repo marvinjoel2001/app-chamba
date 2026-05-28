@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -42,8 +41,7 @@ class WorkerBackgroundService {
       );
       await _notifications
           .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
+              AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
     }
 
@@ -106,8 +104,6 @@ class WorkerBackgroundService {
 
   @pragma('vm:entry-point')
   static Future<void> _onStart(ServiceInstance service) async {
-    DartPluginRegistrant.ensureInitialized();
-
     if (service is AndroidServiceInstance) {
       service.on('stop').listen((_) {
         service.stopSelf();

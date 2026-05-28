@@ -70,12 +70,7 @@ class _SupportScreenState extends State<SupportScreen> {
   Future<void> _submitReason(String reason) async {
     final user = SessionStore.currentUser;
     final requestId = widget.requestId ?? SessionStore.activeRequestId;
-    if (user == null || requestId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No hay solicitud activa para reportar.')),
-        );
-      }
+    if (user == null) {
       return;
     }
 

@@ -21,6 +21,7 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellScreenState extends State<MainShellScreen> {
   int currentIndex = 0;
+  final Set<int> _visitedIndices = {0};
   final RealtimeService _realtime = RealtimeService.instance;
 
   // Worker: [Inicio(0), Billetera(1), Mensajes(2), Perfil(3)]
@@ -109,12 +110,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = widget.role == 'worker'
-        ? const [
-            IncomingRequestScreen(),
-            WalletScreen(),
-            MessagesScreen(),
-            ProfileMenuScreen(),
+    final isWorker = widget.role == 'worker';
+    final pages = isWorker
+        ? [
+            IncomingRequestScreen(isActive: currentIndex == 0),
+            const WalletScreen(),
+            const MessagesScreen(),
+            const ProfileMenuScreen(),
           ]
         : [
             ExploreScreen(role: widget.role),
@@ -127,7 +129,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
     }
 
     return Scaffold(
-      body: IndexedStack(index: currentIndex, children: pages),
+      body: IndexedStack(
+        index: currentIndex,
+        children: List.generate(
+          pages.length,
+          (i) => _visitedIndices.contains(i) ? pages[i] : const SizedBox.shrink(),
+        ),
+      ),
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: UnreadMessagesNotifier.instance,
         builder: (context, unreadCount, _) {
@@ -140,7 +148,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
               if (index == _messagesTabIndex) {
                 UnreadMessagesNotifier.instance.reset();
               }
-              setState(() => currentIndex = index);
+              setState(() {
+                currentIndex = index;
+                _visitedIndices.add(index);
+              });
             },
           );
         },

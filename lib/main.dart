@@ -10,8 +10,10 @@ import 'core/session/session_store.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SessionStore.hydrate();
-  await const PushNotificationService().initialize();
-  await WorkerBackgroundService.initialize();
+  await Future.wait([
+    const PushNotificationService().initialize(),
+    WorkerBackgroundService.initialize(),
+  ]);
   await WorkerBackgroundService.restoreIfEnabled();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

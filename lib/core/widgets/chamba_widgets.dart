@@ -60,7 +60,7 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final blur = elevated ? 32.0 : 24.0;
+    final blur = elevated ? 12.0 : 10.0;
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
@@ -311,22 +311,19 @@ Widget _buildNav(
   int badgeIndex,
   int? badgeCount,
 ) {
-  return SafeArea(
-    top: false,
-    minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-        child: Container(
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppTheme.colorGlassDarkSoft,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.colorGlassBorderSoft),
-            boxShadow: AppTheme.shadowMd,
-          ),
+  return RepaintBoundary(
+    child: SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+      child: Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.colorGlassDarkSoft,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppTheme.colorGlassBorderSoft),
+          boxShadow: AppTheme.shadowMd,
+        ),
           child: Row(
             children: List.generate(items.length, (index) {
               final item = items[index];
@@ -377,7 +374,6 @@ Widget _buildNav(
           ),
         ),
       ),
-    ),
   );
 }
 
@@ -445,10 +441,12 @@ class _GlowCircle extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 42, sigmaY: 42),
-        child: const SizedBox.expand(),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, color.withValues(alpha: 0)],
+          stops: const [0.0, 1.0],
+        ),
       ),
     );
   }

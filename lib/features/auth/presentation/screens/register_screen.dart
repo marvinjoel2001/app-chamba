@@ -30,6 +30,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _selectedRole = 'client';
   String _countryCode = '+591';
   bool _acceptedTerms = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -121,12 +122,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: ChoiceChip(
-                                label: const Text('Quiero contratar'),
+                              child: ChambaChip(
+                                label: 'Quiero contratar',
                                 selected: _selectedRole == 'client',
-                                onSelected: authState.isLoading
+                                onTap: authState.isLoading
                                     ? null
-                                    : (_) {
+                                    : () {
                                         setState(() {
                                           _selectedRole = 'client';
                                         });
@@ -135,12 +136,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: ChoiceChip(
-                                label: const Text('Quiero trabajar'),
+                              child: ChambaChip(
+                                label: 'Quiero trabajar',
                                 selected: _selectedRole == 'worker',
-                                onSelected: authState.isLoading
+                                onTap: authState.isLoading
                                     ? null
-                                    : (_) {
+                                    : () {
                                         setState(() {
                                           _selectedRole = 'worker';
                                         });
@@ -221,11 +222,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
-                          obscureText: true,
+                          obscureText: _obscurePassword,
                           style: const TextStyle(color: AppTheme.colorText),
                           decoration: AppTheme.glassInputDecoration(
                             labelText: 'Contraseña',
                             icon: Icons.lock_outline,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppTheme.colorMuted,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                           ),
                           validator: (value) {
                             final trimmed = value?.trim() ?? '';

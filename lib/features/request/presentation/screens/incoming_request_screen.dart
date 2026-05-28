@@ -17,7 +17,9 @@ import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
 class IncomingRequestScreen extends StatefulWidget {
-  const IncomingRequestScreen({super.key});
+  const IncomingRequestScreen({this.isActive = true, super.key});
+
+  final bool isActive;
 
   @override
   State<IncomingRequestScreen> createState() => _IncomingRequestScreenState();
@@ -80,11 +82,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _realtime.on('job.cancelled', _onJobCancelled);
 
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      _tickOfferCountdown();
+      if (widget.isActive) _tickOfferCountdown();
     });
     // Polling silencioso — no muestra spinner
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (mounted) _load(silent: true);
+      if (mounted && widget.isActive) _load(silent: true);
     });
 
     _initLocation();
@@ -106,6 +108,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _acceptedAnimCtrl.dispose();
     _sheetCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(IncomingRequestScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _load(silent: true);
+    }
   }
 
   Future<void> _initLocation() async {

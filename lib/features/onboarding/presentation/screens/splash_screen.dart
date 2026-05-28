@@ -9,7 +9,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
-import 'role_selection_screen.dart';
+import '../../../auth/presentation/screens/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final user = SessionStore.currentUser;
     if (user == null) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
       );
       return;
     }
@@ -91,73 +91,87 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: ChambaBackground(
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                const Spacer(),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      color: AppTheme.colorGlassHigh,
-                      border: Border.all(color: AppTheme.colorGlassBorderSoft),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Image.asset(
-                      'assets/images/branding/chamba_splash_logo.png',
-                      fit: BoxFit.contain,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Spacer(),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.colorPrimary.withValues(alpha: 0.5),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(36),
+                    child: Container(
+                      width: 150,
+                      height: 150,
+                      color: AppTheme.colorGlassDarkSoft,
+                      padding: const EdgeInsets.all(24),
+                      child: Image.asset(
+                        'assets/images/icon/icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 32),
                 Text(
                   'Chamba',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
                     fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'CONNECTING OPPORTUNITIES',
-                  style: TextStyle(
-                    color: AppTheme.colorPrimary,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    shadows: [
+                      BoxShadow(
+                        color: AppTheme.colorPrimary.withValues(alpha: 0.6),
+                        blurRadius: 20,
+                      ),
+                    ],
                   ),
                 ),
                 const Spacer(),
-                Row(
-                  children: [
-                    const Text(
-                      'Initializing...',
-                      style: TextStyle(fontSize: 20),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${(progress * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                LinearProgressIndicator(
-                  value: progress,
-                  color: AppTheme.colorPrimary,
-                  backgroundColor: AppTheme.colorPrimary.withValues(
-                    alpha: 0.25,
+                SizedBox(
+                  width: 200,
+                  child: Column(
+                    children: [
+                      LinearProgressIndicator(
+                        value: progress,
+                        color: Colors.white,
+                        backgroundColor: Colors.white.withValues(alpha: 0.15),
+                        minHeight: 4,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      const SizedBox(height: 16),
+                      AnimatedOpacity(
+                        opacity: progress > 0.1 ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          'Cargando...',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  minHeight: 10,
-                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 48),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

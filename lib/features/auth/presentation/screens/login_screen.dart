@@ -29,6 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _identifierVerified = false;
   bool _checkingIdentifier = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -147,9 +148,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
                       decoration: AppTheme.glassContainerDecoration(),
                       child: Form(
                         key: _formKey,
@@ -158,21 +159,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           children: [
                             Center(
                               child: Container(
-                                width: 92,
-                                height: 92,
-                                padding: const EdgeInsets.all(12),
+                                width: 100,
+                                height: 100,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.colorSurfaceSoft,
                                   shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppTheme.colorPrimary.withValues(
-                                      alpha: 0.24,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.colorPrimary.withValues(alpha: 0.35),
+                                      blurRadius: 20,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(50),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppTheme.colorGlassDarkSoft,
+                                      border: Border.all(
+                                        color: AppTheme.colorGlassBorderSoft,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Image.asset(
+                                      'assets/images/icon/icon.png',
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
-                                ),
-                                child: Image.asset(
-                                  'assets/images/branding/chamba_handshake_icon.png',
-                                  fit: BoxFit.contain,
                                 ),
                               ),
                             ),
@@ -213,13 +228,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: _passwordController,
-                                obscureText: true,
+                                obscureText: _obscurePassword,
                                 style: const TextStyle(
                                   color: AppTheme.colorText,
                                 ),
                                 decoration: AppTheme.glassInputDecoration(
                                   labelText: 'Contraseña',
                                   icon: Icons.lock_outline,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      color: AppTheme.colorMuted,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (!_identifierVerified) {

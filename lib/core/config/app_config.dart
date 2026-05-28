@@ -6,12 +6,11 @@ class AppConfig {
   const AppConfig._();
 
   static String get apiBaseUrl => _resolveLocalhost(
-    const String.fromEnvironment(
-      'API_BASE_URL',
-      // defaultValue: 'https://eloquent-vibrancy-production.up.railway.app/api', // Railway (producción)
-      defaultValue: 'http://localhost:3001/api',
-    ),
-  );
+        const String.fromEnvironment(
+          'API_BASE_URL',
+          defaultValue: '',
+        ),
+      );
 
   static const String socketNamespace = '/realtime';
   static const String mapboxAccessToken = String.fromEnvironment(
@@ -32,12 +31,11 @@ class AppConfig {
   );
 
   static String get socketBaseUrl => _resolveLocalhost(
-    const String.fromEnvironment(
-      'SOCKET_BASE_URL',
-      // defaultValue: 'https://eloquent-vibrancy-production.up.railway.app', // Railway (producción)
-      defaultValue: 'http://localhost:3001',
-    ),
-  );
+        const String.fromEnvironment(
+          'SOCKET_BASE_URL',
+          defaultValue: '',
+        ),
+      );
 
   static String _resolveLocalhost(String rawUrl) {
     if (kIsWeb || !Platform.isAndroid) {

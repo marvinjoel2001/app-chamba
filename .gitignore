@@ -50,3 +50,7 @@ app.*.map.json
 .env.local.json
 .env.production.json
 .env.*.json
+
+# Environment Variables
+.env.json
+.env
