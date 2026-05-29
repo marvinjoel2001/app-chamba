@@ -124,16 +124,15 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
       border: null,
       boxShadow: enabled
           ? (_pressed
-                ? AppTheme.shadowSm
-                : widget.isYellow
-                ? AppTheme.shadowYellow
-                : AppTheme.shadowMd)
+              ? AppTheme.shadowSm
+              : widget.isYellow
+                  ? AppTheme.shadowYellow
+                  : AppTheme.shadowMd)
           : const [],
     );
 
-    final foreground = widget.isYellow
-        ? AppTheme.colorText
-        : AppTheme.colorTextOnPurple;
+    final foreground =
+        widget.isYellow ? AppTheme.colorText : AppTheme.colorTextOnPurple;
 
     return GestureDetector(
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
@@ -187,12 +186,14 @@ class ChambaChip extends StatelessWidget {
     required this.label,
     required this.selected,
     this.onTap,
+    this.icon,
     super.key,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -214,15 +215,30 @@ class ChambaChip extends StatelessWidget {
           ),
           boxShadow: selected ? AppTheme.shadowSm : const [],
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected
-                ? AppTheme.colorTextOnPurple
-                : AppTheme.colorPrimaryLight,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? AppTheme.colorTextOnPurple
+                    : AppTheme.colorPrimaryLight,
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? AppTheme.colorTextOnPurple
+                    : AppTheme.colorPrimaryLight,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -319,61 +335,61 @@ Widget _buildNav(
         height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: AppTheme.colorGlassDarkSoft,
+          color: AppTheme.colorBackgroundAlt,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppTheme.colorGlassBorderSoft),
           boxShadow: AppTheme.shadowMd,
         ),
-          child: Row(
-            children: List.generate(items.length, (index) {
-              final item = items[index];
-              final selected = index == currentIndex;
-              final showBadge = index == badgeIndex && (badgeCount ?? 0) > 0;
-              return Expanded(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // SizedBox.expand garantiza que el item ocupe todo el Expanded
-                    SizedBox.expand(
-                      child: _BottomNavItem(
-                        icon: item.icon,
-                        label: item.label,
-                        selected: selected,
-                        onTap: () => onTap(index),
-                      ),
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final selected = index == currentIndex;
+            final showBadge = index == badgeIndex && (badgeCount ?? 0) > 0;
+            return Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // SizedBox.expand garantiza que el item ocupe todo el Expanded
+                  SizedBox.expand(
+                    child: _BottomNavItem(
+                      icon: item.icon,
+                      label: item.label,
+                      selected: selected,
+                      onTap: () => onTap(index),
                     ),
-                    if (showBadge)
-                      Positioned(
-                        top: 2,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          constraints: const BoxConstraints(
-                            minWidth: 18,
-                            minHeight: 18,
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      top: 2,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.colorError,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          badgeCount! > 99 ? '99+' : '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
                           ),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.colorError,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            badgeCount! > 99 ? '99+' : '$badgeCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                  ],
-                ),
-              );
-            }),
-          ),
+                    ),
+                ],
+              ),
+            );
+          }),
         ),
       ),
+    ),
   );
 }
 

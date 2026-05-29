@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -32,6 +33,10 @@ class CloudinaryUploadService {
       );
     }
 
+    debugPrint('[Cloudinary] Subiendo imagen: $fileName a folder: $folder');
+    debugPrint(
+        '[Cloudinary] Cloud name: $cloudName, Upload preset: $uploadPreset');
+
     final endpoint = Uri.parse(
       'https://api.cloudinary.com/v1_1/$cloudName/image/upload',
     );
@@ -51,7 +56,7 @@ class CloudinaryUploadService {
     if (response.statusCode >= 400 || secureUrl == null || publicId == null) {
       final detail =
           (payload['error'] as Map<String, dynamic>?)?['message'] as String? ??
-          'No se pudo subir la imagen a Cloudinary';
+              'No se pudo subir la imagen a Cloudinary';
       throw Exception(detail);
     }
 

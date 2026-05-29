@@ -65,10 +65,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   final controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   final RealtimeService _realtime = RealtimeService.instance;
+  final Set<String> _readMessageIds = {};
   bool _loading = true;
   bool _isOffline = false;
   bool _shouldRedirectToLogin = false;
+  bool _isNearBottom = true;
   String? _error;
   List<ChatMessage> _messages = const [];
 
@@ -79,6 +83,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtime.connect(userId: userId);
     _realtime.joinThread(widget.threadId);
     _realtime.on('message.new', _onMessageNew);
+    _scrollController.addListener(_onScroll);
+    _scrollController.addListener(_markVisibleMessagesAsRead);
     _load();
   }
 
@@ -86,6 +92,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
     controller.dispose();
+    _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -95,7 +103,62 @@ class _ChatScreenState extends State<ChatScreen> {
     if (threadId != widget.threadId) {
       return;
     }
-    _load();
+
+    // Parse new message from payload and append instead of full reload
+    final messageId = map['message']?['id']?.toString();
+    final senderId = map['message']?['senderUserId']?.toString();
+    final content = map['message']?['content']?.toString();
+
+    if (messageId != null && senderId != null) {
+      final newMessage = ChatMessage(
+        id: messageId,
+        threadId: threadId ?? widget.threadId,
+        senderUserId: senderId,
+        content: content,
+        createdAt: DateTime.now(),
+      );
+
+      setState(() {
+        _messages = [..._messages, newMessage];
+      });
+
+      // Only scroll if user is near bottom
+      if (_isNearBottom) {
+        _scrollToBottom();
+      }
+    } else {
+      // Fallback to reload if payload doesn't have full message
+      _load();
+    }
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    _isNearBottom = (maxScroll - currentScroll) < 100;
+  }
+
+  void _markVisibleMessagesAsRead() {
+    // Implement read tracking based on viewport visibility
+    // For now, mark last few messages as read when near bottom
+    if (_isNearBottom && _messages.isNotEmpty) {
+      final currentUserId = SessionStore.currentUser?.id;
+      final lastMessages = _messages.reversed.take(5);
+
+      for (final msg in lastMessages) {
+        if (msg.senderUserId != currentUserId &&
+            !_readMessageIds.contains(msg.id)) {
+          _readMessageIds.add(msg.id);
+        }
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Scroll to bottom after build
+    });
   }
 
   Future<void> _load() async {
@@ -269,7 +332,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           Expanded(
                             child: Text(
                               widget.jobTitle,
-                              style: Theme.of(context).textTheme.titleMedium
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w700),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -347,21 +412,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
-                    ? Center(child: Text(_error!))
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final message = _messages[index];
+                        ? Center(child: Text(_error!))
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) {
+                              final message = _messages[index];
 
-                          if (message.isSystem) {
-                            return _buildSystemMessage(message);
-                          }
+                              if (message.isSystem) {
+                                return _buildSystemMessage(message);
+                              }
 
-                          final mine = message.senderUserId == currentUserId;
-                          return _buildTextMessage(message, mine);
-                        },
-                      ),
+                              final mine =
+                                  message.senderUserId == currentUserId;
+                              return _buildTextMessage(message, mine);
+                            },
+                          ),
               ),
 
               // Rehire button for archived chats
@@ -379,23 +446,33 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
 
-              // Message input (disabled for archived chats)
+              // Message input (disabled for archived chats) - Multiline with proper keyboard handling
               if (!widget.isArchived)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: GlassCard(
                     borderRadius: 30,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
                           child: TextField(
                             controller: controller,
+                            focusNode: _focusNode,
+                            keyboardType: TextInputType.multiline,
+                            maxLines: 5,
+                            minLines: 1,
+                            textCapitalization: TextCapitalization.sentences,
                             decoration: const InputDecoration(
                               hintText: 'Escribe un mensaje...',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                               filled: false,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -451,9 +528,8 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
-          crossAxisAlignment: mine
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

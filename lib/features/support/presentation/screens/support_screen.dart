@@ -147,8 +147,10 @@ class _SupportScreenState extends State<SupportScreen> {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: CircleAvatar(
-                        backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.15),
-                        child: Icon(r.icon, color: AppTheme.colorPrimary, size: 22),
+                        backgroundColor:
+                            AppTheme.colorPrimary.withValues(alpha: 0.15),
+                        child: Icon(r.icon,
+                            color: AppTheme.colorPrimary, size: 22),
                       ),
                       title: Text(
                         r.title,
@@ -206,9 +208,12 @@ class _SupportChatView extends StatefulWidget {
 class _SupportChatViewState extends State<_SupportChatView> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+  final Set<String> _readMessageIds = {};
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  bool _isNearBottom = true;
   Timer? _pollTimer;
 
   @override
@@ -217,8 +222,87 @@ class _SupportChatViewState extends State<_SupportChatView> {
     _loadMessages();
     _pollTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _loadMessages(),
+      (_) => _fetchNewMessagesOnly(),
     );
+    _scrollController.addListener(_onScroll);
+    _scrollController.addListener(_markVisibleMessagesAsRead);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    // Consider "near bottom" if within 100 pixels
+    _isNearBottom = (maxScroll - currentScroll) < 100;
+  }
+
+  /// Fetches only new messages and appends them, avoiding full reload
+  Future<void> _fetchNewMessagesOnly() async {
+    try {
+      final result = await MobileBackendService.instance.getDisputeMessages(
+        disputeId: widget.disputeId,
+      );
+      final newMsgs = (result['messages'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+      if (!mounted) return;
+
+      // Find messages that don't exist in current list
+      final existingIds = _messages.map((m) => m['id']?.toString()).toSet();
+      final messagesToAdd = newMsgs
+          .where(
+            (m) => !existingIds.contains(m['id']?.toString()),
+          )
+          .toList();
+
+      if (messagesToAdd.isNotEmpty) {
+        setState(() {
+          _messages.addAll(messagesToAdd);
+        });
+        // Only scroll if user is already near bottom
+        if (_isNearBottom) {
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {
+      // Silent fail on polling
+    }
+  }
+
+  /// Marks messages as read based on which are visible in the viewport
+  void _markVisibleMessagesAsRead() {
+    if (!_scrollController.hasClients || _messages.isEmpty) return;
+
+    final viewport = _scrollController.position.viewportDimension;
+    final scrollOffset = _scrollController.position.pixels;
+
+    // Estimate visible range (messages are roughly 60-100px tall)
+    // Find which indices are likely visible
+    const estimatedMessageHeight = 80.0;
+    final firstVisibleIndex = (scrollOffset / estimatedMessageHeight).floor();
+    final lastVisibleIndex =
+        ((scrollOffset + viewport) / estimatedMessageHeight).ceil();
+
+    final clampedStart = firstVisibleIndex.clamp(0, _messages.length - 1);
+    final clampedEnd = lastVisibleIndex.clamp(0, _messages.length - 1);
+
+    bool hasNewReads = false;
+    for (var i = clampedStart; i <= clampedEnd; i++) {
+      final msg = _messages[i];
+      final msgId = msg['id']?.toString();
+      final isMe = msg['senderId'] == SessionStore.currentUser?.id;
+
+      // Only mark others' messages as read (not our own)
+      if (msgId != null && !isMe && !_readMessageIds.contains(msgId)) {
+        _readMessageIds.add(msgId);
+        hasNewReads = true;
+      }
+    }
+
+    // Only rebuild if we marked new messages
+    if (hasNewReads && mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -226,6 +310,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
     _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -315,6 +400,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
           ],
         ),
       ),
+      resizeToAvoidBottomInset: true,
       body: Column(
         children: [
           // Info banner
@@ -324,7 +410,8 @@ class _SupportChatViewState extends State<_SupportChatView> {
             color: AppTheme.colorPrimary.withValues(alpha: 0.1),
             child: const Row(
               children: [
-                Icon(Icons.info_outline, color: AppTheme.colorPrimary, size: 18),
+                Icon(Icons.info_outline,
+                    color: AppTheme.colorPrimary, size: 18),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -356,6 +443,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
                         itemCount: _messages.length,
                         itemBuilder: (_, i) {
                           final msg = _messages[i];
+                          final msgId = msg['id']?.toString() ?? '';
                           final isMe = msg['senderId'] == userId;
                           final senderName =
                               msg['senderName']?.toString() ?? 'Soporte';
@@ -380,7 +468,8 @@ class _SupportChatViewState extends State<_SupportChatView> {
                               ),
                               decoration: BoxDecoration(
                                 color: isMe
-                                    ? AppTheme.colorPrimary.withValues(alpha: 0.2)
+                                    ? AppTheme.colorPrimary
+                                        .withValues(alpha: 0.2)
                                     : AppTheme.colorSurfaceSoft,
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(16),
@@ -400,8 +489,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
                                 children: [
                                   if (!isMe)
                                     Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.only(bottom: 4),
                                       child: Text(
                                         senderName,
                                         style: const TextStyle(
@@ -420,14 +508,34 @@ class _SupportChatViewState extends State<_SupportChatView> {
                                   ),
                                   if (time != null)
                                     Padding(
-                                      padding:
-                                          const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                                        style: const TextStyle(
-                                          color: AppTheme.colorMuted,
-                                          fontSize: 10,
-                                        ),
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                            style: const TextStyle(
+                                              color: AppTheme.colorMuted,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          // Read indicator for own messages
+                                          if (isMe)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  left: 4),
+                                              child: Icon(
+                                                _readMessageIds.contains(msgId)
+                                                    ? Icons.done_all
+                                                    : Icons.done,
+                                                size: 12,
+                                                color: _readMessageIds
+                                                        .contains(msgId)
+                                                    ? AppTheme.colorSuccess
+                                                    : AppTheme.colorMuted,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                 ],
@@ -438,7 +546,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
                       ),
           ),
 
-          // Input bar
+          // Input bar - Multiline with proper keyboard handling
           Container(
             padding: EdgeInsets.only(
               left: 12,
@@ -453,11 +561,17 @@ class _SupportChatViewState extends State<_SupportChatView> {
               ),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    focusNode: _focusNode,
                     style: const TextStyle(color: AppTheme.colorText),
+                    keyboardType: TextInputType.multiline,
+                    maxLines: 5,
+                    minLines: 1,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: 'Escribe tu mensaje...',
                       hintStyle: const TextStyle(color: AppTheme.colorMuted),
@@ -465,15 +579,13 @@ class _SupportChatViewState extends State<_SupportChatView> {
                       fillColor: AppTheme.colorSurfaceSoft,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 10,
+                        vertical: 12,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
                   ),
                 ),
                 const SizedBox(width: 8),

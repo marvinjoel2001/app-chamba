@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -33,6 +34,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
     super.initState();
     _realtime.on('message.new', _onMessageNew);
     _realtime.on('user.verification.updated', _onVerificationUpdated);
+
+    // Iniciar servicio de background para workers automáticamente
+    if (widget.role == 'worker') {
+      WorkerBackgroundService.setEnabled(true);
+    }
   }
 
   @override
@@ -60,8 +66,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final data = payload is Map
         ? Map<String, dynamic>.from(payload as Map)
         : <String, dynamic>{};
-    final nextVerificationStatus =
-        data['verificationStatus']?.toString() ?? currentUser.verificationStatus;
+    final nextVerificationStatus = data['verificationStatus']?.toString() ??
+        currentUser.verificationStatus;
     final hasIdDecision = data.containsKey('idPhotoVerified');
     final hasFaceDecision = data.containsKey('facePhotoVerified');
 
@@ -75,7 +81,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
       profilePhotoUrl: currentUser.profilePhotoUrl,
       verificationStatus: nextVerificationStatus,
       idPhotoUrl: data['idPhotoUrl']?.toString() ?? currentUser.idPhotoUrl,
-      facePhotoUrl: data['facePhotoUrl']?.toString() ?? currentUser.facePhotoUrl,
+      facePhotoUrl:
+          data['facePhotoUrl']?.toString() ?? currentUser.facePhotoUrl,
       idPhotoVerified: hasIdDecision
           ? data['idPhotoVerified'] as bool?
           : currentUser.idPhotoVerified,
@@ -86,12 +93,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     await SessionStore.setCurrentUser(updatedUser);
 
-    final message =
-        data['message']?.toString().trim().isNotEmpty == true
+    final message = data['message']?.toString().trim().isNotEmpty == true
         ? data['message'].toString().trim()
         : nextVerificationStatus == 'verified'
-        ? 'Tu perfil fue verificado correctamente.'
-        : 'Tu estado de verificacion fue actualizado.';
+            ? 'Tu perfil fue verificado correctamente.'
+            : 'Tu estado de verificacion fue actualizado.';
 
     if (!mounted) {
       return;
@@ -133,7 +139,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
         index: currentIndex,
         children: List.generate(
           pages.length,
-          (i) => _visitedIndices.contains(i) ? pages[i] : const SizedBox.shrink(),
+          (i) =>
+              _visitedIndices.contains(i) ? pages[i] : const SizedBox.shrink(),
         ),
       ),
       bottomNavigationBar: ValueListenableBuilder<int>(

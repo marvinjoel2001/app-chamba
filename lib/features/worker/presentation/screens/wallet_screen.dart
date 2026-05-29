@@ -37,7 +37,7 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen> with RouteAware {
   GetWorkerHistoryUseCase get _getWorkerHistoryUseCase =>
       widget.getWorkerHistoryUseCase ?? WorkerDependencies.getWorkerHistory;
 
@@ -51,6 +51,26 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute is PageRoute) {
+      // Suscripción a cambios de ruta para recargar al volver a la pantalla
+      modalRoute.addScopedWillPopCallback(() async {
+        _load();
+        return true;
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WalletScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recargar datos cuando el widget se actualiza
     _load();
   }
 
@@ -183,11 +203,11 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Billetera',
+                    'Mi Billetera',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.colorSuccess,
-                      fontWeight: FontWeight.w800,
-                    ),
+                          color: AppTheme.colorText,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                   const Spacer(),
                   IconButton(
@@ -205,11 +225,22 @@ class _WalletScreenState extends State<WalletScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D1F14),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppTheme.colorSuccess.withValues(alpha: 0.25),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF1A237E), // Indigo deep
+                      Color(0xFF0D47A1), // Blue dark
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
@@ -219,7 +250,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           const Text(
                             'Ganancias totales',
                             style: TextStyle(
-                              color: AppTheme.colorMuted,
+                              color: Colors.white70,
                               fontSize: 13,
                             ),
                           ),
@@ -227,7 +258,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           Text(
                             'Bs ${total.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              color: AppTheme.colorText,
+                              color: Colors.white,
                               fontSize: 36,
                               fontWeight: FontWeight.w800,
                             ),
@@ -237,14 +268,14 @@ class _WalletScreenState extends State<WalletScreen> {
                             children: [
                               const Icon(
                                 Icons.trending_up,
-                                color: AppTheme.colorSuccess,
+                                color: Colors.white70,
                                 size: 16,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '${filtered.length} trabajo${filtered.length == 1 ? '' : 's'} en el período',
                                 style: const TextStyle(
-                                  color: AppTheme.colorSuccess,
+                                  color: Colors.white70,
                                   fontSize: 13,
                                 ),
                               ),
@@ -277,13 +308,15 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.colorSuccess,
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF1A237E),
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
+                                elevation: 2,
                               ),
                             ),
                           ),
@@ -326,25 +359,23 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: selected
-                              ? AppTheme.colorSuccess
+                              ? const Color(0xFF1A237E)
                               : AppTheme.colorSurfaceSoft,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: selected
-                                ? AppTheme.colorSuccess
+                                ? const Color(0xFF3949AB)
                                 : AppTheme.colorGlassBorderSoft,
                           ),
                         ),
                         child: Text(
                           f.label,
                           style: TextStyle(
-                            color: selected
-                                ? Colors.black
-                                : AppTheme.colorMuted,
+                            color:
+                                selected ? Colors.white : AppTheme.colorMuted,
                             fontSize: 13,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -372,133 +403,137 @@ class _WalletScreenState extends State<WalletScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Center(
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: AppTheme.colorError),
-                      ),
-                    )
-                  : filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.work_off,
-                            color: AppTheme.colorMuted,
-                            size: 48,
+                      ? Center(
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: AppTheme.colorError),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Sin trabajos en este período',
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: AppTheme.colorMuted),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) {
-                        final job = filtered[i];
-                        final title = job.title;
-                        final amount = job.amount;
-                        final address = job.address;
-                        final category = job.category;
-                        final date = _formatDate(job.acceptedAt);
-
-                        return Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF111C30),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppTheme.colorGlassBorderSoft,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              // Ícono de categoría
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorSuccess.withValues(
-                                    alpha: 0.12,
+                        )
+                      : filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.work_off,
+                                    color: AppTheme.colorMuted,
+                                    size: 48,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  _categoryIcon(category),
-                                  color: AppTheme.colorSuccess,
-                                  size: 22,
-                                ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Sin trabajos en este período',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(color: AppTheme.colorMuted),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              // Info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      title,
-                                      style: const TextStyle(
-                                        color: AppTheme.colorText,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, i) {
+                                final job = filtered[i];
+                                final title = job.title;
+                                final amount = job.amount;
+                                final address = job.address;
+                                final category = job.category;
+                                final date = _formatDate(job.acceptedAt);
+
+                                return Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF111C30),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppTheme.colorGlassBorderSoft,
                                     ),
-                                    if (address.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        address,
-                                        style: const TextStyle(
-                                          color: AppTheme.colorMuted,
-                                          fontSize: 12,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Ícono de categoría
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1A237E)
+                                              .withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        child: Icon(
+                                          _categoryIcon(category),
+                                          color: const Color(0xFF3949AB),
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Info
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title,
+                                              style: const TextStyle(
+                                                color: AppTheme.colorText,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (address.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                address,
+                                                style: const TextStyle(
+                                                  color: AppTheme.colorMuted,
+                                                  fontSize: 12,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.calendar_today,
+                                                  color: AppTheme.colorMuted,
+                                                  size: 12,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  date,
+                                                  style: const TextStyle(
+                                                    color: AppTheme.colorMuted,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Monto
+                                      Text(
+                                        '+ Bs ${amount.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          color: Color(0xFF1A237E),
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                        ),
                                       ),
                                     ],
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          color: AppTheme.colorMuted,
-                                          size: 12,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          date,
-                                          style: const TextStyle(
-                                            color: AppTheme.colorMuted,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Monto
-                              Text(
-                                '+ Bs ${amount.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  color: AppTheme.colorSuccess,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                                  ),
+                                );
+                              },
+                            ),
             ),
           ],
         ),

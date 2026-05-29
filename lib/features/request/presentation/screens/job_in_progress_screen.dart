@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -67,8 +68,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever)
-        return;
+          perm == LocationPermission.deniedForever) return;
 
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -93,7 +93,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           workerUserId: user.id,
           latitude: pos.latitude,
           longitude: pos.longitude,
-        )).fold(
+        ))
+            .fold(
           onSuccess: (value) => value,
           onFailure: (failure) => throw Exception(failure.message),
         );
@@ -178,14 +179,82 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     }
   }
 
+  /// Calcula la distancia en metros entre dos coordenadas usando la fórmula de Haversine
+  double _calculateDistanceInMeters(LatLng pos1, LatLng pos2) {
+    const earthRadius = 6371000.0; // Radio de la Tierra en metros
+    final lat1Rad = pos1.latitude * pi / 180;
+    final lat2Rad = pos2.latitude * pi / 180;
+    final deltaLat = (pos2.latitude - pos1.latitude) * pi / 180;
+    final deltaLng = (pos2.longitude - pos1.longitude) * pi / 180;
+
+    final a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(deltaLng / 2) * sin(deltaLng / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  /// Verifica si el worker está dentro del radio permitido (100m) para marcar llegada
+  bool get _isWithinArrivalZone {
+    final destLat =
+        (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+    final destLng =
+        (_tracking?['destination']?['longitude'] as num?)?.toDouble();
+
+    if (destLat == null || destLng == null || _deviceLocation == null) {
+      return false;
+    }
+
+    final destination = LatLng(destLat, destLng);
+    final distance = _calculateDistanceInMeters(_deviceLocation!, destination);
+
+    return distance <= 100; // 100 metros de tolerancia
+  }
+
+  /// Obtiene la distancia actual al destino en metros
+  double? get _distanceToDestinationInMeters {
+    final destLat =
+        (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+    final destLng =
+        (_tracking?['destination']?['longitude'] as num?)?.toDouble();
+
+    if (destLat == null || destLng == null || _deviceLocation == null) {
+      return null;
+    }
+
+    final destination = LatLng(destLat, destLng);
+    return _calculateDistanceInMeters(_deviceLocation!, destination);
+  }
+
   Future<void> _markArrived() async {
     final user = SessionStore.currentUser;
     if (user == null) return;
+
+    // Validación de geofencing: debe estar a menos de 100m del destino
+    if (!_isWithinArrivalZone) {
+      final distance = _distanceToDestinationInMeters;
+      final distanceText = distance != null
+          ? '${(distance / 1000).toStringAsFixed(1)} km'
+          : 'desconocida';
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Debes estar a menos de 100m del destino para marcar llegada. Distancia actual: $distanceText',
+          ),
+          backgroundColor: AppTheme.colorError,
+        ),
+      );
+      return;
+    }
+
     try {
       (await RequestDependencies.workerMarkArrived(
         requestId: widget.requestId,
         workerUserId: user.id,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -235,7 +304,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       (await RequestDependencies.completeJob(
         requestId: widget.requestId,
         workerUserId: user.id,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -358,7 +428,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       (await RequestDependencies.cancelJob(
         requestId: widget.requestId,
         userId: user.id,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -386,27 +457,25 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final title = _tracking?['title']?.toString() ?? 'Trabajo en curso';
     final amount = _tracking?['agreedAmount'];
     final priceType = _tracking?['priceType']?.toString();
-    final workElapsedSeconds = (_tracking?['workElapsedSeconds'] as num?)
-        ?.toInt();
+    final workElapsedSeconds =
+        (_tracking?['workElapsedSeconds'] as num?)?.toInt();
 
     final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
     final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
-    final destLat = (_tracking?['destination']?['latitude'] as num?)
-        ?.toDouble();
-    final destLng = (_tracking?['destination']?['longitude'] as num?)
-        ?.toDouble();
+    final destLat =
+        (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+    final destLng =
+        (_tracking?['destination']?['longitude'] as num?)?.toDouble();
 
     // Worker: GPS del dispositivo → DB → fallback
-    final workerPos =
-        _deviceLocation ??
+    final workerPos = _deviceLocation ??
         (workerLat != null && workerLng != null
             ? LatLng(workerLat, workerLng)
             : const LatLng(-16.5002, -68.1342));
 
     // Destino (ubicación del trabajo)
-    final destPos = destLat != null && destLng != null
-        ? LatLng(destLat, destLng)
-        : null;
+    final destPos =
+        destLat != null && destLng != null ? LatLng(destLat, destLng) : null;
 
     // Centro del mapa: punto medio entre worker y destino, o solo worker
     final mapCenter = destPos != null
@@ -649,244 +718,254 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Text(
-                      _error!,
-                      style: const TextStyle(color: AppTheme.colorError),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.colorMuted.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        Row(
+                      ? Text(
+                          _error!,
+                          style: const TextStyle(color: AppTheme.colorError),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.colorSuccessSoft,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                workerArrived
-                                    ? clientConfirmed
-                                          ? 'EN TRABAJO'
-                                          : 'LLEGASTE'
-                                    : 'EN CAMINO',
-                                style: const TextStyle(
-                                  color: AppTheme.colorSuccess,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.colorMuted
+                                      .withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
                             ),
-                            const Spacer(),
-                            Text(
-                              amount != null ? 'Bs $amount' : '',
-                              style: const TextStyle(
-                                color: AppTheme.colorText,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: AppTheme.colorText,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppTheme.colorSurfaceSoft,
-                              backgroundImage:
-                                  client?['profilePhotoUrl'] != null
-                                  ? NetworkImage(
-                                      client!['profilePhotoUrl'] as String,
-                                    )
-                                  : null,
-                              child: client?['profilePhotoUrl'] == null
-                                  ? Text(
-                                      (client?['firstName'] ?? 'C')
-                                          .toString()
-                                          .substring(0, 1),
-                                      style: const TextStyle(
-                                        color: AppTheme.colorText,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'
-                                        .trim(),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorSuccessSoft,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    workerArrived
+                                        ? clientConfirmed
+                                            ? 'EN TRABAJO'
+                                            : 'LLEGASTE'
+                                        : 'EN CAMINO',
                                     style: const TextStyle(
-                                      color: AppTheme.colorText,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
+                                      color: AppTheme.colorSuccess,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.location_on,
-                                        color: AppTheme.colorMuted,
-                                        size: 13,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          address,
-                                          style: const TextStyle(
-                                            color: AppTheme.colorMuted,
-                                            fontSize: 12,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        if (distanceKm != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.colorSurfaceSoft,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.straighten,
-                                  color: AppTheme.colorMuted,
-                                  size: 16,
                                 ),
-                                const SizedBox(width: 6),
+                                const Spacer(),
                                 Text(
-                                  '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                  amount != null ? 'Bs $amount' : '',
                                   style: const TextStyle(
-                                    color: AppTheme.colorMuted,
-                                    fontSize: 13,
+                                    color: AppTheme.colorText,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: ChambaPrimaryButton(
-                                label: clientConfirmed
-                                    ? 'TRABAJO TERMINADO'
-                                    : workerArrived
-                                    ? 'Esperando cliente...'
-                                    : 'LLEGUÉ AL SITIO',
-                                icon: clientConfirmed
-                                    ? Icons.check_circle
-                                    : workerArrived
-                                    ? Icons.hourglass_top
-                                    : Icons.location_on,
-                                isYellow: clientConfirmed,
-                                onPressed: workerArrived && !clientConfirmed
-                                    ? null
-                                    : clientConfirmed
-                                    ? _completeJob
-                                    : _markArrived,
+                            const SizedBox(height: 8),
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            // Chat directo con el cliente + badge de no leídos
-                            ValueListenableBuilder<int>(
-                              valueListenable: UnreadMessagesNotifier.instance,
-                              builder: (context, unread, _) {
-                                return Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    _ActionIconButton(
-                                      icon: Icons.chat_bubble_outline,
-                                      color: AppTheme.colorPrimary,
-                                      onTap: () {
-                                        UnreadMessagesNotifier.instance.reset();
-                                        _openChat();
-                                      },
-                                    ),
-                                    if (unread > 0)
-                                      Positioned(
-                                        top: -4,
-                                        right: -4,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(3),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 18,
-                                            minHeight: 18,
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: AppTheme.colorSurfaceSoft,
+                                  backgroundImage: client?['profilePhotoUrl'] !=
+                                          null
+                                      ? NetworkImage(
+                                          client!['profilePhotoUrl'] as String,
+                                        )
+                                      : null,
+                                  child: client?['profilePhotoUrl'] == null
+                                      ? Text(
+                                          (client?['firstName'] ?? 'C')
+                                              .toString()
+                                              .substring(0, 1),
+                                          style: const TextStyle(
+                                            color: AppTheme.colorText,
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                          decoration: const BoxDecoration(
-                                            color: AppTheme.colorError,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Text(
-                                            unread > 99 ? '99+' : '$unread',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'
+                                            .trim(),
+                                        style: const TextStyle(
+                                          color: AppTheme.colorText,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
                                         ),
                                       ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on,
+                                            color: AppTheme.colorMuted,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              address,
+                                              style: const TextStyle(
+                                                color: AppTheme.colorMuted,
+                                                fontSize: 12,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            if (distanceKm != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.colorSurfaceSoft,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.straighten,
+                                      color: AppTheme.colorMuted,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                      style: const TextStyle(
+                                        color: AppTheme.colorMuted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                   ],
-                                );
-                              },
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: ChambaPrimaryButton(
+                                    label: clientConfirmed
+                                        ? 'TRABAJO TERMINADO'
+                                        : workerArrived
+                                            ? 'Esperando cliente...'
+                                            : !_isWithinArrivalZone
+                                                ? 'Acércate al destino'
+                                                : 'LLEGUÉ AL SITIO',
+                                    icon: clientConfirmed
+                                        ? Icons.check_circle
+                                        : workerArrived
+                                            ? Icons.hourglass_top
+                                            : !_isWithinArrivalZone
+                                                ? Icons.location_disabled
+                                                : Icons.location_on,
+                                    isYellow: clientConfirmed,
+                                    onPressed: workerArrived && !clientConfirmed
+                                        ? null
+                                        : clientConfirmed
+                                            ? _completeJob
+                                            : !_isWithinArrivalZone
+                                                ? null // Deshabilitado fuera de zona
+                                                : _markArrived,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                // Chat directo con el cliente + badge de no leídos
+                                ValueListenableBuilder<int>(
+                                  valueListenable:
+                                      UnreadMessagesNotifier.instance,
+                                  builder: (context, unread, _) {
+                                    return Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        _ActionIconButton(
+                                          icon: Icons.chat_bubble_outline,
+                                          color: AppTheme.colorPrimary,
+                                          onTap: () {
+                                            UnreadMessagesNotifier.instance
+                                                .reset();
+                                            _openChat();
+                                          },
+                                        ),
+                                        if (unread > 0)
+                                          Positioned(
+                                            top: -4,
+                                            right: -4,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(3),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 18,
+                                                minHeight: 18,
+                                              ),
+                                              decoration: const BoxDecoration(
+                                                color: AppTheme.colorError,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Text(
+                                                unread > 99 ? '99+' : '$unread',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: _cancelJob,
+                              child: const Text(
+                                'Cancelar trabajo',
+                                style: TextStyle(color: AppTheme.colorError),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        TextButton(
-                          onPressed: _cancelJob,
-                          child: const Text(
-                            'Cancelar trabajo',
-                            style: TextStyle(color: AppTheme.colorError),
-                          ),
-                        ),
-                      ],
-                    ),
             ),
           ),
         ],

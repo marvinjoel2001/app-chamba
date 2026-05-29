@@ -165,9 +165,8 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: saving
-                      ? null
-                      : () => Navigator.of(context).pop(null),
+                  onPressed:
+                      saving ? null : () => Navigator.of(context).pop(null),
                   child: const Text('Cancelar'),
                 ),
                 TextButton(
@@ -321,32 +320,37 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                     padding: EdgeInsets.only(bottom: 8),
                     child: Text('Sesión expirada. Inicia sesión nuevamente.'),
                   ),
-                const Text(
-                  'Paso 2 de 5',
-                  style: TextStyle(color: AppTheme.colorMuted),
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: 0.4,
-                  backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.2),
-                  color: AppTheme.colorPrimary,
-                  borderRadius: BorderRadius.circular(20),
-                  minHeight: 10,
-                ),
-                const SizedBox(height: 22),
+                if (widget.forceToHomeAfterSave) ...[
+                  const Text(
+                    'Paso 2 de 5',
+                    style: TextStyle(color: AppTheme.colorMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: 0.4,
+                    backgroundColor:
+                        AppTheme.colorPrimary.withValues(alpha: 0.2),
+                    color: AppTheme.colorPrimary,
+                    borderRadius: BorderRadius.circular(20),
+                    minHeight: 10,
+                  ),
+                  const SizedBox(height: 22),
+                ] else ...[
+                  const SizedBox(height: 16),
+                ],
                 if (_loading) const LinearProgressIndicator(),
                 Text(
                   '¿Qué habilidades tienes?',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Puedes cambiar esto después desde tu perfil',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.colorMuted,
-                  ),
+                        color: AppTheme.colorMuted,
+                      ),
                 ),
                 const SizedBox(height: 16),
                 Expanded(
@@ -354,11 +358,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                     itemCount: _skills.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.9,
-                        ),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.9,
+                    ),
                     itemBuilder: (context, index) {
                       final (label, icon) = _skills[index];
                       final isSelected = selected.contains(label);

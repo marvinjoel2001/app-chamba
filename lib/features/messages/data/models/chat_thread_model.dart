@@ -25,14 +25,19 @@ class ChatThreadModel extends ChatThread {
   factory ChatThreadModel.fromJson(Map<String, dynamic> json) {
     final request = json['request'] as Map<String, dynamic>? ?? {};
     final counterpart = json['counterpart'] as Map<String, dynamic>? ?? {};
-    
+
     return ChatThreadModel(
       id: json['id']?.toString() ?? '',
       jobId: request['id']?.toString() ?? json['requestId']?.toString() ?? '',
-      jobTitle: request['title']?.toString() ?? 'Trabajo',
+      jobTitle: request['title']?.toString()?.trim().isNotEmpty == true
+          ? request['title'].toString().trim()
+          : 'Solicitud de servicio',
       jobDescription: request['description']?.toString() ?? '',
-      jobStatus: _parseStatus(request['status']?.toString() ?? json['requestStatus']?.toString()),
-      agreedPrice: (request['budget'] as num? ?? json['agreedPrice'] as num? ?? 0).toDouble(),
+      jobStatus: _parseStatus(
+          request['status']?.toString() ?? json['requestStatus']?.toString()),
+      agreedPrice:
+          (request['budget'] as num? ?? json['agreedPrice'] as num? ?? 0)
+              .toDouble(),
       counterpartName: _formatCounterpartName(counterpart),
       counterpartFirstName: counterpart['firstName']?.toString(),
       counterpartLastName: counterpart['lastName']?.toString(),
@@ -44,7 +49,8 @@ class ChatThreadModel extends ChatThread {
       lastMessageAt: _parseDate(json['lastMessageAt']?.toString()),
       lastMessage: json['lastMessage']?.toString(),
       hasUnreadMessages: json['hasUnreadMessages'] as bool? ?? false,
-      type: _parseType(json['type']?.toString() ?? json['archived'] as bool? ?? false),
+      type: _parseType(
+          json['type']?.toString() ?? json['archived'] as bool? ?? false),
     );
   }
 
@@ -111,8 +117,8 @@ class ChatThreadModel extends ChatThread {
       return raw ? ChatThreadType.archived : ChatThreadType.active;
     }
     if (raw is String) {
-      return raw.toLowerCase() == 'archived' 
-          ? ChatThreadType.archived 
+      return raw.toLowerCase() == 'archived'
+          ? ChatThreadType.archived
           : ChatThreadType.active;
     }
     return ChatThreadType.active;

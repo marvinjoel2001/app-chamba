@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +12,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/explore_dependencies.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
+import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -40,6 +43,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   static const double _workerPanelBottomOffset = 84;
 
   bool get _isClient => widget.role == 'client';
+
+  bool get _isVerified {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
+  }
 
   @override
   void initState() {
@@ -98,29 +108,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
         return;
       }
 
-      final response =
-          (await ExploreDependencies.explore(
-                userId: user.id,
-                latitude: currentLocation.latitude,
-                longitude: currentLocation.longitude,
-              ))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
+      final response = (await ExploreDependencies.explore(
+        userId: user.id,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      ))
+          .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          )
+          .payload;
       final activeRequest = response['activeRequest'];
       if (activeRequest is Map<String, dynamic>) {
         SessionStore.activeRequestId = activeRequest['id'] as String?;
       }
 
       // Si la solicitud activa está cancelada o completada, limpiarla
-      final activeStatus = (activeRequest as Map<String, dynamic>?)?['status']
-          ?.toString();
+      final activeStatus =
+          (activeRequest as Map<String, dynamic>?)?['status']?.toString();
       final cleanedRequest =
           (activeStatus == 'cancelled' || activeStatus == 'completed')
-          ? null
-          : (activeRequest is Map<String, dynamic> ? activeRequest : null);
+              ? null
+              : (activeRequest is Map<String, dynamic> ? activeRequest : null);
 
       if (cleanedRequest == null) {
         SessionStore.activeRequestId = null;
@@ -292,15 +301,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         return;
       }
 
-      final preview =
-          (await ExploreDependencies.previewRequestCategories(
-                description: prompt,
-              ))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
+      final preview = (await ExploreDependencies.previewRequestCategories(
+        description: prompt,
+      ))
+          .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          )
+          .payload;
 
       if (!mounted) {
         return;
@@ -638,7 +646,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildWorkerPanel(BuildContext context) {
-    return GlassCard(
+    final panelContent = GlassCard(
       borderRadius: 32,
       child: Column(
         children: [
@@ -701,6 +709,80 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ],
       ),
     );
+
+    // Si no está verificado, mostrar blur overlay con botón de verificación
+    if (!_isVerified) {
+      return Stack(
+        children: [
+          // Panel difuminado de fondo
+          ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: panelContent,
+            ),
+          ),
+          // Overlay con mensaje y botón
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(32),
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        size: 48,
+                        color: AppTheme.colorPrimary,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Verifica tu perfil para ver trabajos',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Necesitamos verificar tu identidad antes de mostrarte solicitudes disponibles',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ChambaPrimaryButton(
+                        label: 'Verificar mi perfil',
+                        icon: Icons.verified,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const VerificationCheckpointScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return panelContent;
   }
 
   Widget _buildMap() {
@@ -797,7 +879,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         const SizedBox(width: 10),
                         Text(
                           user == null ? 'Chamba' : 'Hola, ${user.firstName}',
-                          style: Theme.of(context).textTheme.headlineMedium
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const Spacer(),

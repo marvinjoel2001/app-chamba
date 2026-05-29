@@ -71,6 +71,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.connect(userId: userId);
     _realtime.on('offer.new', _onOfferEvent);
     _realtime.on('offer.accepted', _onOfferEvent);
+    _realtime.on('job.completed', _onJobCompleted);
+    _realtime.on('job.cancelled', _onJobCancelled);
     _load();
   }
 
@@ -78,9 +80,60 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   void dispose() {
     _realtime.off('offer.new', _onOfferEvent);
     _realtime.off('offer.accepted', _onOfferEvent);
+    _realtime.off('job.completed', _onJobCompleted);
+    _realtime.off('job.cancelled', _onJobCancelled);
     _radarCtrl.dispose();
     _dotsTimer?.cancel();
     super.dispose();
+  }
+
+  void _onJobCompleted(dynamic _) {
+    // Limpiar sesión del trabajo activo
+    SessionStore.activeRequestId = null;
+    SessionStore.activeThreadId = null;
+
+    if (mounted) {
+      // Mostrar diálogo de confirmación y redirigir al home
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppTheme.colorBackgroundAccent,
+          title: const Text(
+            '¡Trabajo completado!',
+            style: TextStyle(color: AppTheme.colorSuccess),
+          ),
+          content: const Text(
+            'El trabajo ha sido marcado como completado exitosamente.',
+            style: TextStyle(color: AppTheme.colorMuted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Cerrar diálogo y navegar al home limpiando el stack
+                Navigator.of(context).pop();
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              child: const Text('Aceptar'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _onJobCancelled(dynamic _) {
+    // Limpiar sesión del trabajo activo
+    SessionStore.activeRequestId = null;
+    SessionStore.activeThreadId = null;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El trabajo fue cancelado.')),
+      );
+      // Volver al home limpiando el stack
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   void _onOfferEvent(dynamic payload) => _load();
@@ -121,16 +174,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     }
 
     try {
-      final response =
-          (await RequestDependencies.getRequestStatus(
-                requestId: SessionStore.activeRequestId,
-                clientUserId: user.id,
-              ))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
+      final response = (await RequestDependencies.getRequestStatus(
+        requestId: SessionStore.activeRequestId,
+        clientUserId: user.id,
+      ))
+          .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          )
+          .payload;
       final request = response['request'] as Map<String, dynamic>?;
       if (request != null) {
         SessionStore.activeRequestId = request['id'] as String?;
@@ -366,8 +418,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       : 'Solicitud: ${request['title']}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -459,7 +511,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       (await RequestDependencies.cancelJob(
                         requestId: requestId,
                         userId: user.id,
-                      )).fold(
+                      ))
+                          .fold(
                         onSuccess: (value) => value,
                         onFailure: (failure) =>
                             throw Exception(failure.message),
@@ -551,9 +604,9 @@ class _MetricCard extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: AppTheme.colorPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+                  color: AppTheme.colorPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
           Text(label, style: const TextStyle(color: AppTheme.colorMuted)),
         ],

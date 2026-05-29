@@ -8,7 +8,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../auth/presentation/state/auth_dependencies.dart';
-import '../../../onboarding/presentation/screens/role_selection_screen.dart';
+import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -16,6 +16,7 @@ import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
 import 'worker_history_screen.dart';
+import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 
 class ProfileMenuScreen extends StatefulWidget {
@@ -44,6 +45,21 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
   bool _updatingPhoto = false;
 
   bool get _isWorker => SessionStore.currentUser?.type == 'worker';
+
+  bool get _isVerified {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
+  }
+
+  void _navigateToVerification() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const VerificationCheckpointScreen(),
+      ),
+    );
+  }
 
   Future<void> _pickAndUploadPhoto() async {
     final user = SessionStore.currentUser;
@@ -217,7 +233,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     }
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const RoleSelectionScreen()),
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
       (_) => false,
     );
   }
@@ -298,7 +314,9 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                             children: [
                               Text(
                                 user?.fullName ?? 'Usuario',
-                                style: Theme.of(context).textTheme.headlineSmall
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
                                     ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 4),
@@ -318,14 +336,30 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                       alignment: Alignment.centerLeft,
                       child: ChambaChip(label: roleLabel, selected: true),
                     ),
+                    if (_isWorker) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: _isVerified ? null : _navigateToVerification,
+                          child: ChambaChip(
+                            label:
+                                _isVerified ? 'Verificado' : 'Verificar perfil',
+                            selected: _isVerified,
+                            icon: _isVerified
+                                ? Icons.verified
+                                : Icons.warning_amber_rounded,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 12),
               _SectionTitle(
-                label: _isWorker
-                    ? 'Herramientas de trabajo'
-                    : 'Gestión de cuenta',
+                label:
+                    _isWorker ? 'Herramientas de trabajo' : 'Gestión de cuenta',
               ),
               if (_isWorker) ...[
                 _NavTile(
@@ -461,9 +495,9 @@ class _SectionTitle extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppTheme.colorMuted,
-        ),
+              fontWeight: FontWeight.w700,
+              color: AppTheme.colorMuted,
+            ),
       ),
     );
   }
