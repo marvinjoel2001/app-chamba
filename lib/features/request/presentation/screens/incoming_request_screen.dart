@@ -13,6 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
+import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
@@ -52,6 +53,53 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   // DraggableScrollableController para el bottom sheet
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
+
+  bool get _isVerified {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
+  }
+
+  void _showVerificationRequired() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.colorBackgroundAccent,
+        title: const Row(
+          children: [
+            Icon(Icons.verified_user, color: AppTheme.colorPrimary),
+            SizedBox(width: 8),
+            Text('Verificación requerida'),
+          ],
+        ),
+        content: const Text(
+          'Debes verificar tu identidad para poder aceptar o ofertar en solicitudes.',
+          style: TextStyle(color: AppTheme.colorMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const VerificationCheckpointScreen(),
+                ),
+              );
+            },
+            child: const Text(
+              'Verificar',
+              style: TextStyle(color: AppTheme.colorPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -150,7 +198,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           workerUserId: user.id,
           latitude: pos.latitude,
           longitude: pos.longitude,
-        )).fold(
+        ))
+            .fold(
           onSuccess: (value) => value,
           onFailure: (failure) => throw Exception(failure.message),
         );
@@ -176,7 +225,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       (await RequestDependencies.setAvailability(
         workerUserId: user.id,
         available: value,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -376,8 +426,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       final previousOffer =
           previousRequest?['workerOffer'] as Map<String, dynamic>?;
       final previousOfferStatus = previousOffer?['status']?.toString();
-      final previousOfferAmount = (previousOffer?['amount'] as num?)
-          ?.toDouble();
+      final previousOfferAmount =
+          (previousOffer?['amount'] as num?)?.toDouble();
 
       final response =
           (await RequestDependencies.getIncomingRequest(workerUserId: user.id))
@@ -393,16 +443,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       final newOffer = mutableRequest?['workerOffer'] as Map<String, dynamic>?;
       final newOfferStatus = newOffer?['status']?.toString();
 
-      final isDifferentRequest =
-          previousRequestId != null &&
+      final isDifferentRequest = previousRequestId != null &&
           newRequestId != null &&
           previousRequestId != newRequestId;
-      final budgetIncreased =
-          previousBudget != null &&
+      final budgetIncreased = previousBudget != null &&
           newBudget != null &&
           newBudget > previousBudget;
-      final budgetAbovePreviousOffer =
-          previousOfferAmount != null &&
+      final budgetAbovePreviousOffer = previousOfferAmount != null &&
           newBudget != null &&
           newBudget > previousOfferAmount;
       final lostPendingOffer =
@@ -438,8 +485,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
       SessionStore.activeRequestId = mutableRequest?['id']?.toString();
 
-      final offerStatus = (mutableRequest?['workerOffer'] as Map?)?['status']
-          ?.toString();
+      final offerStatus =
+          (mutableRequest?['workerOffer'] as Map?)?['status']?.toString();
       if (offerStatus == 'accepted' && !_showAcceptedBanner && mounted) {
         setState(() => _showAcceptedBanner = true);
         _acceptedAnimCtrl.forward(from: 0);
@@ -496,8 +543,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final req = _request;
     final workerOffer = req?['workerOffer'] as Map<String, dynamic>?;
     final offerStatus = workerOffer?['status']?.toString();
-    final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)
-        ?.toInt();
+    final secondsRemaining =
+        (workerOffer?['secondsRemaining'] as num?)?.toInt();
     final hasPendingOffer = offerStatus == 'pending';
     final isAcceptedOffer = offerStatus == 'accepted';
     final mapCenter = _workerLocation ?? const LatLng(-16.5002, -68.1342);
@@ -867,8 +914,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final isDeclinedOffer = offerStatus == 'declined';
 
     // El cliente mejoró su oferta si el budget actual es mayor que mi oferta
-    final clientImproved =
-        hasPendingOffer &&
+    final clientImproved = hasPendingOffer &&
         !isDeclinedOffer &&
         myOfferAmount != null &&
         currentBudget > myOfferAmount;
@@ -1058,7 +1104,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.reactivateOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1201,6 +1248,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1209,7 +1260,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1239,6 +1291,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
@@ -1264,7 +1320,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         setState(() => _clientCountered = false);
@@ -1411,6 +1468,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1419,7 +1480,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1449,6 +1511,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
@@ -1473,7 +1539,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1552,6 +1619,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1560,7 +1631,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1590,6 +1662,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
@@ -1614,7 +1690,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1672,9 +1749,8 @@ class _AvailabilityLabel extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: active
-              ? activeColor
-              : AppTheme.colorMuted.withValues(alpha: 0.5),
+          color:
+              active ? activeColor : AppTheme.colorMuted.withValues(alpha: 0.5),
           fontSize: 11,
           fontWeight: FontWeight.w800,
           letterSpacing: 1,

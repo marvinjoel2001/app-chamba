@@ -524,7 +524,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                       Text(
                                         '+ Bs ${amount.toStringAsFixed(0)}',
                                         style: const TextStyle(
-                                          color: Color(0xFF1A237E),
+                                          color: Color(0xFF00E676),
                                           fontWeight: FontWeight.w800,
                                           fontSize: 15,
                                         ),
