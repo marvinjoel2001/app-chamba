@@ -225,13 +225,49 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       return;
     }
 
-    final selected = await _imagePicker.pickMultiImage(
-      imageQuality: 70,
-      maxWidth: 1080,
+    final option = await showModalBottomSheet<_ImageSourceOption>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _ImageSourceBottomSheet(),
     );
-    if (selected.isEmpty) {
+
+    if (option == null) return;
+
+    List<XFile> selected = [];
+
+    try {
+      switch (option) {
+        case _ImageSourceOption.camera:
+          final photo = await _imagePicker.pickImage(
+            source: ImageSource.camera,
+            imageQuality: 70,
+            maxWidth: 1080,
+          );
+          if (photo != null) selected = [photo];
+          break;
+        case _ImageSourceOption.gallery:
+          selected = await _imagePicker.pickMultiImage(
+            imageQuality: 70,
+            maxWidth: 1080,
+          );
+          break;
+        case _ImageSourceOption.files:
+          selected = await _imagePicker.pickMultiImage(
+            imageQuality: 70,
+            maxWidth: 1080,
+          );
+          break;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al seleccionar imagenes: $e')),
+        );
+      }
       return;
     }
+
+    if (selected.isEmpty) return;
 
     final remaining = 5 - _pendingImages.length;
     final toProcess = selected.take(remaining);
@@ -240,9 +276,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       _pendingImages.add(_PendingImage(bytes: bytes, fileName: item.name));
     }
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -654,4 +688,151 @@ class _PendingImage {
 
   final Uint8List bytes;
   final String fileName;
+}
+
+enum _ImageSourceOption { camera, gallery, files }
+
+class _ImageSourceBottomSheet extends StatelessWidget {
+  const _ImageSourceBottomSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.colorBackgroundAlt,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Agregar fotos',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Selecciona una opcion',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.colorMuted),
+          ),
+          const SizedBox(height: 24),
+          _OptionTile(
+            icon: Icons.camera_alt_outlined,
+            title: 'Camara',
+            subtitle: 'Toma una foto ahora',
+            color: Colors.blue,
+            onTap: () => Navigator.of(context).pop(_ImageSourceOption.camera),
+          ),
+          _OptionTile(
+            icon: Icons.photo_library_outlined,
+            title: 'Galeria',
+            subtitle: 'Selecciona de tu album',
+            color: Colors.purple,
+            onTap: () => Navigator.of(context).pop(_ImageSourceOption.gallery),
+          ),
+          _OptionTile(
+            icon: Icons.folder_open_outlined,
+            title: 'Archivos',
+            subtitle: 'Busca en tus archivos',
+            color: Colors.orange,
+            onTap: () => Navigator.of(context).pop(_ImageSourceOption.files),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 13, color: AppTheme.colorMuted),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withValues(alpha: 0.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
