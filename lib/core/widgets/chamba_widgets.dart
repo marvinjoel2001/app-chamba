@@ -187,6 +187,7 @@ class ChambaChip extends StatelessWidget {
     required this.selected,
     this.onTap,
     this.icon,
+    this.color,
     super.key,
   });
 
@@ -194,9 +195,11 @@ class ChambaChip extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
   final IconData? icon;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? AppTheme.colorPrimary;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -205,13 +208,13 @@ class ChambaChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.colorPrimary
-              : AppTheme.colorPrimary.withValues(alpha: 0.08),
+              ? effectiveColor
+              : effectiveColor.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: selected
-                ? AppTheme.colorPrimary
-                : AppTheme.colorPrimary.withValues(alpha: 0.20),
+                ? effectiveColor
+                : effectiveColor.withValues(alpha: 0.20),
           ),
           boxShadow: selected ? AppTheme.shadowSm : const [],
         ),
@@ -222,18 +225,14 @@ class ChambaChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: selected
-                    ? AppTheme.colorTextOnPurple
-                    : AppTheme.colorPrimaryLight,
+                color: selected ? AppTheme.colorTextOnPurple : effectiveColor,
               ),
               const SizedBox(width: 6),
             ],
             Text(
               label,
               style: TextStyle(
-                color: selected
-                    ? AppTheme.colorTextOnPurple
-                    : AppTheme.colorPrimaryLight,
+                color: selected ? AppTheme.colorTextOnPurple : effectiveColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
@@ -346,44 +345,12 @@ Widget _buildNav(
             final selected = index == currentIndex;
             final showBadge = index == badgeIndex && (badgeCount ?? 0) > 0;
             return Expanded(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // SizedBox.expand garantiza que el item ocupe todo el Expanded
-                  SizedBox.expand(
-                    child: _BottomNavItem(
-                      icon: item.icon,
-                      label: item.label,
-                      selected: selected,
-                      onTap: () => onTap(index),
-                    ),
-                  ),
-                  if (showBadge)
-                    Positioned(
-                      top: 2,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.colorError,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          badgeCount! > 99 ? '99+' : '$badgeCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
+              child: _BottomNavItem(
+                icon: item.icon,
+                label: item.label,
+                selected: selected,
+                badgeCount: showBadge ? badgeCount : null,
+                onTap: () => onTap(index),
               ),
             );
           }),
@@ -406,12 +373,14 @@ class _BottomNavItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badgeCount,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final int? badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +396,37 @@ class _BottomNavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 24, color: iconColor),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 24, color: iconColor),
+                if (badgeCount != null && badgeCount! > 0)
+                  Positioned(
+                    top: -6,
+                    right: -10,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.colorError,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        badgeCount! > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 220),

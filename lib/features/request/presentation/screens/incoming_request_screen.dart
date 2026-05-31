@@ -37,6 +37,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   Timer? _ticker;
   Timer? _pollTimer;
   LatLng? _workerLocation;
+  StreamSubscription<Position>? _locationStreamSubscription;
   bool _available = true; // se actualiza desde la DB en _initLocation
   bool _togglingAvailability = false;
 
@@ -89,7 +90,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       if (mounted && widget.isActive) _load(silent: true);
     });
 
-    _initLocation();
+    _startLocationStream();
     _load();
   }
 
@@ -105,6 +106,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _realtime.off('job.cancelled', _onJobCancelled);
     _ticker?.cancel();
     _pollTimer?.cancel();
+    _locationStreamSubscription?.cancel();
     _acceptedAnimCtrl.dispose();
     _sheetCtrl.dispose();
     super.dispose();
@@ -118,7 +120,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  Future<void> _initLocation() async {
+  Future<void> _startLocationStream() async {
     try {
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -129,32 +131,34 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(
+      await _locationStreamSubscription?.cancel();
+
+      _locationStreamSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          distanceFilter: 10,
         ),
-      );
-      final loc = LatLng(pos.latitude, pos.longitude);
-      if (mounted) {
+      ).listen((Position pos) async {
+        if (!mounted) return;
+
+        final loc = LatLng(pos.latitude, pos.longitude);
         setState(() => _workerLocation = loc);
-        // Mover el mapa a la ubicación real del dispositivo
+
         try {
           _mapController.move(loc, 14);
         } catch (_) {}
-      }
 
-      final user = SessionStore.currentUser;
-      if (user != null) {
-        (await RequestDependencies.updateWorkerLocation(
-          workerUserId: user.id,
-          latitude: pos.latitude,
-          longitude: pos.longitude,
-        )).fold(
-          onSuccess: (value) => value,
-          onFailure: (failure) => throw Exception(failure.message),
-        );
-      }
+        final user = SessionStore.currentUser;
+        if (user != null) {
+          try {
+            await RequestDependencies.updateWorkerLocation(
+              workerUserId: user.id,
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+            );
+          } catch (_) {}
+        }
+      });
     } catch (_) {}
   }
 
@@ -176,7 +180,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       (await RequestDependencies.setAvailability(
         workerUserId: user.id,
         available: value,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -189,6 +194,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     } finally {
       if (mounted) setState(() => _togglingAvailability = false);
     }
+  }
+
+  bool get _isVerified {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
   }
 
   void _onNewRequest(dynamic payload) => _load(silent: true);
@@ -376,8 +388,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       final previousOffer =
           previousRequest?['workerOffer'] as Map<String, dynamic>?;
       final previousOfferStatus = previousOffer?['status']?.toString();
-      final previousOfferAmount = (previousOffer?['amount'] as num?)
-          ?.toDouble();
+      final previousOfferAmount =
+          (previousOffer?['amount'] as num?)?.toDouble();
 
       final response =
           (await RequestDependencies.getIncomingRequest(workerUserId: user.id))
@@ -393,16 +405,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       final newOffer = mutableRequest?['workerOffer'] as Map<String, dynamic>?;
       final newOfferStatus = newOffer?['status']?.toString();
 
-      final isDifferentRequest =
-          previousRequestId != null &&
+      final isDifferentRequest = previousRequestId != null &&
           newRequestId != null &&
           previousRequestId != newRequestId;
-      final budgetIncreased =
-          previousBudget != null &&
+      final budgetIncreased = previousBudget != null &&
           newBudget != null &&
           newBudget > previousBudget;
-      final budgetAbovePreviousOffer =
-          previousOfferAmount != null &&
+      final budgetAbovePreviousOffer = previousOfferAmount != null &&
           newBudget != null &&
           newBudget > previousOfferAmount;
       final lostPendingOffer =
@@ -438,8 +447,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
       SessionStore.activeRequestId = mutableRequest?['id']?.toString();
 
-      final offerStatus = (mutableRequest?['workerOffer'] as Map?)?['status']
-          ?.toString();
+      final offerStatus =
+          (mutableRequest?['workerOffer'] as Map?)?['status']?.toString();
       if (offerStatus == 'accepted' && !_showAcceptedBanner && mounted) {
         setState(() => _showAcceptedBanner = true);
         _acceptedAnimCtrl.forward(from: 0);
@@ -496,8 +505,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final req = _request;
     final workerOffer = req?['workerOffer'] as Map<String, dynamic>?;
     final offerStatus = workerOffer?['status']?.toString();
-    final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)
-        ?.toInt();
+    final secondsRemaining =
+        (workerOffer?['secondsRemaining'] as num?)?.toInt();
     final hasPendingOffer = offerStatus == 'pending';
     final isAcceptedOffer = offerStatus == 'accepted';
     final mapCenter = _workerLocation ?? const LatLng(-16.5002, -68.1342);
@@ -867,8 +876,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final isDeclinedOffer = offerStatus == 'declined';
 
     // El cliente mejoró su oferta si el budget actual es mayor que mi oferta
-    final clientImproved =
-        hasPendingOffer &&
+    final clientImproved = hasPendingOffer &&
         !isDeclinedOffer &&
         myOfferAmount != null &&
         currentBudget > myOfferAmount;
@@ -905,10 +913,31 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Fila 1: precio + categoría + distancia ────
+            // ── Fila 1: foto cliente + precio + categoría + distancia ────
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Foto del cliente
+                if (req['client']?['profilePhotoUrl'] != null) ...[
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage:
+                        NetworkImage(req['client']['profilePhotoUrl']),
+                  ),
+                  const SizedBox(width: 10),
+                ] else if (req['clientName'] != null) ...[
+                  CircleAvatar(
+                    radius: 20,
+                    child: Text(
+                      req['clientName']
+                          .toString()
+                          .substring(0, 1)
+                          .toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Text(
                   'Bs ${currentBudget.toStringAsFixed(0)}',
                   style: TextStyle(
@@ -976,6 +1005,24 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               thickness: 1,
             ),
             const SizedBox(height: 10),
+            if (!isAcceptedOffer) ...[
+              ChambaPrimaryButton(
+                label: 'VER DETALLES DEL TRABAJO',
+                icon: Icons.remove_red_eye_outlined,
+                isYellow: false,
+                compact: true,
+                onPressed: () {
+                  if (_sheetCtrl.isAttached) {
+                    _sheetCtrl.animateTo(
+                      0.85,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
 
             // ── Botones según estado ───────────────────────────────
             if (isAcceptedOffer) ...[
@@ -1058,7 +1105,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.reactivateOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1192,11 +1240,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 ),
               ],
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'ACEPTAR',
+              if (!_isVerified)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
+                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'ACEPTAR',
                       icon: Icons.check_circle,
                       isYellow: true,
                       compact: true,
@@ -1209,7 +1274,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1264,7 +1330,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         setState(() => _clientCountered = false);
@@ -1402,11 +1469,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 ),
               ],
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'ACEPTAR',
+              if (!_isVerified)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
+                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'ACEPTAR',
                       icon: Icons.check_circle,
                       isYellow: true,
                       compact: true,
@@ -1419,7 +1503,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1473,7 +1558,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1543,11 +1629,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                   ),
                 ),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'ACEPTAR',
+              if (!_isVerified)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
+                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'ACEPTAR',
                       icon: Icons.check_circle,
                       isYellow: true,
                       compact: true,
@@ -1560,7 +1663,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             workerUserId: user.id,
                             amount: currentBudget,
                             message: 'Acepto el precio ofertado.',
-                          )).fold(
+                          ))
+                              .fold(
                             onSuccess: (value) => value,
                             onFailure: (failure) =>
                                 throw Exception(failure.message),
@@ -1614,7 +1718,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   (await RequestDependencies.declineOffer(
                     requestId: req['id'] as String,
                     workerUserId: user.id,
-                  )).fold(
+                  ))
+                      .fold(
                     onSuccess: (_) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1672,9 +1777,8 @@ class _AvailabilityLabel extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: active
-              ? activeColor
-              : AppTheme.colorMuted.withValues(alpha: 0.5),
+          color:
+              active ? activeColor : AppTheme.colorMuted.withValues(alpha: 0.5),
           fontSize: 11,
           fontWeight: FontWeight.w800,
           letterSpacing: 1,

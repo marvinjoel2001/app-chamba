@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -12,6 +14,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
+import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/tracking_dependencies.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 
@@ -31,14 +34,26 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Timer? _pollTimer;
   bool _confirmingArrival = false;
 
+  List<LatLng> _routePoints = [];
+  LatLng? _lastRouteFetchPos;
+  int _unreadMessages = 0;
+
   @override
   void initState() {
     super.initState();
     _realtime.on('job.worker_arrived', _onWorkerArrived);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
+    _realtime.on('chat.message', _onChatMessage);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _load();
+  }
+
+  void _onChatMessage(dynamic data) {
+    final msg = data as Map<String, dynamic>? ?? {};
+    if (msg['senderId'] != SessionStore.currentUser?.id) {
+      if (mounted) setState(() => _unreadMessages++);
+    }
   }
 
   @override
@@ -46,6 +61,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.off('job.worker_arrived', _onWorkerArrived);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
+    _realtime.off('chat.message', _onChatMessage);
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -80,8 +96,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
+                // Navegar al home del cliente borrando toda la pila de navegación
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MainShellScreen(role: 'client'),
+                  ),
+                  (route) => false,
+                );
               },
               child: const Text('Aceptar'),
             ),
@@ -147,6 +168,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
       if (SessionStore.activeThreadId == null) {
         await _ensureActiveThread();
       }
+
+      final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
+      final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
+      final destLat = (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+      final destLng = (_tracking?['destination']?['longitude'] as num?)?.toDouble();
+
+      if (workerLat != null && workerLng != null && destLat != null && destLng != null) {
+        final workerPos = LatLng(workerLat, workerLng);
+        final destPos = LatLng(destLat, destLng);
+        if (_lastRouteFetchPos == null ||
+            (workerPos.latitude - _lastRouteFetchPos!.latitude).abs() > 0.0005 ||
+            (workerPos.longitude - _lastRouteFetchPos!.longitude).abs() > 0.0005) {
+          _lastRouteFetchPos = workerPos;
+          _fetchRoute(workerPos, destPos);
+        }
+      }
+
       if (!mounted) return;
       setState(() => _loading = false);
     } catch (error) {
@@ -155,6 +193,28 @@ class _TrackingScreenState extends State<TrackingScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _fetchRoute(LatLng start, LatLng end) async {
+    final token = AppConfig.mapboxAccessToken.trim();
+    if (token.isEmpty) return;
+    try {
+      final url = Uri.parse(
+          'https://api.mapbox.com/directions/v5/mapbox/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?geometries=geojson&access_token=$token');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
+          final coords = data['routes'][0]['geometry']['coordinates'] as List;
+          final points = coords.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
+          if (mounted) {
+            setState(() {
+              _routePoints = points;
+            });
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _confirmArrival() async {
@@ -167,7 +227,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
       (await TrackingDependencies.clientConfirmArrival(
         requestId: requestId,
         clientUserId: user.id,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -221,7 +282,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
       (await TrackingDependencies.cancelJob(
         requestId: requestId,
         userId: user.id,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -253,10 +315,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     final workerLat = (worker?['latitude'] as num?)?.toDouble();
     final workerLng = (worker?['longitude'] as num?)?.toDouble();
-    final destLat = (_tracking?['destination']?['latitude'] as num?)
-        ?.toDouble();
-    final destLng = (_tracking?['destination']?['longitude'] as num?)
-        ?.toDouble();
+    final destLat =
+        (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+    final destLng =
+        (_tracking?['destination']?['longitude'] as num?)?.toDouble();
 
     // Posición del worker (se actualiza con el polling)
     final workerPos = workerLat != null && workerLng != null
@@ -264,9 +326,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
         : const LatLng(-16.5002, -68.1342);
 
     // Destino (ubicación del trabajo = donde está el cliente)
-    final destPos = destLat != null && destLng != null
-        ? LatLng(destLat, destLng)
-        : null;
+    final destPos =
+        destLat != null && destLng != null ? LatLng(destLat, destLng) : null;
 
     // Centro: punto medio entre worker y destino
     final mapCenter = destPos != null
@@ -310,7 +371,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         },
                       ),
                       // Línea de ruta worker → destino
-                      if (destPos != null)
+                      if (_routePoints.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _routePoints,
+                              color: AppTheme.colorSuccess.withValues(
+                                alpha: 0.8,
+                              ),
+                              strokeWidth: 4,
+                            ),
+                          ],
+                        )
+                      else if (destPos != null)
                         PolylineLayer(
                           polylines: [
                             Polyline(
@@ -508,261 +581,300 @@ class _TrackingScreenState extends State<TrackingScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Text(
-                      _error!,
-                      style: const TextStyle(color: AppTheme.colorError),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Handle
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.colorMuted.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        // Status + monto
-                        Row(
+                      ? Text(
+                          _error!,
+                          style: const TextStyle(color: AppTheme.colorError),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.colorSuccessSoft,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                workerArrived
-                                    ? clientConfirmed
-                                          ? 'EN TRABAJO'
-                                          : '¡LLEGÓ!'
-                                    : 'EN CAMINO',
-                                style: const TextStyle(
-                                  color: AppTheme.colorSuccess,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                            // Handle
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.colorMuted
+                                      .withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
                             ),
-                            const Spacer(),
-                            Text(
-                              amount != null ? 'Bs $amount' : '',
-                              style: const TextStyle(
-                                color: AppTheme.colorText,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: AppTheme.colorText,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Info del worker
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppTheme.colorSurfaceSoft,
-                              backgroundImage:
-                                  worker?['profilePhotoUrl'] != null
-                                  ? NetworkImage(
-                                      worker!['profilePhotoUrl'] as String,
-                                    )
-                                  : null,
-                              child: worker?['profilePhotoUrl'] == null
-                                  ? Text(
-                                      (worker?['firstName'] ?? 'W')
-                                          .toString()
-                                          .substring(0, 1),
-                                      style: const TextStyle(
-                                        color: AppTheme.colorText,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
-                                        .trim(),
+                            // Status + monto
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorSuccessSoft,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    workerArrived
+                                        ? clientConfirmed
+                                            ? 'EN TRABAJO'
+                                            : '¡LLEGÓ!'
+                                        : 'EN CAMINO',
                                     style: const TextStyle(
-                                      color: AppTheme.colorText,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
+                                      color: AppTheme.colorSuccess,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.location_on,
-                                        color: AppTheme.colorMuted,
-                                        size: 13,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          address,
-                                          style: const TextStyle(
-                                            color: AppTheme.colorMuted,
-                                            fontSize: 12,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Distancia
-                        if (distanceKm != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.colorSurfaceSoft,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.straighten,
-                                  color: AppTheme.colorMuted,
-                                  size: 16,
                                 ),
-                                const SizedBox(width: 6),
+                                const Spacer(),
                                 Text(
-                                  '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                  amount != null ? 'Bs $amount' : '',
                                   style: const TextStyle(
-                                    color: AppTheme.colorMuted,
-                                    fontSize: 13,
+                                    color: AppTheme.colorText,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        const SizedBox(height: 16),
-                        // Botones
-                        Row(
-                          children: [
-                            // Confirmar llegada (solo si el worker llegó y no se confirmó aún)
-                            Expanded(
-                              flex: 3,
-                              child: ChambaPrimaryButton(
-                                label: clientConfirmed
-                                    ? 'Llegada confirmada ✓'
-                                    : workerArrived
-                                    ? 'CONFIRMAR LLEGADA'
-                                    : 'Esperando al trabajador...',
-                                icon: clientConfirmed
-                                    ? Icons.check_circle
-                                    : workerArrived
-                                    ? Icons.where_to_vote
-                                    : Icons.hourglass_top,
-                                isYellow: workerArrived && !clientConfirmed,
-                                onPressed: workerArrived && !clientConfirmed
-                                    ? (_confirmingArrival
-                                          ? null
-                                          : _confirmArrival)
-                                    : null,
+                            const SizedBox(height: 8),
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            // Chat
-                            _ActionIconButton(
-                              icon: Icons.chat_bubble_outline,
-                              color: AppTheme.colorPrimary,
-                              onTap: () async {
-                                if (SessionStore.activeThreadId == null) {
-                                  await _ensureActiveThread();
-                                }
-                                final threadId = SessionStore.activeThreadId;
-                                if (threadId == null) {
-                                  if (!context.mounted) return;
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const MessagesScreen(),
+                            const SizedBox(height: 12),
+                            // Info del worker
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: AppTheme.colorSurfaceSoft,
+                                  backgroundImage: worker?['profilePhotoUrl'] !=
+                                          null
+                                      ? NetworkImage(
+                                          worker!['profilePhotoUrl'] as String,
+                                        )
+                                      : null,
+                                  child: worker?['profilePhotoUrl'] == null
+                                      ? Text(
+                                          (worker?['firstName'] ?? 'W')
+                                              .toString()
+                                              .substring(0, 1),
+                                          style: const TextStyle(
+                                            color: AppTheme.colorText,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
+                                            .trim(),
+                                        style: const TextStyle(
+                                          color: AppTheme.colorText,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on,
+                                            color: AppTheme.colorMuted,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              address,
+                                              style: const TextStyle(
+                                                color: AppTheme.colorMuted,
+                                                fontSize: 12,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Distancia
+                            if (distanceKm != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.colorSurfaceSoft,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.straighten,
+                                      color: AppTheme.colorMuted,
+                                      size: 16,
                                     ),
-                                  );
-                                  return;
-                                }
-                                if (!context.mounted) return;
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ChatScreen(
-                                      threadId: threadId,
-                                      counterpartName:
-                                          '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
-                                              .trim(),
-                                      counterpartAvatarUrl:
-                                          worker?['profilePhotoUrl'] as String?,
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                      style: const TextStyle(
+                                        color: AppTheme.colorMuted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            // Botones
+                            Row(
+                              children: [
+                                // Confirmar llegada (solo si el worker llegó y no se confirmó aún)
+                                Expanded(
+                                  flex: 3,
+                                  child: ChambaPrimaryButton(
+                                    label: clientConfirmed
+                                        ? 'Llegada confirmada ✓'
+                                        : workerArrived
+                                            ? 'CONFIRMAR LLEGADA'
+                                            : 'Esperando al trabajador...',
+                                    icon: clientConfirmed
+                                        ? Icons.check_circle
+                                        : workerArrived
+                                            ? Icons.where_to_vote
+                                            : Icons.hourglass_top,
+                                    isYellow: workerArrived && !clientConfirmed,
+                                    onPressed: workerArrived && !clientConfirmed
+                                        ? (_confirmingArrival
+                                            ? null
+                                            : _confirmArrival)
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                // Chat
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    _ActionIconButton(
+                                      icon: Icons.chat_bubble_outline,
+                                      color: AppTheme.colorPrimary,
+                                      onTap: () async {
+                                        setState(() => _unreadMessages = 0);
+                                        if (SessionStore.activeThreadId == null) {
+                                          await _ensureActiveThread();
+                                        }
+                                        final threadId =
+                                            SessionStore.activeThreadId;
+                                        if (threadId == null) {
+                                          if (!context.mounted) return;
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  const MessagesScreen(),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        if (!context.mounted) return;
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => ChatScreen(
+                                              threadId: threadId,
+                                              counterpartName:
+                                                  '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
+                                                      .trim(),
+                                              counterpartAvatarUrl:
+                                                  worker?['profilePhotoUrl']
+                                                      as String?,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    if (_unreadMessages > 0)
+                                      Positioned(
+                                        top: -5,
+                                        right: -5,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: AppTheme.colorError,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Text(
+                                            _unreadMessages.toString(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Ocultar botón cancelar si el worker ya llegó
+                                if (!workerArrived)
+                                  TextButton(
+                                    onPressed: _cancelJob,
+                                    child: const Text(
+                                      'Cancelar trabajo',
+                                      style:
+                                          TextStyle(color: AppTheme.colorError),
                                     ),
                                   ),
-                                );
-                              },
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => SupportScreen(
+                                          requestId:
+                                              SessionStore.activeRequestId,
+                                          reportedUserId:
+                                              worker?['id']?.toString(),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.flag_outlined,
+                                      size: 16, color: AppTheme.colorMuted),
+                                  label: const Text(
+                                    'Reportar problema',
+                                    style: TextStyle(
+                                        color: AppTheme.colorMuted,
+                                        fontSize: 12),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextButton(
-                              onPressed: _cancelJob,
-                              child: const Text(
-                                'Cancelar trabajo',
-                                style: TextStyle(color: AppTheme.colorError),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => SupportScreen(
-                                      requestId: SessionStore.activeRequestId,
-                                      reportedUserId: worker?['id']?.toString(),
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.flag_outlined, size: 16, color: AppTheme.colorMuted),
-                              label: const Text(
-                                'Reportar problema',
-                                style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
             ),
           ),
         ],

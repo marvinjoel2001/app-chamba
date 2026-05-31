@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -49,11 +51,56 @@ class _RadarScreenState extends State<RadarScreen> {
   LatLng? _workerLocation;
   double _workRadiusKm = 5;
   double _zoom = 13;
+  StreamSubscription<Position>? _locationStreamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) => _startLocationStream());
+  }
+
+  @override
+  void dispose() {
+    _locationStreamSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startLocationStream() async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+
+    // Check permissions first
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    // Cancel any existing subscription
+    await _locationStreamSubscription?.cancel();
+
+    // Start listening to position stream
+    _locationStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Update every 10 meters
+      ),
+    ).listen((Position position) {
+      if (!mounted) return;
+
+      final newLocation = LatLng(position.latitude, position.longitude);
+      setState(() => _workerLocation = newLocation);
+
+      // Update server with new location
+      _updateWorkerLocationUseCase(
+        workerUserId: user.id,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -82,8 +129,7 @@ class _RadarScreenState extends State<RadarScreen> {
           available = summary.available;
           _summary = summary;
           _workRadiusKm = summary.workRadiusKm;
-          _workerLocation =
-              deviceLocation ??
+          _workerLocation = deviceLocation ??
               (summary.latitude != null && summary.longitude != null
                   ? LatLng(summary.latitude!, summary.longitude!)
                   : const LatLng(-16.5002, -68.1342));
@@ -511,9 +557,8 @@ class _MapControl extends StatelessWidget {
           height: 46,
           child: Icon(
             icon,
-            color: highlighted
-                ? AppTheme.colorTextOnPurple
-                : AppTheme.colorText,
+            color:
+                highlighted ? AppTheme.colorTextOnPurple : AppTheme.colorText,
           ),
         ),
       ),

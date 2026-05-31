@@ -282,44 +282,44 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          // Botón retirar fondos (placeholder)
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Función de retiro próximamente disponible.',
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.account_balance,
-                                color: Colors.black,
-                                size: 18,
-                              ),
-                              label: const Text(
-                                'Retirar Fondos',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF1A237E),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 2,
-                              ),
-                            ),
-                          ),
+                          // Botón retirar fondos (placeholder - oculto temporalmente)
+                          // SizedBox(
+                          //   width: double.infinity,
+                          //   child: ElevatedButton.icon(
+                          //     onPressed: () {
+                          //       ScaffoldMessenger.of(context).showSnackBar(
+                          //         const SnackBar(
+                          //           content: Text(
+                          //             'Función de retiro próximamente disponible.',
+                          //           ),
+                          //         ),
+                          //       );
+                          //     },
+                          //     icon: const Icon(
+                          //       Icons.account_balance,
+                          //       color: Colors.black,
+                          //       size: 18,
+                          //     ),
+                          //     label: const Text(
+                          //       'Retirar Fondos',
+                          //       style: TextStyle(
+                          //         color: Colors.black,
+                          //         fontWeight: FontWeight.w700,
+                          //       ),
+                          //     ),
+                          //     style: ElevatedButton.styleFrom(
+                          //       backgroundColor: Colors.white,
+                          //       foregroundColor: const Color(0xFF1A237E),
+                          //       padding: const EdgeInsets.symmetric(
+                          //         vertical: 14,
+                          //       ),
+                          //       shape: RoundedRectangleBorder(
+                          //         borderRadius: BorderRadius.circular(14),
+                          //       ),
+                          //       elevation: 2,
+                          //     ),
+                          //   ),
+                          // ),
                         ],
                       ),
               ),
@@ -524,7 +524,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                       Text(
                                         '+ Bs ${amount.toStringAsFixed(0)}',
                                         style: const TextStyle(
-                                          color: Color(0xFF1A237E),
+                                          color: Colors.green,
                                           fontWeight: FontWeight.w800,
                                           fontSize: 15,
                                         ),

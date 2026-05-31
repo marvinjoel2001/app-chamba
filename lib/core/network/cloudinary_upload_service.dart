@@ -32,6 +32,12 @@ class CloudinaryUploadService {
         'Configura CLOUDINARY_CLOUD_NAME y CLOUDINARY_UPLOAD_PRESET en env/dart_define.local.json',
       );
     }
+    // NOTA IMPORTANTE: El upload_preset debe ser de tipo "unsigned" en Cloudinary
+    // y debe estar configurado con "Allowed formats" que incluya las extensiones
+    // necesarias (jpg, jpeg, png, webp) para evitar el error "Upload preset must be whitelisted"
+    // Ir a: Cloudinary Dashboard > Settings > Upload > Upload presets > [tu_preset] > Edit
+    // 1. Set "Signing Mode" a "Unsigned"
+    // 2. En "Allowed formats" agregar: jpg,jpeg,png,webp
 
     debugPrint('[Cloudinary] Subiendo imagen: $fileName a folder: $folder');
     debugPrint(

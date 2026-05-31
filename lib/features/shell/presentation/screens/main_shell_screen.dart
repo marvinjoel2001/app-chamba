@@ -52,8 +52,17 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final myId = SessionStore.currentUser?.id;
     final map = payload is Map ? payload : <dynamic, dynamic>{};
     final senderUserId = map['message']?['senderUserId']?.toString();
-    if (senderUserId == myId) return;
+    
+    // Ignorar mensajes enviados por nosotros o mensajes del sistema (senderUserId null)
+    if (senderUserId == null || senderUserId == 'null' || senderUserId == myId) {
+      return;
+    }
+    
+    // Si estamos en la pestaña de mensajes, asumimos que se leerán pronto
+    // NOTA: Si el usuario está en el ChatScreen abierto desde TrackingScreen,
+    // también podríamos querer evitar incrementar, pero por ahora seguimos la lógica base.
     if (currentIndex == _messagesTabIndex) return;
+    
     UnreadMessagesNotifier.instance.increment();
   }
 

@@ -87,6 +87,22 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       ).showSnackBar(const SnackBar(content: Text('No hay solicitud activa.')));
       return;
     }
+    // Validación: Worker debe estar verificado
+    final isVerified = user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
+    if (!isVerified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Debes verificar tu identidad antes de enviar ofertas.',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      // Opcional: navegar a pantalla de verificación
+      // Navigator.of(context).pushNamed('/verification');
+      return;
+    }
     // Validación: Worker debe ofertar MAYOR que el precio base del cliente
     final basePriceInt = _base.toInt();
     final selectedInt = _selectedAmount.toInt();
@@ -106,7 +122,8 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
         requestId: requestId,
         workerUserId: widget.workerId ?? user.id,
         amount: _selectedAmount,
-      )).fold(
+      ))
+          .fold(
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -221,7 +238,9 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                           FilteringTextInputFormatter.digitsOnly,
                         ],
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displayMedium
+                        style: Theme.of(context)
+                            .textTheme
+                            .displayMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                         decoration: InputDecoration(
                           prefixText: 'Bs ',
@@ -254,8 +273,8 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                     'Bs ${_selectedAmount.toInt()}/día',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
 
                 const SizedBox(height: 28),
@@ -283,9 +302,8 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                     const SizedBox(width: 8),
                     // Botón lápiz (editar manual)
                     GestureDetector(
-                      onTap: _editingManually
-                          ? _applyManualEdit
-                          : _openManualEdit,
+                      onTap:
+                          _editingManually ? _applyManualEdit : _openManualEdit,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         width: 58,
@@ -416,8 +434,8 @@ class _JobDetailsSheet extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                      fontWeight: FontWeight.w800,
+                    ),
               ),
               const SizedBox(height: 8),
 
@@ -556,9 +574,9 @@ class _JobDetailsSheet extends StatelessWidget {
                       child: client['profilePhotoUrl'] == null
                           ? Text(
                               (client['firstName'] ?? 'C').toString().substring(
-                                0,
-                                1,
-                              ),
+                                    0,
+                                    1,
+                                  ),
                               style: const TextStyle(
                                 color: AppTheme.colorText,
                                 fontWeight: FontWeight.w700,
@@ -601,8 +619,8 @@ class _JobDetailsSheet extends StatelessWidget {
                     separatorBuilder: (_, __) => const SizedBox(width: 10),
                     itemBuilder: (context, i) {
                       final photo = photos[i];
-                      final url = (photo is Map ? photo['url'] : photo)
-                          ?.toString();
+                      final url =
+                          (photo is Map ? photo['url'] : photo)?.toString();
                       if (url == null) return const SizedBox.shrink();
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(14),

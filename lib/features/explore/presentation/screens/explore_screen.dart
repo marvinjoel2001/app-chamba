@@ -57,6 +57,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     // Escuchar eventos de trabajo completado/cancelado para limpiar el banner
     _realtime.on('job.completed', _onJobFinished);
     _realtime.on('job.cancelled', _onJobFinished);
+    _realtime.on('offer.new', _onNewOffer);
     _load();
   }
 
@@ -64,8 +65,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void dispose() {
     _realtime.off('job.completed', _onJobFinished);
     _realtime.off('job.cancelled', _onJobFinished);
+    _realtime.off('offer.new', _onNewOffer);
     _promptController.dispose();
     super.dispose();
+  }
+
+  void _onNewOffer(dynamic data) {
+    if (_activeRequest != null) {
+      final current = _activeRequest!['pendingOffersCount'] as int? ?? 0;
+      setState(() {
+        _activeRequest!['pendingOffersCount'] = current + 1;
+      });
+    }
   }
 
   void _onJobFinished(dynamic _) {
@@ -573,14 +584,38 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'SOLICITUD EN CURSO',
-                        style: TextStyle(
-                          color: AppTheme.colorPrimaryLight,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'SOLICITUD EN CURSO',
+                            style: TextStyle(
+                              color: AppTheme.colorPrimaryLight,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Badge de ofertas recibidas
+                          if (_activeRequest?['pendingOffersCount'] != null &&
+                              (_activeRequest!['pendingOffersCount'] as num) > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.colorHighlight,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${_activeRequest!['pendingOffersCount']} oferta${(_activeRequest!['pendingOffersCount'] as num) != 1 ? 's' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(

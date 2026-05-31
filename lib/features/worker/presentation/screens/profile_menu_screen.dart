@@ -53,10 +53,20 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
         (user.idPhotoVerified == true && user.facePhotoVerified == true);
   }
 
+  bool get _isVerificationPending {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'pending' ||
+        (user.idPhotoVerified == true || user.facePhotoVerified == true) &&
+            user.verificationStatus != 'verified';
+  }
+
   void _navigateToVerification() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const VerificationCheckpointScreen(),
+        builder: (_) => VerificationCheckpointScreen(
+          isPending: _isVerificationPending,
+        ),
       ),
     );
   }
@@ -160,6 +170,38 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     }
   }
 
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Center(
+              child: Hero(
+                tag: 'profile_photo',
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openPhotoActionsSheet() async {
     final hasPhoto = SessionStore.currentUser?.profilePhotoUrl != null;
     await showModalBottomSheet<void>(
@@ -261,54 +303,74 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                   children: [
                     Row(
                       children: [
-                        Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundImage: user?.profilePhotoUrl == null
-                                  ? null
-                                  : NetworkImage(user!.profilePhotoUrl!),
-                              child: user?.profilePhotoUrl == null
-                                  ? Text(
-                                      (user?.firstName ?? 'U').substring(0, 1),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 22,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            Positioned(
-                              right: -4,
-                              bottom: -4,
-                              child: Material(
-                                color: AppTheme.colorPrimary,
-                                shape: const CircleBorder(),
-                                child: IconButton(
-                                  onPressed: _updatingPhoto
-                                      ? null
-                                      : _openPhotoActionsSheet,
-                                  icon: _updatingPhoto
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8, bottom: 8),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              GestureDetector(
+                                onTap: user?.profilePhotoUrl != null
+                                    ? () => _showFullScreenImage(
+                                        context, user!.profilePhotoUrl!)
+                                    : null,
+                                child: Hero(
+                                  tag: 'profile_photo',
+                                  child: CircleAvatar(
+                                    radius: 44,
+                                    backgroundImage: user?.profilePhotoUrl == null
+                                        ? null
+                                        : NetworkImage(user!.profilePhotoUrl!),
+                                    child: user?.profilePhotoUrl == null
+                                        ? Text(
+                                            (user?.firstName ?? 'U')
+                                                .substring(0, 1),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 26,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: -4,
+                                bottom: -4,
+                                child: Material(
+                                  color: AppTheme.colorPrimary,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    onTap: _updatingPhoto
+                                        ? null
+                                        : _openPhotoActionsSheet,
+                                  customBorder: const CircleBorder(),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    alignment: Alignment.center,
+                                    child: _updatingPhoto
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.edit_outlined,
                                             color: Colors.white,
+                                            size: 16,
                                           ),
-                                        )
-                                      : const Icon(
-                                          Icons.edit_outlined,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -342,14 +404,22 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                         alignment: Alignment.centerLeft,
                         child: GestureDetector(
                           onTap: _isVerified ? null : _navigateToVerification,
-                          child: ChambaChip(
-                            label:
-                                _isVerified ? 'Verificado' : 'Verificar perfil',
-                            selected: _isVerified,
-                            icon: _isVerified
-                                ? Icons.verified
-                                : Icons.warning_amber_rounded,
-                          ),
+                          child: _isVerificationPending
+                              ? ChambaChip(
+                                  label: 'Verificación en proceso',
+                                  selected: true,
+                                  icon: Icons.search,
+                                  color: Colors.orange,
+                                )
+                              : ChambaChip(
+                                  label: _isVerified
+                                      ? 'Verificado'
+                                      : 'Verificar perfil',
+                                  selected: _isVerified,
+                                  icon: _isVerified
+                                      ? Icons.verified
+                                      : Icons.warning_amber_rounded,
+                                ),
                         ),
                       ),
                     ],
