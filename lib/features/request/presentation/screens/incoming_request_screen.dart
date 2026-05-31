@@ -13,6 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
+import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
@@ -53,6 +54,53 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   // DraggableScrollableController para el bottom sheet
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
+
+  bool get _isVerified {
+    final user = SessionStore.currentUser;
+    if (user == null) return false;
+    return user.verificationStatus == 'verified' ||
+        (user.idPhotoVerified == true && user.facePhotoVerified == true);
+  }
+
+  void _showVerificationRequired() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.colorBackgroundAccent,
+        title: const Row(
+          children: [
+            Icon(Icons.verified_user, color: AppTheme.colorPrimary),
+            SizedBox(width: 8),
+            Text('Verificación requerida'),
+          ],
+        ),
+        content: const Text(
+          'Debes verificar tu identidad para poder aceptar o ofertar en solicitudes.',
+          style: TextStyle(color: AppTheme.colorMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const VerificationCheckpointScreen(),
+                ),
+              );
+            },
+            child: const Text(
+              'Verificar',
+              style: TextStyle(color: AppTheme.colorPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -148,17 +196,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           _mapController.move(loc, 14);
         } catch (_) {}
 
-        final user = SessionStore.currentUser;
-        if (user != null) {
-          try {
-            await RequestDependencies.updateWorkerLocation(
-              workerUserId: user.id,
-              latitude: pos.latitude,
-              longitude: pos.longitude,
-            );
-          } catch (_) {}
-        }
-      });
+      final user = SessionStore.currentUser;
+      if (user != null) {
+        (await RequestDependencies.updateWorkerLocation(
+          workerUserId: user.id,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        ))
+            .fold(
+          onSuccess: (value) => value,
+          onFailure: (failure) => throw Exception(failure.message),
+        );
+      }
     } catch (_) {}
   }
 
@@ -1266,6 +1315,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1305,6 +1358,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
@@ -1495,6 +1552,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1534,6 +1595,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
@@ -1655,6 +1720,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       isYellow: true,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final user = SessionStore.currentUser;
                         if (user == null) return;
                         try {
@@ -1694,6 +1763,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       icon: Icons.payments,
                       compact: true,
                       onPressed: () async {
+                        if (!_isVerified) {
+                          _showVerificationRequired();
+                          return;
+                        }
                         final sent = await Navigator.of(context).push<bool>(
                           MaterialPageRoute<bool>(
                             builder: (_) => CounterOfferScreen(
