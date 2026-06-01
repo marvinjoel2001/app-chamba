@@ -201,9 +201,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final features = decoded['features'] as List<dynamic>? ?? const [];
-      final first = features.isEmpty
-          ? null
-          : features.first as Map<String, dynamic>?;
+      final first =
+          features.isEmpty ? null : features.first as Map<String, dynamic>?;
       final placeName = first?['place_name_es']?.toString().trim();
       if (placeName != null && placeName.isNotEmpty) {
         return placeName;
@@ -328,27 +327,26 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         });
       }
 
-      final response =
-          (await RequestDependencies.createRequest(
-                clientUserId: user.id,
-                title: widget.initialTitle?.trim().isNotEmpty == true
-                    ? widget.initialTitle!.trim()
-                    : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
-                description: description,
-                category: _primaryCategoryName,
-                aiCategories: _suggestedCategories,
-                budget: budget,
-                priceType: priceType,
-                address: _resolvedAddress ?? 'Ubicacion actual',
-                latitude: _latitude!,
-                longitude: _longitude!,
-                photos: uploadedPhotos,
-              ))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
+      final response = (await RequestDependencies.createRequest(
+        clientUserId: user.id,
+        title: widget.initialTitle?.trim().isNotEmpty == true
+            ? widget.initialTitle!.trim()
+            : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
+        description: description,
+        category: _primaryCategoryName,
+        aiCategories: _suggestedCategories,
+        budget: budget,
+        priceType: priceType,
+        address: _resolvedAddress ?? 'Ubicacion actual',
+        latitude: _latitude!,
+        longitude: _longitude!,
+        photos: uploadedPhotos,
+      ))
+          .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          )
+          .payload;
 
       final request = response['request'] as Map<String, dynamic>?;
       SessionStore.activeRequestId = request?['id'] as String?;
@@ -357,11 +355,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         return;
       }
 
-      Navigator.of(context).push(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (_) =>
               RequestStatusScreen(latitude: _latitude!, longitude: _longitude!),
         ),
+        (route) => route.isFirst,
       );
     } catch (error) {
       if (!mounted) {
@@ -462,8 +461,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       final category = entry.value;
                       final label =
                           category['name']?.toString().trim().isNotEmpty == true
-                          ? category['name'].toString().trim()
-                          : 'General';
+                              ? category['name'].toString().trim()
+                              : 'General';
                       return ChambaChip(label: label, selected: entry.key == 0);
                     }).toList(),
             ),
@@ -554,8 +553,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                         priceType == 'Precio fijo'
                             ? 'Precio fijo: el monto indicado es el total que se pagará al finalizar todo el trabajo, sin importar el tiempo que tome.'
                             : priceType == 'Por hora'
-                            ? 'Por hora: el monto indicado se pagará por cada hora de trabajo. El total dependerá del tiempo que dure el servicio.'
-                            : 'Por día: el monto indicado se pagará por cada día completo de trabajo realizado.',
+                                ? 'Por hora: el monto indicado se pagará por cada hora de trabajo. El total dependerá del tiempo que dure el servicio.'
+                                : 'Por día: el monto indicado se pagará por cada día completo de trabajo realizado.',
                         style: const TextStyle(
                           color: AppTheme.colorMuted,
                           fontSize: 11,

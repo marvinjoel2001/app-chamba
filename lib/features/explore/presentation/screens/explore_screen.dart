@@ -598,7 +598,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           const SizedBox(width: 8),
                           // Badge de ofertas recibidas
                           if (_activeRequest?['pendingOffersCount'] != null &&
-                              (_activeRequest!['pendingOffersCount'] as num) > 0)
+                              (_activeRequest!['pendingOffersCount'] as num) >
+                                  0)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
@@ -870,15 +871,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ),
                     Marker(
                       point: _mapCenter,
-                      width: 60,
-                      height: 60,
-                      child: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: AppTheme.colorHighlight,
-                        child: Icon(
-                          Icons.location_on,
-                          color: AppTheme.colorText.withValues(alpha: 0.75),
-                        ),
+                      width: 40,
+                      height: 40,
+                      child: Icon(
+                        Icons.location_on,
+                        color: AppTheme.colorPrimary,
+                        size: 36,
                       ),
                     ),
                   ],
