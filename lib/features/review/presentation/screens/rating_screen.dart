@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/review_dependencies.dart';
 
 class RatingScreen extends StatefulWidget {
@@ -76,10 +77,21 @@ class _RatingScreenState extends State<RatingScreen> {
         return;
       }
 
+      SessionStore.activeRequestId = null;
+      SessionStore.activeThreadId = null;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Calificacion enviada: $stars estrellas')),
+        SnackBar(
+          content: Text('Calificación enviada: $stars estrellas'),
+          backgroundColor: AppTheme.colorSuccess,
+        ),
       );
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const MainShellScreen(role: 'client'),
+        ),
+        (route) => false,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -132,47 +144,82 @@ class _RatingScreenState extends State<RatingScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Tu opinion ayuda a mejorar la comunidad y califica el desempeno del trabajador.',
+                        'Tu opinión ayuda a mejorar la comunidad y califica el desempeño del trabajador.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppTheme.colorMuted,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (index) {
                           final selected = index < stars;
-                          return IconButton(
-                            onPressed: () => setState(() => stars = index + 1),
-                            icon: Icon(
-                              Icons.star,
-                              size: 46,
-                              color: selected
-                                  ? AppTheme.colorHighlight
-                                  : AppTheme.colorMuted.withValues(alpha: 0.45),
+                          return GestureDetector(
+                            onTap: () => setState(() => stars = index + 1),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: AnimatedScale(
+                                scale: selected ? 1.2 : 1.0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.elasticOut,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Icon(
+                                    Icons.star_rounded,
+                                    size: 52,
+                                    color: selected
+                                        ? AppTheme.colorHighlight
+                                        : AppTheme.colorMuted.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
                             ),
                           );
                         }),
                       ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _commentController,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText:
-                              'Escribe aqui tu experiencia con el servicio...',
-                        ),
+                      const SizedBox(height: 24),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        child: stars <= 2
+                            ? TextField(
+                                controller: _commentController,
+                                maxLines: 4,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      '¿Qué salió mal? Déjanos tu reclamo o comentario (opcional)...',
+                                  filled: true,
+                                  fillColor: AppTheme.colorBackgroundAccent,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 24),
                       ChambaPrimaryButton(
                         label: _loading ? 'Enviando...' : 'CALIFICAR',
                         isYellow: true,
                         onPressed: _loading ? null : _submit,
                       ),
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Omitir por ahora'),
+                        onPressed: () {
+                          SessionStore.activeRequestId = null;
+                          SessionStore.activeThreadId = null;
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const MainShellScreen(role: 'client'),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: const Text(
+                          'Omitir por ahora',
+                          style: TextStyle(color: AppTheme.colorMuted),
+                        ),
                       ),
                     ],
                   ),

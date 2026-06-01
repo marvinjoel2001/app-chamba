@@ -17,6 +17,7 @@ import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/tracking_dependencies.dart';
 import '../../../support/presentation/screens/support_screen.dart';
+import '../../../review/presentation/screens/rating_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
@@ -80,34 +81,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   void _onJobCompleted(dynamic _) {
     if (mounted) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          backgroundColor: AppTheme.colorBackgroundAccent,
-          title: const Text(
-            '¡Trabajo completado!',
-            style: TextStyle(color: AppTheme.colorSuccess),
-          ),
-          content: const Text(
-            'El trabajador marcó el trabajo como completado.',
-            style: TextStyle(color: AppTheme.colorMuted),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Navegar al home del cliente borrando toda la pila de navegación
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const MainShellScreen(role: 'client'),
-                  ),
-                  (route) => false,
-                );
-              },
-              child: const Text('Aceptar'),
-            ),
-          ],
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const RatingScreen(),
         ),
+        (route) => false,
       );
     }
   }

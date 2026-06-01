@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/request_dependencies.dart';
 import '../../../../../features/offers/presentation/screens/offers_screen.dart';
+import '../../../review/presentation/screens/rating_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen({this.latitude, this.longitude, super.key});
@@ -88,36 +89,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onJobCompleted(dynamic _) {
-    // Limpiar sesión del trabajo activo
-    SessionStore.activeRequestId = null;
-    SessionStore.activeThreadId = null;
-
     if (mounted) {
-      // Mostrar diálogo de confirmación y redirigir al home
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          backgroundColor: AppTheme.colorBackgroundAccent,
-          title: const Text(
-            '¡Trabajo completado!',
-            style: TextStyle(color: AppTheme.colorSuccess),
-          ),
-          content: const Text(
-            'El trabajo ha sido marcado como completado exitosamente.',
-            style: TextStyle(color: AppTheme.colorMuted),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Cerrar diálogo y navegar al home limpiando el stack
-                Navigator.of(context).pop();
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              child: const Text('Aceptar'),
-            ),
-          ],
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const RatingScreen(),
         ),
+        (route) => false,
       );
     }
   }
