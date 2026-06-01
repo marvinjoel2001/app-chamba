@@ -21,6 +21,7 @@ class CreateRequestUseCase {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   }) {
     return _repository.createRequest(
       clientUserId: clientUserId,
@@ -36,6 +37,7 @@ class CreateRequestUseCase {
       scheduledAt: scheduledAt,
       photosBase64: photosBase64,
       photos: photos,
+      paymentMethod: paymentMethod,
     );
   }
 }

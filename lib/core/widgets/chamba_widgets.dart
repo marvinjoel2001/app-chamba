@@ -271,7 +271,7 @@ class ChambaBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = role == 'worker' ? _workerItems : _clientItems;
-    return _buildNav(context, items, currentIndex, onTap, 0, null);
+    return _buildNav(context, items, currentIndex, onTap, 0, null, false);
   }
 }
 
@@ -283,6 +283,7 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
     required this.unreadCount,
     required this.messagesTabIndex,
     required this.onTap,
+    this.isLightTheme = false,
     super.key,
   });
 
@@ -291,6 +292,7 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
   final int unreadCount;
   final int messagesTabIndex;
   final ValueChanged<int> onTap;
+  final bool isLightTheme;
 
   static const _clientItems = [
     _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
@@ -314,6 +316,7 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
       onTap,
       messagesTabIndex,
       unreadCount,
+      isLightTheme,
     );
   }
 }
@@ -325,7 +328,18 @@ Widget _buildNav(
   ValueChanged<int> onTap,
   int badgeIndex,
   int? badgeCount,
+  bool isLightTheme,
 ) {
+  final bgColor = isLightTheme ? Colors.white : AppTheme.colorBackgroundAlt;
+  final borderColor =
+      isLightTheme ? const Color(0xFFE2E8F0) : AppTheme.colorGlassBorderSoft;
+  final shadow = isLightTheme
+      ? const [
+          BoxShadow(
+              color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 4))
+        ]
+      : AppTheme.shadowMd;
+
   return RepaintBoundary(
     child: SafeArea(
       top: false,
@@ -334,10 +348,10 @@ Widget _buildNav(
         height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: AppTheme.colorBackgroundAlt,
+          color: bgColor,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.colorGlassBorderSoft),
-          boxShadow: AppTheme.shadowMd,
+          border: Border.all(color: borderColor),
+          boxShadow: shadow,
         ),
         child: Row(
           children: List.generate(items.length, (index) {
@@ -351,6 +365,7 @@ Widget _buildNav(
                 selected: selected,
                 badgeCount: showBadge ? badgeCount : null,
                 onTap: () => onTap(index),
+                isLightTheme: isLightTheme,
               ),
             );
           }),
@@ -374,6 +389,7 @@ class _BottomNavItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.badgeCount,
+    this.isLightTheme = false,
   });
 
   final IconData icon;
@@ -381,11 +397,15 @@ class _BottomNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final int? badgeCount;
+  final bool isLightTheme;
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = selected ? AppTheme.colorPrimary : AppTheme.colorMuted;
-    const labelColor = AppTheme.colorMuted;
+    final iconColor = selected
+        ? AppTheme.colorPrimary
+        : (isLightTheme ? const Color(0xFF64748B) : AppTheme.colorMuted);
+    final labelColor =
+        isLightTheme ? const Color(0xFF64748B) : AppTheme.colorMuted;
 
     return InkWell(
       borderRadius: BorderRadius.circular(100),

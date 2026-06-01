@@ -1,4 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:record/record.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/realtime_service.dart';
@@ -73,8 +81,19 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isOffline = false;
   bool _shouldRedirectToLogin = false;
   bool _isNearBottom = true;
+  bool _showEmojiPicker = false;
+  bool _isRecording = false;
   String? _error;
   List<ChatMessage> _messages = const [];
+
+  // Audio recording
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  String? _recordingPath;
+  bool _isPlayingAudio = false;
+
+  // Image preview before sending
+  File? _pendingImage;
+  bool _isSendingMedia = false;
 
   @override
   void initState() {
@@ -104,7 +123,6 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // Parse new message from payload and append instead of full reload
     final messageId = map['message']?['id']?.toString();
     final senderId = map['message']?['senderUserId']?.toString();
     final content = map['message']?['content']?.toString();
@@ -122,13 +140,472 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = [..._messages, newMessage];
       });
 
-      // Only scroll if user is near bottom
       if (_isNearBottom) {
         _scrollToBottom();
       }
     } else {
-      // Fallback to reload if payload doesn't have full message
       _load();
+    }
+  }
+
+  void _toggleEmojiPicker() {
+    setState(() {
+      _showEmojiPicker = !_showEmojiPicker;
+    });
+    if (_showEmojiPicker) {
+      _focusNode.unfocus();
+    }
+  }
+
+  void _onEmojiSelected(emoji) {
+    controller.text = controller.text + (emoji?.emoji ?? '');
+  }
+
+  Widget _buildMessageInput() {
+    final bool hasText = controller.text.isNotEmpty;
+    final bool hasPendingImage = _pendingImage != null;
+
+    return Column(
+      children: [
+        // Image preview before sending (WhatsApp style)
+        if (hasPendingImage)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.colorSurfaceSoft,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _pendingImage!,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: _cancelPendingImage,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        focusNode: _focusNode,
+                        decoration: const InputDecoration(
+                          hintText: 'Agregar leyenda...',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
+                    ),
+                    if (_isSendingMedia)
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: AppTheme.colorPrimary,
+                        child: IconButton(
+                          onPressed: () => _sendImageMessage(_pendingImage!),
+                          icon: const Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        // Regular message input
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.colorSurfaceSoft,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Emoji button
+              IconButton(
+                onPressed: _toggleEmojiPicker,
+                icon: Icon(
+                  _showEmojiPicker
+                      ? Icons.keyboard
+                      : Icons.emoji_emotions_outlined,
+                  color: AppTheme.colorMuted,
+                ),
+              ),
+
+              // File/Attach button (disabled when image pending)
+              IconButton(
+                onPressed: hasPendingImage ? null : _showAttachmentMenu,
+                icon: Icon(
+                  Icons.add_circle_outline,
+                  color: hasPendingImage
+                      ? AppTheme.colorMuted.withOpacity(0.3)
+                      : AppTheme.colorMuted,
+                ),
+              ),
+
+              // Text input or disabled when sending media
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: _focusNode,
+                  keyboardType: TextInputType.multiline,
+                  maxLines: 5,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  enabled: !_isSendingMedia,
+                  onChanged: (text) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: hasPendingImage
+                        ? 'Agrega una descripción...'
+                        : 'Escribe un mensaje...',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Send or Voice button
+              if (hasText || hasPendingImage)
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: AppTheme.colorPrimary,
+                  child: IconButton(
+                    onPressed: _isSendingMedia
+                        ? null
+                        : (hasPendingImage
+                            ? () => _sendImageMessage(_pendingImage!)
+                            : _send),
+                    icon: _isSendingMedia
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTapDown: (_) => _startRecording(),
+                  onTapUp: (_) => _stopRecording(),
+                  onTapCancel: () => _stopRecording(),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: _isRecording
+                        ? AppTheme.colorError
+                        : AppTheme.colorPrimary,
+                    child: Icon(
+                      _isRecording ? Icons.mic : Icons.mic_none,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _cancelPendingImage() {
+    setState(() => _pendingImage = null);
+    controller.clear();
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.colorSurfaceSoft,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Adjuntar',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildAttachmentOption(
+                  icon: Icons.image,
+                  label: 'Galeria',
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage();
+                  },
+                ),
+                _buildAttachmentOption(
+                  icon: Icons.camera_alt,
+                  label: 'Camara',
+                  color: Colors.red,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(camera: true);
+                  },
+                ),
+                _buildAttachmentOption(
+                  icon: Icons.insert_drive_file,
+                  label: 'Documento',
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickFile();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: color.withValues(alpha: 0.2),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      // Check microphone permission
+      final status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        return;
+      }
+
+      // Get temp directory for recording
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/voice_message_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      // Start recording
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+
+      setState(() {
+        _isRecording = true;
+        _recordingPath = path;
+      });
+    } catch (e) {
+      debugPrint('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      if (!await _audioRecorder.isRecording()) return;
+
+      final path = await _audioRecorder.stop();
+      setState(() => _isRecording = false);
+
+      if (path != null) {
+        // Send voice message
+        await _sendVoiceMessage(path);
+      }
+    } catch (e) {
+      debugPrint('Error stopping recording: $e');
+      setState(() => _isRecording = false);
+    }
+  }
+
+  Future<void> _sendVoiceMessage(String path) async {
+    setState(() => _isSendingMedia = true);
+    try {
+      final file = File(path);
+      if (!await file.exists()) return;
+
+      // TODO: Upload audio file to Cloudinary and get URL
+      // For now, just send as a special message type
+      final audioUrl = 'file://$path'; // Replace with actual upload
+
+      final currentUserId = SessionStore.currentUser?.id ?? '';
+      await _sendMessageUseCase.call(
+        threadId: widget.threadId,
+        senderUserId: currentUserId,
+        content: '🎤 Mensaje de voz [${await _getAudioDuration(path)}s]',
+      );
+    } catch (e) {
+      setState(() => _error = 'Error enviando audio: $e');
+    } finally {
+      setState(() => _isSendingMedia = false);
+    }
+  }
+
+  Future<int> _getAudioDuration(String path) async {
+    // Simple duration estimation based on file size
+    try {
+      final file = File(path);
+      final size = await file.length();
+      // Rough estimate: ~16KB per second at 128kbps
+      return (size / 16000).ceil();
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (file.path == null) return;
+
+      await _sendFileMessage(file.path!, file.name, file.size);
+    } catch (e) {
+      setState(() => _error = 'Error seleccionando archivo: $e');
+    }
+  }
+
+  Future<void> _sendFileMessage(String path, String name, int size) async {
+    setState(() => _isSendingMedia = true);
+    try {
+      // TODO: Upload file to Cloudinary and get URL
+      final fileUrl = 'file://$path'; // Replace with actual upload
+
+      final currentUserId = SessionStore.currentUser?.id ?? '';
+      await _sendMessageUseCase.call(
+        threadId: widget.threadId,
+        senderUserId: currentUserId,
+        content: '📎 $name',
+      );
+    } catch (e) {
+      setState(() => _error = 'Error enviando archivo: $e');
+    } finally {
+      setState(() => _isSendingMedia = false);
+    }
+  }
+
+  Future<void> _pickImage({bool camera = false}) async {
+    try {
+      final picker = ImagePicker();
+      final source = camera ? ImageSource.camera : ImageSource.gallery;
+
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      // Show preview before sending
+      setState(() => _pendingImage = File(picked.path));
+    } catch (e) {
+      setState(() => _error = 'Error seleccionando imagen: $e');
+    }
+  }
+
+  Future<void> _sendImageMessage(File imageFile) async {
+    setState(() => _isSendingMedia = true);
+    try {
+      // TODO: Upload image to Cloudinary and get URL
+      final imageUrl = 'file://${imageFile.path}'; // Replace with actual upload
+
+      final currentUserId = SessionStore.currentUser?.id ?? '';
+      await _sendMessageUseCase.call(
+        threadId: widget.threadId,
+        senderUserId: currentUserId,
+        content: '📷 Imagen enviada',
+      );
+
+      // Clear preview after sending
+      setState(() => _pendingImage = null);
+    } catch (e) {
+      setState(() => _error = 'Error enviando imagen: $e');
+    } finally {
+      setState(() => _isSendingMedia = false);
     }
   }
 
@@ -419,14 +896,23 @@ class _ChatScreenState extends State<ChatScreen> {
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
                               final message = _messages[index];
+                              final widgets = <Widget>[];
 
-                              if (message.isSystem) {
-                                return _buildSystemMessage(message);
+                              // Show date divider if date changed (WhatsApp style)
+                              if (_shouldShowDateHeader(index)) {
+                                widgets
+                                    .add(_buildDateHeader(message.createdAt));
                               }
 
-                              final mine =
-                                  message.senderUserId == currentUserId;
-                              return _buildTextMessage(message, mine);
+                              if (message.isSystem) {
+                                widgets.add(_buildSystemMessage(message));
+                              } else {
+                                final mine =
+                                    message.senderUserId == currentUserId;
+                                widgets.add(_buildTextMessage(message, mine));
+                              }
+
+                              return Column(children: widgets);
                             },
                           ),
               ),
@@ -446,52 +932,34 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
 
-              // Message input (disabled for archived chats) - Multiline with proper keyboard handling
-              if (!widget.isArchived)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: GlassCard(
-                    borderRadius: 30,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: controller,
-                            focusNode: _focusNode,
-                            keyboardType: TextInputType.multiline,
-                            maxLines: 5,
-                            minLines: 1,
-                            textCapitalization: TextCapitalization.sentences,
-                            decoration: const InputDecoration(
-                              hintText: 'Escribe un mensaje...',
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppTheme.colorPrimary,
-                          child: IconButton(
-                            onPressed: _send,
-                            icon: const Icon(
-                              Icons.send,
-                              color: AppTheme.colorTextOnPurple,
-                            ),
-                          ),
-                        ),
-                      ],
+              // Emoji picker
+              if (_showEmojiPicker)
+                SizedBox(
+                  height: 250,
+                  child: EmojiPicker(
+                    onEmojiSelected: (category, emoji) =>
+                        _onEmojiSelected(emoji),
+                    config: const Config(
+                      height: 250,
+                      checkPlatformCompatibility: true,
+                      viewOrderConfig: ViewOrderConfig(),
+                      skinToneConfig: SkinToneConfig(),
+                      categoryViewConfig: CategoryViewConfig(),
+                      bottomActionBarConfig:
+                          BottomActionBarConfig(enabled: false),
+                      searchViewConfig: SearchViewConfig(),
+                      emojiViewConfig: EmojiViewConfig(
+                        emojiSizeMax: 28,
+                        columns: 8,
+                      ),
                     ),
                   ),
                 ),
-              const SizedBox(height: 12),
+
+              // Message input (disabled for archived chats) - WhatsApp style
+              if (!widget.isArchived) _buildMessageInput(),
+
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -523,42 +991,228 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildTextMessage(ChatMessage message, bool mine) {
+    final time = _formatTime(message.createdAt);
+
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              constraints: const BoxConstraints(maxWidth: 320),
-              decoration: BoxDecoration(
-                color: mine ? AppTheme.colorPrimary : AppTheme.colorSurfaceSoft,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(
-                message.content ?? '',
-                style: TextStyle(
-                  fontSize: 17,
-                  color: mine ? Colors.white : AppTheme.colorText,
+            if (!mine)
+              _buildBubbleTail(isMine: false, color: AppTheme.colorSurfaceSoft),
+            Flexible(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
+                decoration: BoxDecoration(
+                  color: mine
+                      ? const Color(0xFF005C4B) // WhatsApp dark green
+                      : AppTheme.colorSurfaceSoft,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(mine ? 16 : 4),
+                    bottomRight: Radius.circular(mine ? 4 : 16),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.content ?? '',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: mine ? Colors.white : AppTheme.colorText,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          time,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: mine
+                                ? Colors.white.withValues(alpha: 0.7)
+                                : AppTheme.colorMuted,
+                          ),
+                        ),
+                        if (mine) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.done_all,
+                            size: 14,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              _formatDate(message.createdAt),
-              style: TextStyle(
-                fontSize: 12,
-                color: mine
-                    ? AppTheme.colorPrimary.withValues(alpha: 0.75)
-                    : AppTheme.colorMuted,
-              ),
-            ),
+            if (mine)
+              _buildBubbleTail(isMine: true, color: const Color(0xFF005C4B)),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildBubbleTail({required bool isMine, required Color color}) {
+    return CustomPaint(
+      painter: BubbleTailPainter(
+        isMine: isMine,
+        color: color,
+      ),
+      size: const Size(12, 20),
+    );
+  }
+
+  String _formatTime(DateTime? value) {
+    if (value == null) return '--:--';
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+
+  // WhatsApp-style date header methods
+  bool _shouldShowDateHeader(int index) {
+    if (index == 0) return true;
+    if (_messages.isEmpty || index >= _messages.length) return false;
+
+    final currentMessage = _messages[index];
+    final previousMessage = _messages[index - 1];
+
+    final currentDate = _dateOnly(currentMessage.createdAt);
+    final previousDate = _dateOnly(previousMessage.createdAt);
+
+    return currentDate != previousDate;
+  }
+
+  DateTime _dateOnly(DateTime? dateTime) {
+    if (dateTime == null) return DateTime(0);
+    return DateTime(dateTime.year, dateTime.month, dateTime.day);
+  }
+
+  Widget _buildDateHeader(DateTime? dateTime) {
+    if (dateTime == null) return const SizedBox.shrink();
+
+    final label = _getDateLabel(dateTime);
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color.fromRGBO(255, 255, 255, 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getDateLabel(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDay = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    final diff = today.difference(messageDay).inDays;
+
+    final List<String> weekDays = [
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo'
+    ];
+    final List<String> months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
+    ];
+
+    if (diff == 0) return 'Hoy';
+    if (diff == 1) return 'Ayer';
+    if (diff < 7) {
+      // This week - show day name
+      final weekdayIndex = dateTime.weekday - 1; // 1=Monday, 7=Sunday
+      return weekDays[weekdayIndex];
+    }
+
+    // Older - show full date
+    return '${dateTime.day} de ${months[dateTime.month - 1]}';
+  }
+}
+
+// Custom painter for WhatsApp-style bubble tail
+class BubbleTailPainter extends CustomPainter {
+  final bool isMine;
+  final Color color;
+
+  BubbleTailPainter({required this.isMine, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+
+    if (isMine) {
+      // Right tail (my messages)
+      path.moveTo(0, 0);
+      path.lineTo(size.width, size.height * 0.3);
+      path.quadraticBezierTo(
+        size.width * 0.5,
+        size.height * 0.5,
+        size.width * 0.2,
+        size.height * 0.8,
+      );
+      path.lineTo(0, size.height);
+      path.close();
+    } else {
+      // Left tail (other's messages)
+      path.moveTo(size.width, 0);
+      path.lineTo(0, size.height * 0.3);
+      path.quadraticBezierTo(
+        size.width * 0.5,
+        size.height * 0.5,
+        size.width * 0.8,
+        size.height * 0.8,
+      );
+      path.lineTo(size.width, size.height);
+      path.close();
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

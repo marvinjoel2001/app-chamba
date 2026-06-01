@@ -15,6 +15,7 @@ abstract class RequestRemoteDataSource {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   });
 
   Future<Map<String, dynamic>> requestStatus({
@@ -96,6 +97,7 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   }) {
     return MobileBackendService.instance.createRequest(
       clientUserId: clientUserId,
@@ -111,6 +113,7 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
       scheduledAt: scheduledAt,
       photosBase64: photosBase64,
       photos: photos,
+      paymentMethod: paymentMethod,
     );
   }
 

@@ -4,6 +4,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
@@ -52,17 +53,19 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final myId = SessionStore.currentUser?.id;
     final map = payload is Map ? payload : <dynamic, dynamic>{};
     final senderUserId = map['message']?['senderUserId']?.toString();
-    
+
     // Ignorar mensajes enviados por nosotros o mensajes del sistema (senderUserId null)
-    if (senderUserId == null || senderUserId == 'null' || senderUserId == myId) {
+    if (senderUserId == null ||
+        senderUserId == 'null' ||
+        senderUserId == myId) {
       return;
     }
-    
+
     // Si estamos en la pestaña de mensajes, asumimos que se leerán pronto
     // NOTA: Si el usuario está en el ChatScreen abierto desde TrackingScreen,
     // también podríamos querer evitar incrementar, pero por ahora seguimos la lógica base.
     if (currentIndex == _messagesTabIndex) return;
-    
+
     UnreadMessagesNotifier.instance.increment();
   }
 
@@ -143,34 +146,46 @@ class _MainShellScreenState extends State<MainShellScreen> {
       currentIndex = pages.length - 1;
     }
 
-    return Scaffold(
-      body: IndexedStack(
-        index: currentIndex,
-        children: List.generate(
-          pages.length,
-          (i) =>
-              _visitedIndices.contains(i) ? pages[i] : const SizedBox.shrink(),
+    // Detectar si está en la pestaña de mensajes
+    final isOnMessagesTab = currentIndex == _messagesTabIndex;
+
+    // Tema claro para mensajes, oscuro para el resto
+    final theme = isOnMessagesTab ? AppTheme.light() : AppTheme.dark();
+
+    return Theme(
+      data: theme,
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: IndexedStack(
+          index: currentIndex,
+          children: List.generate(
+            pages.length,
+            (i) => _visitedIndices.contains(i)
+                ? pages[i]
+                : const SizedBox.shrink(),
+          ),
         ),
-      ),
-      bottomNavigationBar: ValueListenableBuilder<int>(
-        valueListenable: UnreadMessagesNotifier.instance,
-        builder: (context, unreadCount, _) {
-          return ChambaBottomNavWithBadge(
-            role: widget.role,
-            currentIndex: currentIndex,
-            unreadCount: unreadCount,
-            messagesTabIndex: _messagesTabIndex,
-            onTap: (index) {
-              if (index == _messagesTabIndex) {
-                UnreadMessagesNotifier.instance.reset();
-              }
-              setState(() {
-                currentIndex = index;
-                _visitedIndices.add(index);
-              });
-            },
-          );
-        },
+        bottomNavigationBar: ValueListenableBuilder<int>(
+          valueListenable: UnreadMessagesNotifier.instance,
+          builder: (context, unreadCount, _) {
+            return ChambaBottomNavWithBadge(
+              role: widget.role,
+              currentIndex: currentIndex,
+              unreadCount: unreadCount,
+              messagesTabIndex: _messagesTabIndex,
+              isLightTheme: isOnMessagesTab,
+              onTap: (index) {
+                if (index == _messagesTabIndex) {
+                  UnreadMessagesNotifier.instance.reset();
+                }
+                setState(() {
+                  currentIndex = index;
+                  _visitedIndices.add(index);
+                });
+              },
+            );
+          },
+        ),
       ),
     );
   }

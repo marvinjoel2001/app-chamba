@@ -196,18 +196,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           _mapController.move(loc, 14);
         } catch (_) {}
 
-      final user = SessionStore.currentUser;
-      if (user != null) {
-        (await RequestDependencies.updateWorkerLocation(
-          workerUserId: user.id,
-          latitude: pos.latitude,
-          longitude: pos.longitude,
-        ))
-            .fold(
-          onSuccess: (value) => value,
-          onFailure: (failure) => throw Exception(failure.message),
-        );
-      }
+        final user = SessionStore.currentUser;
+        if (user != null) {
+          (await RequestDependencies.updateWorkerLocation(
+            workerUserId: user.id,
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+          ))
+              .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          );
+        }
+      });
     } catch (_) {}
   }
 
@@ -243,13 +244,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     } finally {
       if (mounted) setState(() => _togglingAvailability = false);
     }
-  }
-
-  bool get _isVerified {
-    final user = SessionStore.currentUser;
-    if (user == null) return false;
-    return user.verificationStatus == 'verified' ||
-        (user.idPhotoVerified == true && user.facePhotoVerified == true);
   }
 
   void _onNewRequest(dynamic payload) => _load(silent: true);

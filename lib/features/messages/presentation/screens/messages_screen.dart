@@ -17,23 +17,18 @@ class MessagesScreen extends StatefulWidget {
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen>
-    with SingleTickerProviderStateMixin {
+class _MessagesScreenState extends State<MessagesScreen> {
   final RealtimeService _realtime = RealtimeService.instance;
-  late TabController _tabController;
 
   bool _loading = true;
   bool _isOffline = false;
   bool _shouldRedirectToLogin = false;
   String? _error;
-  List<ChatThread> _activeThreads = const [];
-  List<ChatThread> _archivedThreads = const [];
+  List<ChatThread> _threads = const [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChanged);
     UnreadMessagesNotifier.instance.reset();
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
@@ -43,16 +38,8 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
     _realtime.off('message.new', _onMessageEvent);
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (_tabController.indexIsChanging) {
-      _load();
-    }
   }
 
   void _onMessageEvent(dynamic payload) {
@@ -86,6 +73,7 @@ class _MessagesScreenState extends State<MessagesScreen>
       _error = null;
     });
 
+    // Cargar todos los threads (activos y archivados) en una sola lista
     final activeResult = await MessagesDependencies.getActiveThreads(
       userId: user.id,
       type: ChatThreadType.active,
@@ -97,36 +85,43 @@ class _MessagesScreenState extends State<MessagesScreen>
 
     if (!mounted) return;
 
+    final List<ChatThread> allThreads = [];
+
     activeResult.fold(
       onSuccess: (threads) {
-        setState(() {
-          _activeThreads = threads;
-          _isOffline = false;
-          _shouldRedirectToLogin = false;
-        });
+        allThreads.addAll(threads);
+        _isOffline = false;
+        _shouldRedirectToLogin = false;
       },
       onFailure: (failure) {
-        setState(() {
-          _isOffline = failure is NetworkFailure;
-          _shouldRedirectToLogin = failure is UnauthorizedFailure;
-        });
+        _isOffline = failure is NetworkFailure;
+        _shouldRedirectToLogin = failure is UnauthorizedFailure;
       },
     );
 
     archivedResult.fold(
       onSuccess: (threads) {
-        setState(() {
-          _archivedThreads = threads;
-          _loading = false;
-        });
+        allThreads.addAll(threads);
       },
       onFailure: (failure) {
-        setState(() {
-          _loading = false;
-          if (_error == null) _error = failure.message;
-        });
+        if (_error == null) _error = failure.message;
       },
     );
+
+    // Ordenar por fecha del último mensaje (más reciente primero)
+    allThreads.sort((a, b) {
+      final aDate = a.lastMessageAt ?? a.createdAt;
+      final bDate = b.lastMessageAt ?? b.createdAt;
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+
+    setState(() {
+      _threads = allThreads;
+      _loading = false;
+    });
   }
 
   Color _statusColor(ChatThreadStatus status) {
@@ -142,69 +137,59 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+
     return Scaffold(
-      body: ChambaBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text(
-                      'Mensajes',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh),
-                    ),
-                  ],
-                ),
-              ),
-              TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Activos'),
-                  Tab(text: 'Historial'),
-                ],
-              ),
-              if (_isOffline)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Sin conexion. Mostrando datos locales.',
-                    style: TextStyle(color: AppTheme.colorMuted),
-                  ),
-                ),
-              if (_shouldRedirectToLogin)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Sesion expirada. Inicia sesion nuevamente.',
-                    style: TextStyle(color: AppTheme.colorError),
-                  ),
-                ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildThreadList(_activeThreads),
-                    _buildThreadList(_archivedThreads, isArchived: true),
-                  ],
-                ),
-              ),
-            ],
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        elevation: 0,
+        title: Text(
+          'Mensajes',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _load,
+            icon: Icon(Icons.refresh, color: theme.iconTheme.color),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (_isOffline)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Sin conexion. Mostrando datos locales.',
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                ),
+              ),
+            if (_shouldRedirectToLogin)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Sesion expirada. Inicia sesion nuevamente.',
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ),
+            Expanded(
+              child: _buildThreadList(_threads, isLight),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildThreadList(List<ChatThread> threads, {bool isArchived = false}) {
+  Widget _buildThreadList(List<ChatThread> threads, bool isLight) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -218,132 +203,183 @@ class _MessagesScreenState extends State<MessagesScreen>
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            isArchived
-                ? 'No hay conversaciones archivadas.'
-                : 'Aun no hay conversaciones activas.',
+            'No tienes conversaciones aun.',
+            style: TextStyle(
+                color: isLight ? Colors.grey[600] : AppTheme.colorMuted),
           ),
         ),
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       itemCount: threads.length,
       itemBuilder: (context, index) {
         final thread = threads[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: GlassCard(
-            child: InkWell(
-              onTap: () => _openChat(thread),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                thread.jobTitle,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                thread.counterpartName,
-                                style: const TextStyle(
-                                  color: AppTheme.colorMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.colorPrimary.withValues(
-                                  alpha: 0.15,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Bs ${thread.agreedPrice.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  color: AppTheme.colorPrimary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _statusColor(
-                                  thread.jobStatus,
-                                ).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                thread.statusLabel,
-                                style: TextStyle(
-                                  color: _statusColor(thread.jobStatus),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    if (thread.lastMessage != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              thread.lastMessage!,
-                              style: const TextStyle(
-                                color: AppTheme.colorMuted,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            _formatDate(thread.lastMessageAt),
-                            style: const TextStyle(
-                              color: AppTheme.colorMuted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+        return _buildWhatsAppThreadItem(thread, isLight);
+      },
+    );
+  }
+
+  Widget _buildWhatsAppThreadItem(ChatThread thread, bool isLight) {
+    final currentUser = SessionStore.currentUser;
+    final isWorker = currentUser?.type == 'worker';
+
+    // Worker ve foto del trabajo, cliente ve foto del worker
+    final String? avatarUrl =
+        isWorker ? null : thread.counterpartProfilePhotoUrl;
+
+    final String avatarText = isWorker
+        ? (thread.jobTitle.isNotEmpty ? thread.jobTitle[0] : 'T')
+        : (thread.counterpartName.isNotEmpty ? thread.counterpartName[0] : '?');
+
+    final bool hasUnread = thread.hasUnreadMessages;
+    const Color unreadColor = Color(0xFF25D366);
+
+    // Colores según el tema
+    final highlightBg = isLight
+        ? const Color(0xFFE8F5E9)
+        : const Color.fromRGBO(255, 255, 255, 0.08);
+    final borderC = isLight
+        ? const Color(0xFFE0E0E0)
+        : const Color.fromRGBO(255, 255, 255, 0.1);
+    final textC = isLight ? const Color(0xFF1E293B) : Colors.white;
+    final mutedC = isLight
+        ? const Color(0xFF64748B)
+        : const Color.fromRGBO(255, 255, 255, 0.7);
+    final secondaryC = isLight
+        ? const Color(0xFF475569)
+        : const Color.fromRGBO(255, 255, 255, 0.5);
+
+    return InkWell(
+      onTap: () => _openChat(thread),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: hasUnread ? highlightBg : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: borderC,
+              width: 0.5,
             ),
           ),
-        );
-      },
+        ),
+        child: Row(
+          children: [
+            // Avatar circular
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isWorker
+                    ? AppTheme.colorPrimary.withValues(alpha: 0.2)
+                    : AppTheme.colorSuccess.withValues(alpha: 0.2),
+                image: avatarUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(avatarUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: avatarUrl == null
+                  ? Center(
+                      child: Text(
+                        avatarText.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+
+            // Contenido
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Primera fila: Nombre del trabajo y fecha
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          thread.jobTitle,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight:
+                                hasUnread ? FontWeight.bold : FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDate(thread.lastMessageAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: hasUnread ? unreadColor : mutedC,
+                          fontWeight:
+                              hasUnread ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Segunda fila: Nombre de la otra persona
+                  Text(
+                    isWorker
+                        ? 'Cliente: ${thread.counterpartName}'
+                        : 'Worker: ${thread.counterpartName}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: mutedC,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+
+                  // Tercera fila: Ultimo mensaje + badge no leidos
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          thread.lastMessage ?? 'Sin mensajes',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: hasUnread ? textC : secondaryC,
+                            fontWeight:
+                                hasUnread ? FontWeight.w500 : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: unreadColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const SizedBox(width: 4, height: 4),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

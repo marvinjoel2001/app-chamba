@@ -25,6 +25,7 @@ class RequestRepositoryImpl implements RequestRepository {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   }) {
     return _wrap(
       () => _remote.createRequest(
@@ -41,6 +42,7 @@ class RequestRepositoryImpl implements RequestRepository {
         scheduledAt: scheduledAt,
         photosBase64: photosBase64,
         photos: photos,
+        paymentMethod: paymentMethod,
       ),
     );
   }

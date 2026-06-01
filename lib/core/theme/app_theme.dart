@@ -110,7 +110,135 @@ class AppTheme {
   }
 
   static ThemeData light() {
-    return dark();
+    final base = ThemeData.light(useMaterial3: true);
+
+    const Color lightPrimary = Color(0xFF8B5CF6);
+    const Color lightBackground = Color(0xFFF8FAFC);
+    const Color lightSurface = Colors.white;
+    const Color lightText = Color(0xFF1E293B);
+    const Color lightMuted = Color(0xFF64748B);
+    const Color lightBorder = Color(0xFFE2E8F0);
+
+    final textTheme = GoogleFonts.plusJakartaSansTextTheme(base.textTheme)
+        .copyWith(
+          displayLarge: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: lightText,
+          ),
+          headlineLarge: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: lightText,
+          ),
+          headlineMedium: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: lightText,
+          ),
+          headlineSmall: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: lightText,
+          ),
+          bodyLarge: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            height: 1.5,
+            color: lightMuted,
+          ),
+          bodyMedium: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: lightText,
+          ),
+          bodySmall: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.3,
+            color: lightMuted,
+          ),
+        )
+        .apply(bodyColor: lightText, displayColor: lightText);
+
+    return base.copyWith(
+      scaffoldBackgroundColor: lightBackground,
+      colorScheme: const ColorScheme.light(
+        primary: lightPrimary,
+        secondary: Color(0xFFEAB308),
+        surface: lightSurface,
+        onPrimary: Colors.white,
+        onSurface: lightText,
+        error: Color(0xFFEF4444),
+      ),
+      textTheme: textTheme,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: lightSurface,
+        foregroundColor: lightText,
+        centerTitle: true,
+        elevation: 0,
+      ),
+      dividerColor: lightBorder,
+      splashColor: lightPrimary.withValues(alpha: 0.1),
+      highlightColor: Colors.transparent,
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: lightText.withValues(alpha: 0.9),
+        contentTextStyle: const TextStyle(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: lightText,
+          side: const BorderSide(color: lightBorder, width: 1.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: lightPrimary),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: lightPrimary.withValues(alpha: 0.1),
+        selectedColor: lightPrimary,
+        side: const BorderSide(color: lightBorder),
+        labelStyle: const TextStyle(color: lightText),
+        secondaryLabelStyle: const TextStyle(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: lightSurface,
+        hintStyle: const TextStyle(color: lightMuted, fontSize: 15),
+        labelStyle: const TextStyle(color: lightMuted),
+        floatingLabelStyle: const TextStyle(color: lightPrimary),
+        prefixIconColor: lightMuted,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: lightBorder, width: 1.2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: lightBorder, width: 1.2),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: lightPrimary, width: 1.5),
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.white,
+        selectedItemColor: lightPrimary,
+        unselectedItemColor: lightMuted,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+      ),
+    );
   }
 
   static ThemeData dark() {

@@ -16,6 +16,7 @@ abstract class RequestRepository {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   });
 
   Future<Result<RequestPayloadEntity>> requestStatus({

@@ -11,6 +11,7 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
 
@@ -56,6 +57,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   String? _resolvedAddress;
   static final http.Client _client = http.Client();
 
+  // Payment methods
+  List<PaymentMethod> _paymentMethods = [];
+  PaymentMethod? _selectedPaymentMethod;
+  bool _loadingPaymentMethods = true;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +70,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
     _initializeLocation();
+    _loadPaymentMethods();
   }
 
   @override
@@ -216,6 +223,39 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     return 'Ubicacion actual';
   }
 
+  Future<void> _loadPaymentMethods() async {
+    try {
+      final uri = Uri.parse(
+        '${AppConfig.apiBaseUrl}/payment-methods',
+      );
+      final response = await _client.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final methods = data
+            .map((json) => PaymentMethod.fromJson(json as Map<String, dynamic>))
+            .where((m) => m.isActive)
+            .toList();
+
+        setState(() {
+          _paymentMethods = methods;
+          // Select first method by default (usually "Efectivo")
+          if (methods.isNotEmpty) {
+            _selectedPaymentMethod = methods.first;
+          }
+          _loadingPaymentMethods = false;
+        });
+      } else {
+        setState(() => _loadingPaymentMethods = false);
+      }
+    } catch (e) {
+      setState(() => _loadingPaymentMethods = false);
+    }
+  }
+
   Future<void> _pickImages() async {
     if (_pendingImages.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -341,6 +381,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         latitude: _latitude!,
         longitude: _longitude!,
         photos: uploadedPhotos,
+        paymentMethod: _selectedPaymentMethod?.name ?? 'Efectivo',
       ))
           .fold(
             onSuccess: (value) => value,
@@ -566,6 +607,92 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            // Payment Method Selector
+            Text(
+              'Método de pago',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (_loadingPaymentMethods)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_paymentMethods.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.colorSurfaceSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.payments_outlined, color: AppTheme.colorMuted),
+                    SizedBox(width: 8),
+                    Text('Efectivo (único método disponible)'),
+                  ],
+                ),
+              )
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _paymentMethods.map((method) {
+                  final isSelected = _selectedPaymentMethod?.id == method.id;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPaymentMethod = method;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
+                            : AppTheme.colorSurfaceSoft,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF4CAF50)
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            color: isSelected
+                                ? const Color(0xFF4CAF50)
+                                : AppTheme.colorMuted,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            method.name,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF4CAF50)
+                                  : AppTheme.colorText,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             const SizedBox(height: 16),
             Row(
               children: [

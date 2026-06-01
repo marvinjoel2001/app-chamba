@@ -93,6 +93,7 @@ class MobileBackendService {
     String? scheduledAt,
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
+    String? paymentMethod,
   }) {
     final body = <String, dynamic>{
       'clientUserId': clientUserId,
@@ -106,6 +107,7 @@ class MobileBackendService {
       'scheduledAt': scheduledAt,
       'photosBase64': photosBase64,
       'photos': photos,
+      'paymentMethod': paymentMethod,
     };
     if (category != null && category.trim().isNotEmpty) {
       body['category'] = category;
