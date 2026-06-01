@@ -16,6 +16,7 @@ class SessionUser {
     this.facePhotoUrl,
     this.idPhotoVerified,
     this.facePhotoVerified,
+    this.isBlocked = false,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class SessionUser {
   final String? facePhotoUrl;
   final bool? idPhotoVerified;
   final bool? facePhotoVerified;
+  final bool isBlocked;
 
   String get fullName {
     final ln = (lastName ?? '').trim();
@@ -49,6 +51,7 @@ class SessionUser {
     String? facePhotoUrl,
     bool? idPhotoVerified,
     bool? facePhotoVerified,
+    bool? isBlocked,
     bool clearProfilePhotoUrl = false,
   }) {
     return SessionUser(
@@ -66,6 +69,7 @@ class SessionUser {
       facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
       idPhotoVerified: idPhotoVerified ?? this.idPhotoVerified,
       facePhotoVerified: facePhotoVerified ?? this.facePhotoVerified,
+      isBlocked: isBlocked ?? this.isBlocked,
     );
   }
 
@@ -83,6 +87,7 @@ class SessionUser {
       'facePhotoUrl': facePhotoUrl,
       'idPhotoVerified': idPhotoVerified,
       'facePhotoVerified': facePhotoVerified,
+      'isBlocked': isBlocked,
     };
   }
 
@@ -100,6 +105,7 @@ class SessionUser {
       facePhotoUrl: json['facePhotoUrl'] as String?,
       idPhotoVerified: json['idPhotoVerified'] as bool?,
       facePhotoVerified: json['facePhotoVerified'] as bool?,
+      isBlocked: json['isBlocked'] as bool? ?? false,
     );
   }
 }
