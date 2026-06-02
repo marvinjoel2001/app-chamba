@@ -7,6 +7,8 @@ import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../domain/entities/chat_thread.dart';
+import '../../notifications/data/notifications_service.dart';
+import '../../notifications/presentation/screens/notifications_screen.dart';
 import '../state/messages_dependencies.dart';
 import 'chat_screen.dart';
 
@@ -25,6 +27,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   bool _shouldRedirectToLogin = false;
   String? _error;
   List<ChatThread> _threads = const [];
+  int _unreadNotificationsCount = 0;
 
   @override
   void initState() {
@@ -44,6 +47,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   void _onMessageEvent(dynamic payload) {
     _load();
+  }
+
+  Future<void> _loadNotifications() async {
+    final result =
+        await NotificationsService.getNotifications(page: 1, limit: 50);
+    if (!mounted) return;
+    setState(() {
+      _unreadNotificationsCount = result.items.where((n) => !n.isRead).length;
+    });
   }
 
   String _formatDate(DateTime? value) {
@@ -72,6 +84,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
       _loading = true;
       _error = null;
     });
+
+    _loadNotifications();
 
     // Cargar todos los threads (activos y archivados) en una sola lista
     final activeResult = await MessagesDependencies.getActiveThreads(
@@ -212,11 +226,124 @@ class _MessagesScreenState extends State<MessagesScreen> {
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      itemCount: threads.length,
+      itemCount: threads.length + 1, // +1 for the static notifications item
       itemBuilder: (context, index) {
-        final thread = threads[index];
+        if (index == 0) {
+          return _buildNotificationsItem(isLight);
+        }
+        final thread = threads[index - 1];
         return _buildWhatsAppThreadItem(thread, isLight);
       },
+    );
+  }
+
+  Widget _buildNotificationsItem(bool isLight) {
+    final hasUnread = _unreadNotificationsCount > 0;
+    const Color unreadColor = Colors.red;
+
+    final highlightBg = isLight
+        ? const Color(0xFFFEE2E2)
+        : const Color.fromRGBO(255, 255, 255, 0.08);
+    final borderC = isLight
+        ? const Color(0xFFE0E0E0)
+        : const Color.fromRGBO(255, 255, 255, 0.1);
+    final textC = isLight ? const Color(0xFF1E293B) : Colors.white;
+    final secondaryC = isLight
+        ? const Color(0xFF475569)
+        : const Color.fromRGBO(255, 255, 255, 0.5);
+
+    return InkWell(
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        );
+        _loadNotifications();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: hasUnread ? highlightBg : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: borderC,
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.redAccent.withValues(alpha: 0.2),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.notifications,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Notificaciones',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                      color: textC,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          hasUnread
+                              ? 'Tienes $_unreadNotificationsCount notificaciones nuevas'
+                              : 'No hay notificaciones nuevas',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: hasUnread ? textC : secondaryC,
+                            fontWeight:
+                                hasUnread ? FontWeight.w500 : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: unreadColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$_unreadNotificationsCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
