@@ -46,7 +46,9 @@ class AppTheme {
   static const Color colorSuccessSoft = Color(0x3322C55E);
   static const Color colorError = Color(0xFFF97373);
   static const Color colorErrorSoft = Color(0x33F97373);
+  static const Color colorWarning = Color(0xFFF59E0B);
   static const Color colorWarningSoft = Color(0x33F59E0B);
+  static const Color colorInfo = Color(0xFF3B82F6);
 
   static const List<BoxShadow> shadowSm = [
     BoxShadow(color: Color(0x33040A14), blurRadius: 10, offset: Offset(0, 4)),

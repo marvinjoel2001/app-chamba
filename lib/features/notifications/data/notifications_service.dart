@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../../../core/network/api_client.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
-import '../models/app_notification.dart';
+import '../domain/models/app_notification.dart';
 
 class NotificationsService {
   static Future<({List<AppNotification> items, bool hasMore})>
@@ -16,7 +16,7 @@ class NotificationsService {
     try {
       final response = await http.get(
         Uri.parse(
-          '${ApiClient.baseUrl}/mobile/notifications?userId=$userId&page=$page&limit=$limit',
+          '${AppConfig.apiBaseUrl}/mobile/notifications?userId=$userId&page=$page&limit=$limit',
         ),
       );
 
@@ -41,7 +41,7 @@ class NotificationsService {
 
     try {
       await http.patch(
-        Uri.parse('${ApiClient.baseUrl}/mobile/notifications/read'),
+        Uri.parse('${AppConfig.apiBaseUrl}/mobile/notifications/read'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'userId': userId}),
       );

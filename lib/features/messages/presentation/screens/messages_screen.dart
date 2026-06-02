@@ -7,8 +7,8 @@ import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../domain/entities/chat_thread.dart';
-import '../../notifications/data/notifications_service.dart';
-import '../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../notifications/data/notifications_service.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../state/messages_dependencies.dart';
 import 'chat_screen.dart';
 

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -1157,9 +1157,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.colorSurface,
+        color: AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.colorBorder),
+        border: Border.all(color: AppTheme.colorGlassBorderSoft),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1222,7 +1222,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, color: AppTheme.colorMuted),
-                color: AppTheme.colorSurface,
+                color: AppTheme.colorSurfaceSoft,
                 onSelected: (val) {
                   final reqId = req['id'].toString();
                   final clientId = client['id'].toString();
@@ -1342,7 +1342,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               onPressed: () => _showJobDetails(req),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.colorText,
-                side: const BorderSide(color: AppTheme.colorBorder),
+                side: const BorderSide(color: AppTheme.colorGlassBorderSoft),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: const Text('Ver detalles del trabajo'),
@@ -1389,7 +1389,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     if (offerProgress != null)
                       LinearProgressIndicator(
                         value: offerProgress,
-                        backgroundColor: AppTheme.colorSurface,
+                        backgroundColor: AppTheme.colorSurfaceSoft,
                         valueColor: AlwaysStoppedAnimation<Color>(
                           offerProgress < 0.2 ? Colors.red : AppTheme.colorPrimary,
                         ),
@@ -1540,7 +1540,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.colorSurface,
+        backgroundColor: AppTheme.colorSurfaceSoft,
         title: const Text('Reportar publicaciÃ³n', style: TextStyle(color: AppTheme.colorText)),
         content: TextField(
           controller: reasonCtrl,
