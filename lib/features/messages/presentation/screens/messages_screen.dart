@@ -311,7 +311,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             fontSize: 16,
                             fontWeight:
                                 hasUnread ? FontWeight.bold : FontWeight.w600,
-                            color: Colors.white,
+                            color: textC,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

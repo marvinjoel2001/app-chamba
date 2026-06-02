@@ -278,6 +278,37 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> blockClient({
+    required String workerUserId,
+    required String clientUserId,
+  }) {
+    return _api.post(
+      '/mobile/users/$workerUserId/block',
+      body: {'blockedUserId': clientUserId},
+    );
+  }
+
+  Future<Map<String, dynamic>> reportRequest({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  }) {
+    return _api.post(
+      '/mobile/requests/$requestId/report',
+      body: {'reporterUserId': reporterUserId, 'reason': reason},
+    );
+  }
+
+  Future<Map<String, dynamic>> dismissRequest({
+    required String requestId,
+    required String workerUserId,
+  }) {
+    return _api.post(
+      '/mobile/requests/$requestId/dismiss',
+      body: {'workerUserId': workerUserId},
+    );
+  }
+
   Future<Map<String, dynamic>> counterOffer({
     required String requestId,
     required String workerUserId,

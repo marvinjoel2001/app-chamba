@@ -27,4 +27,7 @@ class RequestDependencies {
   static final completeJob = CompleteJobUseCase(_repository);
   static final cancelJob = CancelJobUseCase(_repository);
   static final getMessages = GetRequestMessagesUseCase(_repository);
+  static final blockClient = BlockClientUseCase(_repository);
+  static final reportRequest = ReportRequestUseCase(_repository);
+  static final dismissRequest = DismissRequestUseCase(_repository);
 }

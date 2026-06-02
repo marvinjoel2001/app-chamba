@@ -25,6 +25,22 @@ abstract class RequestRemoteDataSource {
 
   Future<Map<String, dynamic>> incomingRequest({required String workerUserId});
 
+  Future<void> blockClient({
+    required String workerUserId,
+    required String clientUserId,
+  });
+
+  Future<void> reportRequest({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  });
+
+  Future<void> dismissRequest({
+    required String requestId,
+    required String workerUserId,
+  });
+
   Future<Map<String, dynamic>> updateWorkerLocation({
     required String workerUserId,
     required double latitude,
@@ -131,6 +147,41 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
   @override
   Future<Map<String, dynamic>> incomingRequest({required String workerUserId}) {
     return MobileBackendService.instance.incomingRequest(
+      workerUserId: workerUserId,
+    );
+  }
+
+  @override
+  Future<void> blockClient({
+    required String workerUserId,
+    required String clientUserId,
+  }) async {
+    await MobileBackendService.instance.blockClient(
+      workerUserId: workerUserId,
+      clientUserId: clientUserId,
+    );
+  }
+
+  @override
+  Future<void> reportRequest({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  }) async {
+    await MobileBackendService.instance.reportRequest(
+      requestId: requestId,
+      reporterUserId: reporterUserId,
+      reason: reason,
+    );
+  }
+
+  @override
+  Future<void> dismissRequest({
+    required String requestId,
+    required String workerUserId,
+  }) async {
+    await MobileBackendService.instance.dismissRequest(
+      requestId: requestId,
       workerUserId: workerUserId,
     );
   }

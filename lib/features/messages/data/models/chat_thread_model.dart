@@ -33,7 +33,7 @@ class ChatThreadModel extends ChatThread {
           ? request['title'].toString().trim()
           : (request['description']?.toString().trim().isNotEmpty == true
               ? request['description'].toString().trim()
-              : 'Solicitud de servicio'),
+              : 'Trabajo General'),
       jobDescription: request['description']?.toString() ?? '',
       jobStatus: _parseStatus(
           request['status']?.toString() ?? json['requestStatus']?.toString()),

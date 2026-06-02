@@ -127,7 +127,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onMessageNew(dynamic payload) {
-    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    Map<String, dynamic> map = {};
+    if (payload is Map) {
+      map = Map<String, dynamic>.from(payload);
+    } else if (payload is String) {
+      try {
+        map = Map<String, dynamic>.from(jsonDecode(payload) as Map);
+      } catch (_) {}
+    }
+    
     final threadId = map['threadId']?.toString();
     if (threadId != widget.threadId) {
       return;
@@ -164,8 +172,6 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_isNearBottom) {
         _scrollToBottom();
       }
-    } else {
-      _load();
     }
   }
 
@@ -573,16 +579,18 @@ class _ChatScreenState extends State<ChatScreen> {
   // Helper methods to detect message type from content
   bool _isAudioMessage(String? content) {
     if (content == null) return false;
-    return content.startsWith('🎤') ||
+    return content.contains('🎤') ||
         content.contains('.m4a') ||
         content.contains('.mp3') ||
         content.contains('.aac') ||
+        content.contains('.webm') ||
+        content.contains('.wav') ||
         content.contains('audio');
   }
 
   bool _isImageMessage(String? content) {
     if (content == null) return false;
-    return content.startsWith('📷') ||
+    return content.contains('📷') ||
         content.contains('.jpg') ||
         content.contains('.jpeg') ||
         content.contains('.png') ||
@@ -592,8 +600,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _extractUrl(String content) {
     // Extract URL from content using regex
-    final urlRegex = RegExp(
-        r'(https?:\/\/[^\s]+)|(file:\/\/[^\s]+)|([a-zA-Z0-9_-]+\.(?:m4a|mp3|aac|jpg|jpeg|png|webp))');
+    final urlRegex = RegExp(r'(https?:\/\/[^\s]+)|(file:\/\/[^\s]+)');
     final match = urlRegex.firstMatch(content);
     return match?.group(0);
   }

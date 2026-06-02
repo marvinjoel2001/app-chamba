@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
@@ -118,7 +117,13 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ChambaBackground(
+      body: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/backgrounds/backgroundSplash.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
         child: SafeArea(
           child: Center(
             child: Padding(
@@ -134,18 +139,20 @@ class _SplashScreenState extends State<SplashScreen> {
                       boxShadow: [
                         BoxShadow(
                           color: AppTheme.colorPrimary.withValues(alpha: 0.5),
-                          blurRadius: 40,
-                          spreadRadius: 10,
+                          blurRadius: 50,
+                          spreadRadius: 15,
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(36),
-                      child: Container(
-                        width: 150,
-                        height: 150,
+                    child: Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: AppTheme.colorGlassDarkSoft,
-                        padding: const EdgeInsets.all(24),
+                      ),
+                      padding: const EdgeInsets.all(28),
+                      child: ClipOval(
                         child: Image.asset(
                           'assets/images/icon/icon.png',
                           fit: BoxFit.contain,
@@ -153,7 +160,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
                   Text(
                     'Chamba',
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
@@ -169,17 +176,17 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   const Spacer(),
                   SizedBox(
-                    width: 200,
+                    width: 220,
                     child: Column(
                       children: [
                         LinearProgressIndicator(
                           value: progress,
                           color: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                          minHeight: 4,
-                          borderRadius: BorderRadius.circular(4),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          minHeight: 5,
+                          borderRadius: BorderRadius.circular(5),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         AnimatedOpacity(
                           opacity: progress > 0.1 ? 1.0 : 0.0,
                           duration: const Duration(milliseconds: 300),
@@ -216,7 +223,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 60),
                 ],
               ),
             ),

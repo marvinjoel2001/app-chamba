@@ -28,6 +28,22 @@ abstract class RequestRepository {
     required String workerUserId,
   });
 
+  Future<Result<void>> blockClient({
+    required String workerUserId,
+    required String clientUserId,
+  });
+
+  Future<Result<void>> reportRequest({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  });
+
+  Future<Result<void>> dismissRequest({
+    required String requestId,
+    required String workerUserId,
+  });
+
   Future<Result<RequestPayloadEntity>> updateWorkerLocation({
     required String workerUserId,
     required double latitude,

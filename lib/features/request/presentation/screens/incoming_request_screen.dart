@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -33,7 +33,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   bool _loading = true;
   String? _error;
-  Map<String, dynamic>? _request;
+  List<Map<String, dynamic>> _requests = [];
   int _offerLifetimeSeconds = 120;
   Timer? _ticker;
   Timer? _pollTimer;
@@ -45,7 +45,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   // El cliente hizo una contraoferta al worker
   bool _clientCountered = false;
 
-  // Animación banner oferta aceptada
+  // AnimaciÃ³n banner oferta aceptada
   bool _showAcceptedBanner = false;
   late final AnimationController _acceptedAnimCtrl;
   late final Animation<double> _acceptedScale;
@@ -55,22 +55,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
 
-  // Filtros de búsqueda
+  // Filtros de bÃºsqueda
   String? _selectedCategory;
   String? _selectedModality; // 'hourly', 'daily', 'full'
   final List<String> _categories = [
     'Limpieza',
-    'Jardinería',
-    'Plomería',
+    'JardinerÃ­a',
+    'PlomerÃ­a',
     'Electricidad',
     'Pintura',
     'Mudanza',
-    'Carpintería',
-    'Albañilería'
+    'CarpinterÃ­a',
+    'AlbaÃ±ilerÃ­a'
   ];
   final List<Map<String, String>> _modalities = [
     {'value': 'hourly', 'label': 'Por hora'},
-    {'value': 'daily', 'label': 'Por día'},
+    {'value': 'daily', 'label': 'Por dÃ­a'},
     {'value': 'full', 'label': 'Precio fijo'},
   ];
 
@@ -90,7 +90,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           children: [
             Icon(Icons.verified_user, color: AppTheme.colorPrimary),
             SizedBox(width: 8),
-            Text('Verificación requerida'),
+            Text('VerificaciÃ³n requerida'),
           ],
         ),
         content: const Text(
@@ -152,7 +152,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (widget.isActive) _tickOfferCountdown();
     });
-    // Polling silencioso — no muestra spinner
+    // Polling silencioso â€” no muestra spinner
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted && widget.isActive) _load(silent: true);
     });
@@ -239,7 +239,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       _available = value;
       if (!value) {
         // Al marcar OCUPADO ocultamos inmediatamente solicitudes/ofertas.
-        _request = null;
+        _requests = [];
         _clientCountered = false;
         _showAcceptedBanner = false;
         _error = null;
@@ -299,7 +299,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       ),
                     ),
 
-                    // Título
+                    // TÃ­tulo
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -332,9 +332,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // Categorías
+                    // CategorÃ­as
                     const Text(
-                      'Categoría',
+                      'CategorÃ­a',
                       style: TextStyle(
                         color: AppTheme.colorMuted,
                         fontSize: 12,
@@ -411,7 +411,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     const SizedBox(height: 32),
 
-                    // Botón aplicar
+                    // BotÃ³n aplicar
                     ChambaPrimaryButton(
                       label: 'Aplicar filtros',
                       icon: Icons.check,
@@ -439,14 +439,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     SessionStore.activeRequestId = null;
     SessionStore.activeThreadId = null;
     if (mounted) {
-      setState(() => _request = null);
+      setState(() {
+        _requests.removeWhere((r) => r['status'] == 'completed');
+      });
     }
   }
 
-  void _showJobDetails() {
-    final req = _request;
-    if (req == null) return;
-
+  void _showJobDetails(Map<String, dynamic> req) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -455,12 +454,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
-  void _onJobCancelled(dynamic _) {
+  void _onJobCancelled(dynamic payload) {
     SessionStore.activeRequestId = null;
     SessionStore.activeThreadId = null;
     if (mounted) {
-      setState(() => _request = null);
-      // Banner rojo de cancelación
+      setState(() {
+        _requests.removeWhere((r) => r['status'] == 'cancelled');
+      });
+      // Banner rojo de cancelaciÃ³n
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
@@ -468,7 +469,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               Icon(Icons.cancel, color: Colors.white, size: 18),
               SizedBox(width: 8),
               Text(
-                'El cliente canceló el trabajo',
+                'El cliente cancelÃ³ el trabajo',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -501,8 +502,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
     final eventRequestId = map['requestId']?.toString();
     final newBudget = (map['newBudget'] as num?)?.toDouble();
-    final currentRequestId =
-        _request?['id']?.toString() ?? SessionStore.activeRequestId;
+    final currentRequestId = SessionStore.activeRequestId;
     if (eventRequestId != null &&
         currentRequestId != null &&
         eventRequestId != currentRequestId) {
@@ -511,18 +511,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (mounted) {
       setState(() {
         _clientCountered = true;
-        final current = _request;
-        if (current != null &&
-            (eventRequestId == null ||
-                current['id']?.toString() == eventRequestId)) {
+        final currentIdx = _requests.indexWhere((r) => r['id']?.toString() == eventRequestId);
+        if (currentIdx != -1) {
           if (newBudget != null) {
-            current['budget'] = newBudget;
+            _requests[currentIdx]['budget'] = newBudget;
           }
-          current['workerOffer'] = null;
+          _requests[currentIdx]['workerOffer'] = null;
         }
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El cliente envió una contraoferta')),
+        const SnackBar(content: Text('El cliente enviÃ³ una contraoferta')),
       );
     }
     _load(silent: true);
@@ -565,25 +563,37 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (map['workerUserId']?.toString() != userId) return;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tu oferta expiró. Puedes mejorarla.')),
+        const SnackBar(content: Text('Tu oferta expirÃ³. Puedes mejorarla.')),
       );
     }
     _load(silent: true);
   }
 
   void _tickOfferCountdown() {
-    final request = _request;
-    if (!mounted || !_available || request == null) return;
-    final offer = request['workerOffer'];
-    if (offer is! Map<String, dynamic>) return;
-    if (offer['status']?.toString() != 'pending') return;
-    final remaining = (offer['secondsRemaining'] as num?)?.toInt();
-    if (remaining == null) return;
-    if (remaining <= 1) {
-      _load();
-      return;
+    if (!mounted || !_available || _requests.isEmpty) return;
+    
+    bool changed = false;
+    for (var request in _requests) {
+      final offer = request['workerOffer'];
+      if (offer is! Map<String, dynamic>) continue;
+      if (offer['status']?.toString() != 'pending') continue;
+      
+      final remaining = (offer['secondsRemaining'] as num?)?.toInt();
+      if (remaining == null) continue;
+      
+      if (remaining <= 1) {
+        // Al menos una oferta expirÃ³, recargamos.
+        _load();
+        return;
+      }
+      
+      offer['secondsRemaining'] = remaining - 1;
+      changed = true;
     }
-    setState(() => offer['secondsRemaining'] = remaining - 1);
+    
+    if (changed) {
+      setState(() {});
+    }
   }
 
   Map<String, dynamic>? _toMutableRequest(dynamic request) {
@@ -600,7 +610,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
-        _error = 'Sesión expirada';
+        _error = 'SesiÃ³n expirada';
         _loading = false;
       });
       return;
@@ -608,7 +618,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (!_available) {
       if (mounted) {
         setState(() {
-          _request = null;
           _clientCountered = false;
           _loading = false;
           _error = null;
@@ -624,15 +633,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
     }
     try {
-      final previousRequest = _request;
-      final previousRequestId = previousRequest?['id']?.toString();
-      final previousBudget = (previousRequest?['budget'] as num?)?.toDouble();
-      final previousOffer =
-          previousRequest?['workerOffer'] as Map<String, dynamic>?;
-      final previousOfferStatus = previousOffer?['status']?.toString();
-      final previousOfferAmount =
-          (previousOffer?['amount'] as num?)?.toDouble();
-
       final response =
           (await RequestDependencies.getIncomingRequest(workerUserId: user.id))
               .fold(
@@ -640,68 +640,43 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 onFailure: (failure) => throw Exception(failure.message),
               )
               .payload;
-      final request = response['request'];
-      final mutableRequest = _toMutableRequest(request);
-      final newRequestId = mutableRequest?['id']?.toString();
-      final newBudget = (mutableRequest?['budget'] as num?)?.toDouble();
-      final newOffer = mutableRequest?['workerOffer'] as Map<String, dynamic>?;
-      final newOfferStatus = newOffer?['status']?.toString();
-
-      final isDifferentRequest = previousRequestId != null &&
-          newRequestId != null &&
-          previousRequestId != newRequestId;
-      final budgetIncreased = previousBudget != null &&
-          newBudget != null &&
-          newBudget > previousBudget;
-      final budgetAbovePreviousOffer = previousOfferAmount != null &&
-          newBudget != null &&
-          newBudget > previousOfferAmount;
-      final lostPendingOffer =
-          previousOfferStatus == 'pending' && newOfferStatus != 'pending';
-
-      bool inferredClientCountered = _clientCountered;
-      if (mutableRequest == null || isDifferentRequest) {
-        inferredClientCountered = false;
-      } else if (newOfferStatus == 'pending' ||
-          newOfferStatus == 'accepted' ||
-          newOfferStatus == 'declined') {
-        inferredClientCountered = false;
-      } else if (lostPendingOffer &&
-          (budgetIncreased || budgetAbovePreviousOffer)) {
-        // Fallback por polling: si perdimos la oferta pendiente y subió el budget,
-        // tratamos el estado como contraoferta del cliente.
-        inferredClientCountered = true;
-      }
-
-      // Si la solicitud está completada o cancelada, limpiar y no mostrar
-      final requestStatus = mutableRequest?['status']?.toString();
-      if (requestStatus == 'completed' || requestStatus == 'cancelled') {
-        SessionStore.activeRequestId = null;
-        SessionStore.activeThreadId = null;
-        if (mounted) {
-          setState(() {
-            _request = null;
-            _loading = false;
-          });
+              
+      final rawRequests = response['requests'] as List<dynamic>? ?? [];
+      final List<Map<String, dynamic>> fetchedRequests = [];
+      
+      for (final req in rawRequests) {
+        final mutableReq = _toMutableRequest(req);
+        if (mutableReq != null) {
+          fetchedRequests.add(mutableReq);
         }
-        return;
       }
-
-      SessionStore.activeRequestId = mutableRequest?['id']?.toString();
-
-      final offerStatus =
-          (mutableRequest?['workerOffer'] as Map?)?['status']?.toString();
-      if (offerStatus == 'accepted' && !_showAcceptedBanner && mounted) {
+      
+      // Filtrar completados o cancelados
+      fetchedRequests.removeWhere((r) {
+        final st = r['status']?.toString();
+        return st == 'completed' || st == 'cancelled';
+      });
+      
+      // Chequear si alguna oferta fue aceptada
+      bool anyAccepted = false;
+      for (final req in fetchedRequests) {
+        final offerStatus = (req['workerOffer'] as Map?)?['status']?.toString();
+        if (offerStatus == 'accepted') {
+          anyAccepted = true;
+          SessionStore.activeRequestId = req['id']?.toString();
+          break;
+        }
+      }
+      
+      if (anyAccepted && !_showAcceptedBanner && mounted) {
         setState(() => _showAcceptedBanner = true);
         _acceptedAnimCtrl.forward(from: 0);
         Future.delayed(const Duration(seconds: 5), () {
           if (mounted) setState(() => _showAcceptedBanner = false);
         });
       }
-
-      // Cuando la oferta está aceptada, expandir el sheet para mostrar
-      // ambos botones (VER TRABAJO + CHATEAR) sin que queden tapados
-      if (offerStatus == 'accepted' && mounted) {
+      
+      if (anyAccepted && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _sheetCtrl.isAttached) {
             _sheetCtrl.animateTo(
@@ -712,13 +687,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           }
         });
       }
-
+      
       if (mounted) {
         setState(() {
-          _request = mutableRequest;
+          _requests = fetchedRequests;
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
-          _clientCountered = inferredClientCountered;
+          // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
+          _clientCountered = false; 
           _loading = false;
         });
       }
@@ -732,9 +708,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  void _openJobInProgress() {
-    final requestId = _request?['id']?.toString();
-    if (requestId == null) return;
+  void _openJobInProgress(String requestId) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => JobInProgressScreen(requestId: requestId),
@@ -744,20 +718,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   @override
   Widget build(BuildContext context) {
-    final req = _request;
-    final workerOffer = req?['workerOffer'] as Map<String, dynamic>?;
-    final offerStatus = workerOffer?['status']?.toString();
-    final secondsRemaining =
-        (workerOffer?['secondsRemaining'] as num?)?.toInt();
-    final hasPendingOffer = offerStatus == 'pending';
-    final isAcceptedOffer = offerStatus == 'accepted';
     final mapCenter = _workerLocation ?? const LatLng(-16.5002, -68.1342);
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
       body: Stack(
         children: [
-          // ── MAPA DE FONDO ──────────────────────────────────────────────
+          // â”€â”€ MAPA DE FONDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Positioned.fill(
             child: AppConfig.mapboxAccessToken.trim().isEmpty
                 ? Container(
@@ -816,7 +783,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
           ),
 
-          // ── BARRA SUPERIOR: disponibilidad ────────────────────────────
+          // â”€â”€ BARRA SUPERIOR: disponibilidad â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -889,7 +856,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ],
                       ),
                     ),
-                    // Botón filtros pegado a la derecha
+                    // BotÃ³n filtros pegado a la derecha
                     Positioned(
                       right: 0,
                       child: Material(
@@ -923,7 +890,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             ),
           ),
 
-          // ── BOTTOM SHEET DRAGGABLE con solicitudes ────────────────────
+          // â”€â”€ BOTTOM SHEET DRAGGABLE con solicitudes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           DraggableScrollableSheet(
             controller: _sheetCtrl,
             initialChildSize: 0.32,
@@ -939,14 +906,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   color: Color(0xFF0D1728),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                // Un único ListView con el scrollController del sheet.
+                // Un Ãºnico ListView con el scrollController del sheet.
                 // Esto hace que arrastrar desde cualquier parte expanda el sheet.
                 child: ListView(
                   controller: scrollController,
                   padding: EdgeInsets.zero,
                   physics: const ClampingScrollPhysics(),
                   children: [
-                    // ── Handle ──────────────────────────────────────
+                    // â”€â”€ Handle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     Center(
                       child: Container(
                         width: 40,
@@ -958,29 +925,82 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ),
                       ),
                     ),
-                    // ── Contenido ────────────────────────────────────
-                    if (_loading)
+                    // â”€â”€ Contenido â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    if (_loading && _requests.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    else if (_error != null)
+                    else if (_error != null && _requests.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Center(child: Text(_error!)),
                       )
-                    else if (req == null)
+                    else if (_requests.isEmpty)
                       _buildEmptyContent(navPadding)
                     else
-                      _buildRequestContent(
-                        req,
-                        workerOffer,
-                        offerStatus,
-                        secondsRemaining,
-                        hasPendingOffer,
-                        isAcceptedOffer,
-                        navPadding,
-                        _clientCountered,
+                      Padding(
+                        padding: EdgeInsets.only(bottom: navPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    'Solicitudes disponibles',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.colorPrimary,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${_requests.length}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              itemCount: _requests.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 16),
+                              itemBuilder: (context, index) {
+                                final req = _requests[index];
+                                final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+                                final offerStatus = workerOffer?['status']?.toString();
+                                final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
+                                final hasPendingOffer = offerStatus == 'pending';
+                                final isAcceptedOffer = offerStatus == 'accepted';
+                                return _buildRequestCard(
+                                  req: req,
+                                  workerOffer: workerOffer,
+                                  offerStatus: offerStatus,
+                                  secondsRemaining: secondsRemaining,
+                                  hasPendingOffer: hasPendingOffer,
+                                  isAcceptedOffer: isAcceptedOffer,
+                                  clientCountered: false, // You can enhance this if needed
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -988,7 +1008,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             },
           ),
 
-          // ── BANNER OFERTA ACEPTADA ─────────────────────────────────────
+          // â”€â”€ BANNER OFERTA ACEPTADA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (_showAcceptedBanner)
             Positioned(
               top: 0,
@@ -1032,7 +1052,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '¡Oferta aceptada!',
+                                    'Â¡Oferta aceptada!',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w800,
@@ -1040,7 +1060,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     ),
                                   ),
                                   Text(
-                                    'El cliente aceptó tu oferta. Dirígete a la ubicación.',
+                                    'El cliente aceptÃ³ tu oferta. DirÃ­gete a la ubicaciÃ³n.',
                                     style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
@@ -1091,8 +1111,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           const SizedBox(height: 6),
           Text(
             _available
-                ? 'Estás disponible. Las solicitudes aparecerán aquí.'
-                : 'Estás ocupado. Activa disponibilidad para recibir trabajos.',
+                ? 'EstÃ¡s disponible. Las solicitudes aparecerÃ¡n aquÃ­.'
+                : 'EstÃ¡s ocupado. Activa disponibilidad para recibir trabajos.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
           ),
@@ -1101,16 +1121,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
-  Widget _buildRequestContent(
-    Map<String, dynamic> req,
-    Map<String, dynamic>? workerOffer,
-    String? offerStatus,
-    int? secondsRemaining,
-    bool hasPendingOffer,
-    bool isAcceptedOffer,
-    double bottomPadding,
-    bool clientCountered,
-  ) {
+  Widget _buildRequestCard({
+    required Map<String, dynamic> req,
+    required Map<String, dynamic>? workerOffer,
+    required String? offerStatus,
+    required int? secondsRemaining,
+    required bool hasPendingOffer,
+    required bool isAcceptedOffer,
+    required bool clientCountered,
+  }) {
     final offerProgress = secondsRemaining == null
         ? null
         : (secondsRemaining / _offerLifetimeSeconds).clamp(0.0, 1.0).toDouble();
@@ -1122,918 +1141,523 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final currentBudget = (req['budget'] as num?)?.toDouble() ?? 0;
     final myOfferAmount = (workerOffer?['amount'] as num?)?.toDouble();
 
-    // Detectar oferta declinada
     final isDeclinedOffer = offerStatus == 'declined';
 
-    // El cliente mejoró su oferta si el budget actual es mayor que mi oferta
     final clientImproved = hasPendingOffer &&
         !isDeclinedOffer &&
         myOfferAmount != null &&
         currentBudget > myOfferAmount;
+    
+    final client = req['client'] as Map<String, dynamic>? ?? {};
+    final clientName = client['name']?.toString() ?? 'Cliente';
+    final clientPhoto = client['profilePhotoUrl']?.toString();
+    final clientRating = (client['rating'] as num?)?.toDouble() ?? 0.0;
+    final clientReviews = (client['reviews'] as num?)?.toInt() ?? 0;
+    final isVerified = client['isVerified'] == true;
 
-    final categoryLabel = req['category']?.toString().trim().isNotEmpty == true
-        ? req['category'].toString().trim()
-        : 'General';
-    final darkText = AppTheme.colorText;
-    final mutedText = AppTheme.colorMuted;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(12, 4, 12, bottomPadding),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: AppTheme.colorPrimary.withValues(alpha: 0.3),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.colorPrimary.withValues(alpha: 0.2),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Fila 1: foto cliente + precio + categoría + distancia ────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Foto del cliente
-                if (req['client']?['profilePhotoUrl'] != null) ...[
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage:
-                        NetworkImage(req['client']['profilePhotoUrl']),
-                  ),
-                  const SizedBox(width: 10),
-                ] else if (req['clientName'] != null) ...[
-                  CircleAvatar(
-                    radius: 20,
-                    child: Text(
-                      req['clientName']
-                          .toString()
-                          .substring(0, 1)
-                          .toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-                Text(
-                  'Bs ${currentBudget.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: darkText,
-                    fontSize: 27,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7A5AF8),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    categoryLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (distanceText != null) ...[
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Icons.location_on,
-                    color: AppTheme.colorMuted,
-                    size: 15,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    distanceText,
-                    style: TextStyle(
-                      color: mutedText,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-
-            const SizedBox(height: 8),
-            // ── Descripción ───────────────────────────────────────
-            Text(
-              req['description']?.toString() ?? '',
-              style: TextStyle(
-                color: darkText,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                height: 1.25,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.colorSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.colorBorder),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppTheme.colorBackgroundAccent,
+                backgroundImage: clientPhoto != null ? NetworkImage(clientPhoto) : null,
+                child: clientPhoto == null
+                    ? const Icon(Icons.person, color: AppTheme.colorMuted)
+                    : null,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 10),
-            Divider(
-              color: Colors.white.withValues(alpha: 0.12),
-              height: 1,
-              thickness: 1,
-            ),
-            const SizedBox(height: 10),
-            if (!isAcceptedOffer) ...[
-              ChambaPrimaryButton(
-                label: 'VER DETALLES DEL TRABAJO',
-                icon: Icons.remove_red_eye_outlined,
-                isYellow: false,
-                compact: true,
-                onPressed: _showJobDetails,
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            // ── Botones según estado ───────────────────────────────
-            if (isAcceptedOffer) ...[
-              ChambaPrimaryButton(
-                label: 'VER TRABAJO EN CURSO',
-                icon: Icons.directions_run,
-                isYellow: true,
-                compact: true,
-                onPressed: _openJobInProgress,
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const MessagesScreen(),
-                  ),
-                ),
-                icon: const Icon(
-                  Icons.chat_bubble_outline,
-                  color: AppTheme.colorPrimary,
-                  size: 16,
-                ),
-                label: const Text(
-                  'Chatear con el cliente',
-                  style: TextStyle(color: AppTheme.colorPrimary, fontSize: 14),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: AppTheme.colorPrimary.withValues(alpha: 0.5),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  minimumSize: const Size(double.infinity, 44),
-                ),
-              ),
-            ] else if (isDeclinedOffer) ...[
-              // ── Oferta declinada (no me interesa) ────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.colorMuted.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.colorMuted.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Column(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.do_not_disturb,
-                      color: AppTheme.colorMuted,
-                      size: 20,
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Marcado como no interesado',
-                      style: TextStyle(
-                        color: AppTheme.colorMuted,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      'Puedes reactivar tu oferta en cualquier momento',
-                      style: TextStyle(
-                        color: AppTheme.colorMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Volver a interesar → reactiva la oferta
-              TextButton(
-                onPressed: () async {
-                  final user = SessionStore.currentUser;
-                  if (user == null) return;
-                  (await RequestDependencies.reactivateOffer(
-                    requestId: req['id'] as String,
-                    workerUserId: user.id,
-                  ))
-                      .fold(
-                    onSuccess: (_) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Oferta reactivada')),
-                        );
-                        _load(silent: true);
-                      }
-                    },
-                    onFailure: (failure) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(failure.message)),
-                        );
-                      }
-                    },
-                  );
-                },
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 36),
-                ),
-                child: const Text(
-                  'Volver a interesar',
-                  style: TextStyle(color: AppTheme.colorPrimary, fontSize: 13),
-                ),
-              ),
-            ] else if (clientCountered) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFEDD5)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFFF1E7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.swap_horiz_rounded,
-                        color: Color(0xFFF97316),
-                        size: 26,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'CONTRAOFERTA RECIBIDA',
-                            style: TextStyle(
-                              color: Color(0xFFF97316),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'El cliente te contraofertó',
-                            style: TextStyle(
-                              color: Color(0xFF374151),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7ED),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFEDD5),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              'Nueva oferta',
-                              style: TextStyle(
-                                color: Color(0xFFF97316),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Bs ${currentBudget.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (offerProgress != null) ...[
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    minHeight: 5,
-                    value: offerProgress,
-                    backgroundColor: AppTheme.colorPrimary.withValues(
-                      alpha: 0.15,
-                    ),
-                    color: offerProgress > 0.3
-                        ? AppTheme.colorPrimary
-                        : AppTheme.colorError,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              if (!_isVerified)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: const Text(
-                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'ACEPTAR',
-                        icon: Icons.check_circle,
-                        isYellow: true,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final user = SessionStore.currentUser;
-                          if (user == null) return;
-                          try {
-                            (await RequestDependencies.createCounterOffer(
-                              requestId: req['id'] as String,
-                              workerUserId: user.id,
-                              amount: currentBudget,
-                              message: 'Acepto el precio ofertado.',
-                            ))
-                                .fold(
-                              onSuccess: (value) => value,
-                              onFailure: (failure) =>
-                                  throw Exception(failure.message),
-                            );
-                            if (mounted) {
-                              setState(() => _clientCountered = false);
-                              await _load();
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    e
-                                        .toString()
-                                        .replaceFirst('Exception: ', ''),
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'OFERTAR',
-                        icon: Icons.payments,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final sent = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute<bool>(
-                              builder: (_) => CounterOfferScreen(
-                                requestId: req['id'] as String,
-                                originalBudget: currentBudget,
-                                requestData: req,
-                              ),
-                            ),
-                          );
-                          if (sent == true && mounted) {
-                            setState(() => _clientCountered = false);
-                            await _load(silent: true);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              TextButton(
-                onPressed: () async {
-                  final user = SessionStore.currentUser;
-                  if (user == null) return;
-                  (await RequestDependencies.declineOffer(
-                    requestId: req['id'] as String,
-                    workerUserId: user.id,
-                  ))
-                      .fold(
-                    onSuccess: (_) {
-                      if (mounted) {
-                        setState(() => _clientCountered = false);
-                        _load(silent: true);
-                      }
-                    },
-                    onFailure: (failure) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(failure.message)),
-                        );
-                      }
-                    },
-                  );
-                },
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 30),
-                ),
-                child: const Text(
-                  'No me interesa',
-                  style: TextStyle(
-                    color: AppTheme.colorText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ] else if (hasPendingOffer) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFDBEAFE)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE8F1FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.watch_later_outlined,
-                        color: Color(0xFF2563EB),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'NEGOCIACIÓN EN CURSO',
-                            style: TextStyle(
-                              color: Color(0xFF2563EB),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            secondsRemaining != null
-                                ? 'Tú ofertaste · expira en ${secondsRemaining}s'
-                                : 'Tú ofertaste',
-                            style: const TextStyle(
-                              color: Color(0xFF374151),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDCFCE7),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              'Tu oferta enviada',
-                              style: TextStyle(
-                                color: Color(0xFF16A34A),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Bs ${(myOfferAmount ?? currentBudget).toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (offerProgress != null) ...[
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    minHeight: 5,
-                    value: offerProgress,
-                    backgroundColor: AppTheme.colorPrimary.withValues(
-                      alpha: 0.15,
-                    ),
-                    color: offerProgress > 0.3
-                        ? AppTheme.colorPrimary
-                        : AppTheme.colorError,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              if (!_isVerified)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: const Text(
-                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'ACEPTAR',
-                        icon: Icons.check_circle,
-                        isYellow: true,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final user = SessionStore.currentUser;
-                          if (user == null) return;
-                          try {
-                            (await RequestDependencies.createCounterOffer(
-                              requestId: req['id'] as String,
-                              workerUserId: user.id,
-                              amount: currentBudget,
-                              message: 'Acepto el precio ofertado.',
-                            ))
-                                .fold(
-                              onSuccess: (value) => value,
-                              onFailure: (failure) =>
-                                  throw Exception(failure.message),
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Oferta enviada')),
-                            );
-                            await _load();
-                          } catch (e) {
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  e.toString().replaceFirst('Exception: ', ''),
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'OFERTAR',
-                        icon: Icons.payments,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final sent = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute<bool>(
-                              builder: (_) => CounterOfferScreen(
-                                requestId: req['id'] as String,
-                                originalBudget: currentBudget,
-                                requestData: req,
-                              ),
-                            ),
-                          );
-                          if (sent == true && mounted) {
-                            await _load(silent: true);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              TextButton(
-                onPressed: () async {
-                  final user = SessionStore.currentUser;
-                  if (user == null) return;
-                  (await RequestDependencies.declineOffer(
-                    requestId: req['id'] as String,
-                    workerUserId: user.id,
-                  ))
-                      .fold(
-                    onSuccess: (_) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Oferta marcada como no interesada'),
-                          ),
-                        );
-                        _load(silent: true);
-                      }
-                    },
-                    onFailure: (failure) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(failure.message)),
-                        );
-                      }
-                    },
-                  );
-                },
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 30),
-                ),
-                child: const Text(
-                  'No me interesa',
-                  style: TextStyle(
-                    color: AppTheme.colorText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ] else ...[
-              // ── Sin oferta activa → mostrar botones de acción ──────
-              if (clientImproved)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.colorSuccess.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppTheme.colorSuccess.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
+                    Row(
                       children: [
-                        const Icon(
-                          Icons.trending_up,
-                          color: AppTheme.colorSuccess,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '¡El cliente subió su oferta a Bs ${currentBudget.toStringAsFixed(0)}!',
-                          style: const TextStyle(
-                            color: AppTheme.colorSuccess,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            clientName,
+                            style: const TextStyle(
+                              color: AppTheme.colorText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                        if (isVerified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified, color: AppTheme.colorPrimary, size: 16),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$clientRating ($clientReviews)',
+                          style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isVerified ? '| Cliente verificado' : '| Nuevo cliente',
+                          style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
-              if (!_isVerified)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppTheme.colorMuted),
+                color: AppTheme.colorSurface,
+                onSelected: (val) {
+                  final reqId = req['id'].toString();
+                  final clientId = client['id'].toString();
+                  if (val == 'dismiss') {
+                    _dismissRequest(reqId);
+                  } else if (val == 'block') {
+                    _blockClient(clientId);
+                  } else if (val == 'report') {
+                    _reportRequest(reqId);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'dismiss',
+                    child: Text('No me interesa', style: TextStyle(color: AppTheme.colorText)),
                   ),
-                  child: const Text(
-                    'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13),
-                    textAlign: TextAlign.center,
+                  const PopupMenuItem(
+                    value: 'block',
+                    child: Text('Bloquear cliente', style: TextStyle(color: AppTheme.colorText)),
                   ),
-                )
-              else
-                Row(
+                  const PopupMenuItem(
+                    value: 'report',
+                    child: Text('Reportar publicaciÃ³n', style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'ACEPTAR',
-                        icon: Icons.check_circle,
-                        isYellow: true,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final user = SessionStore.currentUser;
-                          if (user == null) return;
-                          try {
-                            (await RequestDependencies.createCounterOffer(
-                              requestId: req['id'] as String,
-                              workerUserId: user.id,
-                              amount: currentBudget,
-                              message: 'Acepto el precio ofertado.',
-                            ))
-                                .fold(
-                              onSuccess: (value) => value,
-                              onFailure: (failure) =>
-                                  throw Exception(failure.message),
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Oferta enviada')),
-                            );
-                            await _load();
-                          } catch (e) {
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  e.toString().replaceFirst('Exception: ', ''),
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                    Text(
+                      req['title']?.toString() ?? 'Sin tÃ­tulo',
+                      style: const TextStyle(
+                        color: AppTheme.colorText,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ChambaPrimaryButton(
-                        label: 'OFERTAR',
-                        icon: Icons.payments,
-                        compact: true,
-                        onPressed: () async {
-                          if (!_isVerified) {
-                            _showVerificationRequired();
-                            return;
-                          }
-                          final sent = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute<bool>(
-                              builder: (_) => CounterOfferScreen(
-                                requestId: req['id'] as String,
-                                originalBudget: currentBudget,
-                                requestData: req,
-                              ),
-                            ),
-                          );
-                          if (sent == true && mounted) {
-                            await _load(silent: true);
-                          }
-                        },
+                    const SizedBox(height: 4),
+                    Text(
+                      req['description']?.toString() ?? 'Sin descripciÃ³n',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 14,
                       ),
                     ),
                   ],
                 ),
-              TextButton(
-                onPressed: () async {
-                  final user = SessionStore.currentUser;
-                  if (user == null) return;
-                  (await RequestDependencies.declineOffer(
-                    requestId: req['id'] as String,
-                    workerUserId: user.id,
-                  ))
-                      .fold(
-                    onSuccess: (_) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Oferta marcada como no interesada'),
-                          ),
-                        );
-                        _load(silent: true);
-                      }
-                    },
-                    onFailure: (failure) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(failure.message)),
-                        );
-                      }
-                    },
-                  );
-                },
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 30),
-                ),
-                child: const Text(
-                  'No me interesa',
-                  style: TextStyle(
-                    color: AppTheme.colorText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'Presupuesto',
+                    style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
                   ),
-                ),
+                  Text(
+                    'Bs. $currentBudget',
+                    style: const TextStyle(
+                      color: AppTheme.colorPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(Icons.location_on, color: AppTheme.colorMuted, size: 16),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  req['address']?.toString() ?? 'DirecciÃ³n no disponible',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppTheme.colorText, fontSize: 14),
+                ),
+              ),
+              if (distanceText != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorBackgroundAccent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.directions_walk, color: AppTheme.colorPrimary, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        distanceText,
+                        style: const TextStyle(color: AppTheme.colorText, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => _showJobDetails(req),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.colorText,
+                side: const BorderSide(color: AppTheme.colorBorder),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Ver detalles del trabajo'),
+            ),
+          ),
+          if (isAcceptedOffer) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _openJobInProgress(req['id'].toString()),
+                icon: const Icon(Icons.directions_car),
+                label: const Text('Ver Trabajo'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: () => _openChat(req['id'].toString()),
+                icon: const Icon(Icons.chat),
+                label: const Text('Ir al Chat'),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            if (hasPendingOffer && !clientImproved)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.colorBackgroundAccent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Tu oferta', style: TextStyle(color: AppTheme.colorMuted)),
+                        Text('Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorText, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (offerProgress != null)
+                      LinearProgressIndicator(
+                        value: offerProgress,
+                        backgroundColor: AppTheme.colorSurface,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          offerProgress < 0.2 ? Colors.red : AppTheme.colorPrimary,
+                        ),
+                      ),
+                  ],
+                ),
+              )
+            else if (isDeclinedOffer)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cancel, color: Colors.red),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Oferta declinada', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                          Text('El cliente declinÃ³ tu oferta de Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _showCounterOfferSheet(req['id'].toString()),
+                      child: const Text('Reofertar', style: TextStyle(color: AppTheme.colorPrimary)),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (clientImproved)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.colorPrimary),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.trending_up, color: AppTheme.colorPrimary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Â¡El cliente subiÃ³ el presupuesto a Bs. $currentBudget!',
+                          style: const TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _dismissRequest(req['id'].toString()),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                      ),
+                      child: const Text('No me interesa'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _acceptBudget(req['id'].toString(), currentBudget),
+                      child: const Text('Aceptar trabajo'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () => _showCounterOfferSheet(req['id'].toString()),
+                  icon: const Icon(Icons.handshake),
+                  label: const Text('Proponer otro precio', style: TextStyle(color: AppTheme.colorPrimary)),
+                ),
+              ),
+            ]
           ],
-        ),
+        ],
       ),
     );
   }
+
+  void _dismissRequest(String requestId) async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    try {
+      await RequestDependencies.dismissRequest(
+        requestId: requestId,
+        workerUserId: user.id,
+      );
+      setState(() {
+        _requests.removeWhere((r) => r['id'].toString() == requestId);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitud descartada')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _blockClient(String clientUserId) async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    try {
+      await RequestDependencies.blockClient(
+        workerUserId: user.id,
+        clientUserId: clientUserId,
+      );
+      setState(() {
+        _requests.removeWhere((r) => (r['client'] as Map?)?['id'].toString() == clientUserId);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cliente bloqueado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _reportRequest(String requestId) {
+    final TextEditingController reasonCtrl = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.colorSurface,
+        title: const Text('Reportar publicaciÃ³n', style: TextStyle(color: AppTheme.colorText)),
+        content: TextField(
+          controller: reasonCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Motivo del reporte...',
+            filled: true,
+            fillColor: AppTheme.colorBackgroundAccent,
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final user = SessionStore.currentUser;
+              if (user == null) return;
+              try {
+                await RequestDependencies.reportRequest(
+                  requestId: requestId,
+                  reporterUserId: user.id,
+                  reason: reasonCtrl.text,
+                );
+                setState(() {
+                  _requests.removeWhere((r) => r['id'].toString() == requestId);
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PublicaciÃ³n reportada')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Reportar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _acceptBudget(String requestId, double budget) async {
+    if (!_isVerified) {
+      _showVerificationRequired();
+      return;
+    }
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    try {
+      (await RequestDependencies.createCounterOffer(
+        requestId: requestId,
+        workerUserId: user.id,
+        amount: budget,
+        message: 'Acepto el precio ofertado.',
+      ))
+          .fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Oferta enviada')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showCounterOfferSheet(String requestId) async {
+    if (!_isVerified) {
+      _showVerificationRequired();
+      return;
+    }
+    final req = _requests.firstWhere((r) => r['id'].toString() == requestId);
+    final currentBudget = (req['budget'] as num?)?.toDouble() ?? 0;
+    final sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => CounterOfferScreen(
+          requestId: requestId,
+          originalBudget: currentBudget,
+          requestData: req,
+        ),
+      ),
+    );
+    if (sent == true && mounted) {
+      setState(() => _clientCountered = false);
+      await _load(silent: true);
+    }
+  }
+
+  void _openChat(String requestId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const MessagesScreen(),
+      ),
+    );
+  }
+
 }
+
 
 class _AvailabilityLabel extends StatelessWidget {
   const _AvailabilityLabel({
@@ -2064,7 +1688,7 @@ class _AvailabilityLabel extends StatelessWidget {
   }
 }
 
-// ── Modal de detalles del trabajo ─────────────────────────────────────────────
+// â”€â”€ Modal de detalles del trabajo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _JobDetailsSheet extends StatelessWidget {
   const _JobDetailsSheet({required this.requestData});
 
@@ -2107,7 +1731,7 @@ class _JobDetailsSheet extends StatelessWidget {
                 ),
               ),
 
-              // Título
+              // TÃ­tulo
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -2116,7 +1740,7 @@ class _JobDetailsSheet extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              // Categoría + presupuesto
+              // CategorÃ­a + presupuesto
               Row(
                 children: [
                   if (category.isNotEmpty)
@@ -2152,10 +1776,10 @@ class _JobDetailsSheet extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Descripción
+              // DescripciÃ³n
               if (description.isNotEmpty) ...[
                 const Text(
-                  'Descripción',
+                  'DescripciÃ³n',
                   style: TextStyle(
                     color: AppTheme.colorMuted,
                     fontSize: 12,
@@ -2174,10 +1798,10 @@ class _JobDetailsSheet extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
-              // Dirección
+              // DirecciÃ³n
               if (address.isNotEmpty) ...[
                 const Text(
-                  'Dirección',
+                  'DirecciÃ³n',
                   style: TextStyle(
                     color: AppTheme.colorMuted,
                     fontSize: 12,

@@ -195,6 +195,56 @@ class RequestRepositoryImpl implements RequestRepository {
     return _wrap(() => _remote.messages(userId: userId));
   }
 
+  @override
+  Future<Result<void>> blockClient({
+    required String workerUserId,
+    required String clientUserId,
+  }) async {
+    try {
+      await _remote.blockClient(
+        workerUserId: workerUserId,
+        clientUserId: clientUserId,
+      );
+      return const Success(null);
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
+
+  @override
+  Future<Result<void>> reportRequest({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  }) async {
+    try {
+      await _remote.reportRequest(
+        requestId: requestId,
+        reporterUserId: reporterUserId,
+        reason: reason,
+      );
+      return const Success(null);
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
+
+  @override
+  Future<Result<void>> dismissRequest({
+    required String requestId,
+    required String workerUserId,
+  }) async {
+    try {
+      await _remote.dismissRequest(
+        requestId: requestId,
+        workerUserId: workerUserId,
+      );
+      return const Success(null);
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
+
   Future<Result<RequestPayloadEntity>> _wrap(
     Future<Map<String, dynamic>> Function() action,
   ) async {

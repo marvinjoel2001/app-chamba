@@ -252,3 +252,53 @@ class ReactivateOfferUseCase {
     );
   }
 }
+
+class BlockClientUseCase {
+  BlockClientUseCase(this._repository);
+
+  final RequestRepository _repository;
+
+  Future<Result<void>> call({
+    required String workerUserId,
+    required String clientUserId,
+  }) {
+    return _repository.blockClient(
+      workerUserId: workerUserId,
+      clientUserId: clientUserId,
+    );
+  }
+}
+
+class ReportRequestUseCase {
+  ReportRequestUseCase(this._repository);
+
+  final RequestRepository _repository;
+
+  Future<Result<void>> call({
+    required String requestId,
+    required String reporterUserId,
+    required String reason,
+  }) {
+    return _repository.reportRequest(
+      requestId: requestId,
+      reporterUserId: reporterUserId,
+      reason: reason,
+    );
+  }
+}
+
+class DismissRequestUseCase {
+  DismissRequestUseCase(this._repository);
+
+  final RequestRepository _repository;
+
+  Future<Result<void>> call({
+    required String requestId,
+    required String workerUserId,
+  }) {
+    return _repository.dismissRequest(
+      requestId: requestId,
+      workerUserId: workerUserId,
+    );
+  }
+}
