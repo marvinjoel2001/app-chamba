@@ -14,6 +14,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../request/presentation/screens/request_form_screen.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
@@ -521,21 +522,30 @@ class _ChatScreenState extends State<ChatScreen> {
       final file = File(path);
       if (!await file.exists()) return;
 
-      // TODO: Upload audio file to Cloudinary and get URL
-      // For now, just send as a special message type
-      final audioUrl = 'file://$path'; // Replace with actual upload
+      // Upload audio file to Cloudinary and get URL
+      final bytes = await file.readAsBytes();
+      final uploadResult = await CloudinaryUploadService.uploadFileBytes(
+        bytes: bytes,
+        fileName: path.split('/').last,
+        folder: 'chat_audio',
+        resourceType: 'video', // Audio uses video endpoint in Cloudinary
+      );
+      final audioUrl = uploadResult.secureUrl;
 
       final currentUserId = SessionStore.currentUser?.id ?? '';
       final result = await _sendMessageUseCase.call(
         threadId: widget.threadId,
         senderUserId: currentUserId,
-        content: '🎤 Mensaje de voz [${await _getAudioDuration(path)}s]',
+        content: '🎤 Mensaje de voz [${await _getAudioDuration(path)}s]\n$audioUrl',
       );
 
       result.fold(
         onSuccess: (sentMessage) {
-          // Track locally sent message to prevent duplicate from socket
           _pendingMessageIds.add(sentMessage.id);
+          setState(() {
+            _messages = [..._messages, sentMessage];
+          });
+          _scrollToBottom();
         },
         onFailure: (failure) {
           setState(() => _error = 'Error enviando audio: ${failure.message}');
@@ -724,14 +734,35 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendFileMessage(String path, String name, int size) async {
     setState(() => _isSendingMedia = true);
     try {
-      // TODO: Upload file to Cloudinary and get URL
-      final fileUrl = 'file://$path'; // Replace with actual upload
+      // Upload file to Cloudinary and get URL
+      final fileObj = File(path);
+      final bytes = await fileObj.readAsBytes();
+      final uploadResult = await CloudinaryUploadService.uploadFileBytes(
+        bytes: bytes,
+        fileName: name,
+        folder: 'chat_files',
+        resourceType: 'auto',
+      );
+      final fileUrl = uploadResult.secureUrl;
 
       final currentUserId = SessionStore.currentUser?.id ?? '';
-      await _sendMessageUseCase.call(
+      final result = await _sendMessageUseCase.call(
         threadId: widget.threadId,
         senderUserId: currentUserId,
-        content: '📎 $name',
+        content: '📎 $name\n$fileUrl',
+      );
+
+      result.fold(
+        onSuccess: (sentMessage) {
+          _pendingMessageIds.add(sentMessage.id);
+          setState(() {
+            _messages = [..._messages, sentMessage];
+          });
+          _scrollToBottom();
+        },
+        onFailure: (failure) {
+          setState(() => _error = 'Error enviando archivo: ${failure.message}');
+        },
       );
     } catch (e) {
       setState(() => _error = 'Error enviando archivo: $e');
@@ -765,22 +796,31 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_isSendingMedia) return; // Prevent double send
     setState(() => _isSendingMedia = true);
     try {
-      // TODO: Upload image to Cloudinary and get URL
-      final imageUrl = 'file://${imageFile.path}'; // Replace with actual upload
+      // Upload image to Cloudinary and get URL
+      final bytes = await imageFile.readAsBytes();
+      final uploadResult = await CloudinaryUploadService.uploadFileBytes(
+        bytes: bytes,
+        fileName: imageFile.path.split('/').last,
+        folder: 'chat_images',
+        resourceType: 'image',
+      );
+      final imageUrl = uploadResult.secureUrl;
 
       final currentUserId = SessionStore.currentUser?.id ?? '';
       final result = await _sendMessageUseCase.call(
         threadId: widget.threadId,
         senderUserId: currentUserId,
-        content: '📷 Imagen enviada',
+        content: '📷 Imagen enviada\n$imageUrl',
       );
 
       result.fold(
         onSuccess: (sentMessage) {
-          // Track locally sent message to prevent duplicate from socket
           _pendingMessageIds.add(sentMessage.id);
-          // Clear preview after sending
-          setState(() => _pendingImage = null);
+          setState(() {
+            _pendingImage = null;
+            _messages = [..._messages, sentMessage];
+          });
+          _scrollToBottom();
         },
         onFailure: (failure) {
           setState(() => _error = 'Error enviando imagen: ${failure.message}');
@@ -818,7 +858,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Scroll to bottom after build
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -876,9 +922,11 @@ class _ChatScreenState extends State<ChatScreen> {
     result.fold(
       onSuccess: (sentMessage) {
         controller.clear();
-        // Track locally sent message to prevent duplicate from socket
         _pendingMessageIds.add(sentMessage.id);
-        _load();
+        setState(() {
+          _messages = [..._messages, sentMessage];
+        });
+        _scrollToBottom();
       },
       onFailure: (failure) {
         ScaffoldMessenger.of(
@@ -1007,7 +1055,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black,
+                                  ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1038,14 +1089,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Text(
-                            'Bs ${widget.agreedPrice.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              color: AppTheme.colorPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
                           Text(
                             _formatDate(DateTime.now()),
                             style: const TextStyle(

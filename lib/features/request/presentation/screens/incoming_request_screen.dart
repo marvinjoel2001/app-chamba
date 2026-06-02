@@ -1141,11 +1141,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       padding: EdgeInsets.fromLTRB(12, 4, 12, bottomPadding),
       child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xE6101E38), Color(0xCC132A52)],
-          ),
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
             color: AppTheme.colorPrimary.withValues(alpha: 0.3),

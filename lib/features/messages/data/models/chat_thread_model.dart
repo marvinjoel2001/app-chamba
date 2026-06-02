@@ -29,9 +29,11 @@ class ChatThreadModel extends ChatThread {
     return ChatThreadModel(
       id: json['id']?.toString() ?? '',
       jobId: request['id']?.toString() ?? json['requestId']?.toString() ?? '',
-      jobTitle: request['title']?.toString()?.trim().isNotEmpty == true
+      jobTitle: request['title']?.toString().trim().isNotEmpty == true
           ? request['title'].toString().trim()
-          : 'Solicitud de servicio',
+          : (request['description']?.toString().trim().isNotEmpty == true
+              ? request['description'].toString().trim()
+              : 'Solicitud de servicio'),
       jobDescription: request['description']?.toString() ?? '',
       jobStatus: _parseStatus(
           request['status']?.toString() ?? json['requestStatus']?.toString()),
