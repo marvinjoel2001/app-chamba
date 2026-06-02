@@ -854,31 +854,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
                 MarkerLayer(
                   markers: [
-                    ..._workerMarkers,
+                    // Solo mostrar workers en el mapa del worker, no del cliente
+                    if (!_isClient) ..._workerMarkers,
+                    // Ubicación del usuario: cliente solo ve su ubicación, worker también
                     if (_currentUserLocation != null)
                       Marker(
                         point: _currentUserLocation!,
-                        width: 60,
-                        height: 60,
-                        child: CircleAvatar(
-                          radius: 26,
-                          backgroundColor: AppTheme.colorPrimary,
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Colors.white,
-                          ),
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.location_on,
+                          color: AppTheme.colorHighlight,
+                          size: 36,
                         ),
                       ),
-                    Marker(
-                      point: _mapCenter,
-                      width: 40,
-                      height: 40,
-                      child: Icon(
-                        Icons.location_on,
-                        color: AppTheme.colorPrimary,
-                        size: 36,
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -943,7 +932,33 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
           ),
-          if (_loading) const Center(child: CircularProgressIndicator()),
+          if (_loading)
+            Container(
+              color: Colors.black.withOpacity(0.7),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Conectando con el servidor...',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Esto puede tomar hasta 30 segundos',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.colorHighlight.withOpacity(0.8),
+                            fontSize: 11,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (_error != null)
             Positioned(
               left: 20,

@@ -55,6 +55,25 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
 
+  // Filtros de búsqueda
+  String? _selectedCategory;
+  String? _selectedModality; // 'hourly', 'daily', 'full'
+  final List<String> _categories = [
+    'Limpieza',
+    'Jardinería',
+    'Plomería',
+    'Electricidad',
+    'Pintura',
+    'Mudanza',
+    'Carpintería',
+    'Albañilería'
+  ];
+  final List<Map<String, String>> _modalities = [
+    {'value': 'hourly', 'label': 'Por hora'},
+    {'value': 'daily', 'label': 'Por día'},
+    {'value': 'full', 'label': 'Precio fijo'},
+  ];
+
   bool get _isVerified {
     final user = SessionStore.currentUser;
     if (user == null) return false;
@@ -246,6 +265,174 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
+  void _showFilterModal() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.4,
+            maxChildSize: 0.8,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0D1728),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.colorMuted.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+
+                    // Título
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filtrar trabajos',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              _selectedCategory = null;
+                              _selectedModality = null;
+                            });
+                            setState(() {
+                              _selectedCategory = null;
+                              _selectedModality = null;
+                            });
+                            Navigator.of(context).pop();
+                            _load(silent: true);
+                          },
+                          child: const Text(
+                            'Limpiar',
+                            style: TextStyle(color: AppTheme.colorHighlight),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Categorías
+                    const Text(
+                      'Categoría',
+                      style: TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _categories.map((category) {
+                        final isSelected = _selectedCategory == category;
+                        return ChoiceChip(
+                          label: Text(category),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setModalState(() {
+                              _selectedCategory = selected ? category : null;
+                            });
+                          },
+                          selectedColor: AppTheme.colorPrimary.withOpacity(0.3),
+                          backgroundColor: AppTheme.colorSurfaceSoft,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? AppTheme.colorPrimaryLight
+                                : AppTheme.colorText,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Modalidad
+                    const Text(
+                      'Modalidad de pago',
+                      style: TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _modalities.map((modality) {
+                        final value = modality['value']!;
+                        final label = modality['label']!;
+                        final isSelected = _selectedModality == value;
+                        return ChoiceChip(
+                          label: Text(label),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setModalState(() {
+                              _selectedModality = selected ? value : null;
+                            });
+                          },
+                          selectedColor:
+                              AppTheme.colorHighlight.withOpacity(0.3),
+                          backgroundColor: AppTheme.colorSurfaceSoft,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? AppTheme.colorHighlight
+                                : AppTheme.colorText,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Botón aplicar
+                    ChambaPrimaryButton(
+                      label: 'Aplicar filtros',
+                      icon: Icons.check,
+                      onPressed: () {
+                        setState(() {
+                          // Apply filters to state
+                        });
+                        Navigator.of(context).pop();
+                        _load(silent: true);
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   void _onNewRequest(dynamic payload) => _load(silent: true);
 
   void _onJobCompleted(dynamic _) {
@@ -254,6 +441,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (mounted) {
       setState(() => _request = null);
     }
+  }
+
+  void _showJobDetails() {
+    final req = _request;
+    if (req == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobDetailsSheet(requestData: req),
+    );
   }
 
   void _onJobCancelled(dynamic _) {
@@ -690,21 +889,29 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ],
                       ),
                     ),
-                    // Botón ajustes pegado a la derecha
+                    // Botón filtros pegado a la derecha
                     Positioned(
                       right: 0,
                       child: Material(
-                        color: AppTheme.colorGlassDarkSoft,
+                        color: (_selectedCategory != null ||
+                                _selectedModality != null)
+                            ? AppTheme.colorPrimary.withOpacity(0.3)
+                            : AppTheme.colorGlassDarkSoft,
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
-                          onTap: _load,
+                          onTap: _showFilterModal,
                           borderRadius: BorderRadius.circular(14),
-                          child: const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Icon(
-                              Icons.tune,
-                              color: AppTheme.colorText,
-                              size: 22,
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Badge(
+                              isLabelVisible: _selectedCategory != null ||
+                                  _selectedModality != null,
+                              smallSize: 8,
+                              child: const Icon(
+                                Icons.tune,
+                                color: AppTheme.colorText,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
@@ -1054,15 +1261,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 icon: Icons.remove_red_eye_outlined,
                 isYellow: false,
                 compact: true,
-                onPressed: () {
-                  if (_sheetCtrl.isAttached) {
-                    _sheetCtrl.animateTo(
-                      0.85,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                },
+                onPressed: _showJobDetails,
               ),
               const SizedBox(height: 10),
             ],
@@ -1291,11 +1490,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                   ),
                   child: const Text(
                     'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -1305,75 +1508,77 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     Expanded(
                       child: ChambaPrimaryButton(
                         label: 'ACEPTAR',
-                      icon: Icons.check_circle,
-                      isYellow: true,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final user = SessionStore.currentUser;
-                        if (user == null) return;
-                        try {
-                          (await RequestDependencies.createCounterOffer(
-                            requestId: req['id'] as String,
-                            workerUserId: user.id,
-                            amount: currentBudget,
-                            message: 'Acepto el precio ofertado.',
-                          ))
-                              .fold(
-                            onSuccess: (value) => value,
-                            onFailure: (failure) =>
-                                throw Exception(failure.message),
-                          );
-                          if (mounted) {
-                            setState(() => _clientCountered = false);
-                            await _load();
+                        icon: Icons.check_circle,
+                        isYellow: true,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
                           }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  e.toString().replaceFirst('Exception: ', ''),
-                                ),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'OFERTAR',
-                      icon: Icons.payments,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final sent = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => CounterOfferScreen(
+                          final user = SessionStore.currentUser;
+                          if (user == null) return;
+                          try {
+                            (await RequestDependencies.createCounterOffer(
                               requestId: req['id'] as String,
-                              originalBudget: currentBudget,
-                              requestData: req,
-                            ),
-                          ),
-                        );
-                        if (sent == true && mounted) {
-                          setState(() => _clientCountered = false);
-                          await _load(silent: true);
-                        }
-                      },
+                              workerUserId: user.id,
+                              amount: currentBudget,
+                              message: 'Acepto el precio ofertado.',
+                            ))
+                                .fold(
+                              onSuccess: (value) => value,
+                              onFailure: (failure) =>
+                                  throw Exception(failure.message),
+                            );
+                            if (mounted) {
+                              setState(() => _clientCountered = false);
+                              await _load();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e
+                                        .toString()
+                                        .replaceFirst('Exception: ', ''),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'OFERTAR',
+                        icon: Icons.payments,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
+                          }
+                          final sent = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => CounterOfferScreen(
+                                requestId: req['id'] as String,
+                                originalBudget: currentBudget,
+                                requestData: req,
+                              ),
+                            ),
+                          );
+                          if (sent == true && mounted) {
+                            setState(() => _clientCountered = false);
+                            await _load(silent: true);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               TextButton(
                 onPressed: () async {
                   final user = SessionStore.currentUser;
@@ -1528,11 +1733,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                   ),
                   child: const Text(
                     'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -1542,74 +1751,74 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     Expanded(
                       child: ChambaPrimaryButton(
                         label: 'ACEPTAR',
-                      icon: Icons.check_circle,
-                      isYellow: true,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final user = SessionStore.currentUser;
-                        if (user == null) return;
-                        try {
-                          (await RequestDependencies.createCounterOffer(
-                            requestId: req['id'] as String,
-                            workerUserId: user.id,
-                            amount: currentBudget,
-                            message: 'Acepto el precio ofertado.',
-                          ))
-                              .fold(
-                            onSuccess: (value) => value,
-                            onFailure: (failure) =>
-                                throw Exception(failure.message),
-                          );
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Oferta enviada')),
-                          );
-                          await _load();
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                e.toString().replaceFirst('Exception: ', ''),
+                        icon: Icons.check_circle,
+                        isYellow: true,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
+                          }
+                          final user = SessionStore.currentUser;
+                          if (user == null) return;
+                          try {
+                            (await RequestDependencies.createCounterOffer(
+                              requestId: req['id'] as String,
+                              workerUserId: user.id,
+                              amount: currentBudget,
+                              message: 'Acepto el precio ofertado.',
+                            ))
+                                .fold(
+                              onSuccess: (value) => value,
+                              onFailure: (failure) =>
+                                  throw Exception(failure.message),
+                            );
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Oferta enviada')),
+                            );
+                            await _load();
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().replaceFirst('Exception: ', ''),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'OFERTAR',
+                        icon: Icons.payments,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
+                          }
+                          final sent = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => CounterOfferScreen(
+                                requestId: req['id'] as String,
+                                originalBudget: currentBudget,
+                                requestData: req,
                               ),
                             ),
                           );
-                        }
-                      },
+                          if (sent == true && mounted) {
+                            await _load(silent: true);
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'OFERTAR',
-                      icon: Icons.payments,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final sent = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => CounterOfferScreen(
-                              requestId: req['id'] as String,
-                              originalBudget: currentBudget,
-                              requestData: req,
-                            ),
-                          ),
-                        );
-                        if (sent == true && mounted) {
-                          await _load(silent: true);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               TextButton(
                 onPressed: () async {
                   final user = SessionStore.currentUser;
@@ -1696,11 +1905,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                   ),
                   child: const Text(
                     'Debes verificar tu perfil para poder ofertar o aceptar trabajos.',
-                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -1710,74 +1923,74 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     Expanded(
                       child: ChambaPrimaryButton(
                         label: 'ACEPTAR',
-                      icon: Icons.check_circle,
-                      isYellow: true,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final user = SessionStore.currentUser;
-                        if (user == null) return;
-                        try {
-                          (await RequestDependencies.createCounterOffer(
-                            requestId: req['id'] as String,
-                            workerUserId: user.id,
-                            amount: currentBudget,
-                            message: 'Acepto el precio ofertado.',
-                          ))
-                              .fold(
-                            onSuccess: (value) => value,
-                            onFailure: (failure) =>
-                                throw Exception(failure.message),
-                          );
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Oferta enviada')),
-                          );
-                          await _load();
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                e.toString().replaceFirst('Exception: ', ''),
+                        icon: Icons.check_circle,
+                        isYellow: true,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
+                          }
+                          final user = SessionStore.currentUser;
+                          if (user == null) return;
+                          try {
+                            (await RequestDependencies.createCounterOffer(
+                              requestId: req['id'] as String,
+                              workerUserId: user.id,
+                              amount: currentBudget,
+                              message: 'Acepto el precio ofertado.',
+                            ))
+                                .fold(
+                              onSuccess: (value) => value,
+                              onFailure: (failure) =>
+                                  throw Exception(failure.message),
+                            );
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Oferta enviada')),
+                            );
+                            await _load();
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().replaceFirst('Exception: ', ''),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ChambaPrimaryButton(
+                        label: 'OFERTAR',
+                        icon: Icons.payments,
+                        compact: true,
+                        onPressed: () async {
+                          if (!_isVerified) {
+                            _showVerificationRequired();
+                            return;
+                          }
+                          final sent = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => CounterOfferScreen(
+                                requestId: req['id'] as String,
+                                originalBudget: currentBudget,
+                                requestData: req,
                               ),
                             ),
                           );
-                        }
-                      },
+                          if (sent == true && mounted) {
+                            await _load(silent: true);
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: ChambaPrimaryButton(
-                      label: 'OFERTAR',
-                      icon: Icons.payments,
-                      compact: true,
-                      onPressed: () async {
-                        if (!_isVerified) {
-                          _showVerificationRequired();
-                          return;
-                        }
-                        final sent = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => CounterOfferScreen(
-                              requestId: req['id'] as String,
-                              originalBudget: currentBudget,
-                              requestData: req,
-                            ),
-                          ),
-                        );
-                        if (sent == true && mounted) {
-                          await _load(silent: true);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               TextButton(
                 onPressed: () async {
                   final user = SessionStore.currentUser;
@@ -1851,6 +2064,269 @@ class _AvailabilityLabel extends StatelessWidget {
           letterSpacing: 1,
         ),
       ),
+    );
+  }
+}
+
+// ── Modal de detalles del trabajo ─────────────────────────────────────────────
+class _JobDetailsSheet extends StatelessWidget {
+  const _JobDetailsSheet({required this.requestData});
+
+  final Map<String, dynamic> requestData;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = requestData['title']?.toString() ?? 'Solicitud';
+    final description = requestData['description']?.toString() ?? '';
+    final address = requestData['address']?.toString() ?? '';
+    final budget = requestData['budget'];
+    final category = requestData['category']?.toString() ?? '';
+    final photos = requestData['photos'] as List<dynamic>? ?? const [];
+    final client = requestData['client'] as Map<String, dynamic>?;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0D1728),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Título
+              Text(
+                title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 8),
+
+              // Categoría + presupuesto
+              Row(
+                children: [
+                  if (category.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorPrimary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        category,
+                        style: const TextStyle(
+                          color: AppTheme.colorPrimaryLight,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  if (budget != null)
+                    Text(
+                      'Bs $budget',
+                      style: const TextStyle(
+                        color: AppTheme.colorHighlight,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Descripción
+              if (description.isNotEmpty) ...[
+                const Text(
+                  'Descripción',
+                  style: TextStyle(
+                    color: AppTheme.colorMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Dirección
+              if (address.isNotEmpty) ...[
+                const Text(
+                  'Dirección',
+                  style: TextStyle(
+                    color: AppTheme.colorMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: AppTheme.colorPrimary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        address,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Cliente
+              if (client != null) ...[
+                const Text(
+                  'Cliente',
+                  style: TextStyle(
+                    color: AppTheme.colorMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundImage: client['profilePhotoUrl'] != null
+                          ? NetworkImage(client['profilePhotoUrl'] as String)
+                          : null,
+                      child: client['profilePhotoUrl'] == null
+                          ? Text(
+                              (client['firstName'] as String? ?? 'C')
+                                  .substring(0, 1)
+                                  .toUpperCase(),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'
+                          .trim(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Fotos
+              if (photos.isNotEmpty) ...[
+                const Text(
+                  'Fotos',
+                  style: TextStyle(
+                    color: AppTheme.colorMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: photos.length,
+                    itemBuilder: (context, index) {
+                      final photo = photos[index] as Map<String, dynamic>?;
+                      final url = photo?['url']?.toString();
+                      if (url == null) return const SizedBox.shrink();
+                      return GestureDetector(
+                        onTap: () {
+                          // Full screen view
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => Scaffold(
+                                backgroundColor: Colors.black,
+                                body: SafeArea(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      InteractiveViewer(
+                                        child: Image.network(
+                                          url,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: IconButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 120,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: NetworkImage(url),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

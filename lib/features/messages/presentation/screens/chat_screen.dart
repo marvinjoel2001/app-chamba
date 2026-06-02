@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:record/record.dart';
 import 'package:image_picker/image_picker.dart';
@@ -86,14 +87,20 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _error;
   List<ChatMessage> _messages = const [];
 
-  // Audio recording
+  // Audio recording & playback
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   String? _recordingPath;
+  String? _currentlyPlayingAudioUrl;
   bool _isPlayingAudio = false;
+  Duration _audioPosition = Duration.zero;
+  Duration _audioDuration = Duration.zero;
 
   // Image preview before sending
   File? _pendingImage;
   bool _isSendingMedia = false;
+  bool _isSending = false;
+  final Set<String> _pendingMessageIds = {};
 
   @override
   void initState() {
@@ -110,6 +117,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
+    _audioPlayer.dispose();
+    _audioRecorder.dispose();
     controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -128,6 +137,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final content = map['message']?['content']?.toString();
 
     if (messageId != null && senderId != null) {
+      // Prevent duplicates - check if message already exists
+      if (_messages.any((m) => m.id == messageId)) {
+        return;
+      }
+
+      // Also check if we just sent this message locally
+      if (_pendingMessageIds.contains(messageId)) {
+        _pendingMessageIds.remove(messageId);
+        return;
+      }
+
       final newMessage = ChatMessage(
         id: messageId,
         threadId: threadId ?? widget.threadId,
@@ -495,6 +515,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendVoiceMessage(String path) async {
+    if (_isSendingMedia) return; // Prevent double send
     setState(() => _isSendingMedia = true);
     try {
       final file = File(path);
@@ -505,10 +526,20 @@ class _ChatScreenState extends State<ChatScreen> {
       final audioUrl = 'file://$path'; // Replace with actual upload
 
       final currentUserId = SessionStore.currentUser?.id ?? '';
-      await _sendMessageUseCase.call(
+      final result = await _sendMessageUseCase.call(
         threadId: widget.threadId,
         senderUserId: currentUserId,
         content: '🎤 Mensaje de voz [${await _getAudioDuration(path)}s]',
+      );
+
+      result.fold(
+        onSuccess: (sentMessage) {
+          // Track locally sent message to prevent duplicate from socket
+          _pendingMessageIds.add(sentMessage.id);
+        },
+        onFailure: (failure) {
+          setState(() => _error = 'Error enviando audio: ${failure.message}');
+        },
       );
     } catch (e) {
       setState(() => _error = 'Error enviando audio: $e');
@@ -527,6 +558,149 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       return 0;
     }
+  }
+
+  // Helper methods to detect message type from content
+  bool _isAudioMessage(String? content) {
+    if (content == null) return false;
+    return content.startsWith('🎤') ||
+        content.contains('.m4a') ||
+        content.contains('.mp3') ||
+        content.contains('.aac') ||
+        content.contains('audio');
+  }
+
+  bool _isImageMessage(String? content) {
+    if (content == null) return false;
+    return content.startsWith('📷') ||
+        content.contains('.jpg') ||
+        content.contains('.jpeg') ||
+        content.contains('.png') ||
+        content.contains('.webp') ||
+        content.contains('image');
+  }
+
+  String? _extractUrl(String content) {
+    // Extract URL from content using regex
+    final urlRegex = RegExp(
+        r'(https?:\/\/[^\s]+)|(file:\/\/[^\s]+)|([a-zA-Z0-9_-]+\.(?:m4a|mp3|aac|jpg|jpeg|png|webp))');
+    final match = urlRegex.firstMatch(content);
+    return match?.group(0);
+  }
+
+  Future<void> _playAudio(String url) async {
+    try {
+      if (_currentlyPlayingAudioUrl == url && _isPlayingAudio) {
+        // Pause current
+        await _audioPlayer.pause();
+        setState(() {
+          _isPlayingAudio = false;
+        });
+      } else if (_currentlyPlayingAudioUrl == url && !_isPlayingAudio) {
+        // Resume
+        await _audioPlayer.resume();
+        setState(() {
+          _isPlayingAudio = true;
+        });
+      } else {
+        // Play new
+        await _audioPlayer.stop();
+        await _audioPlayer.play(UrlSource(url));
+        setState(() {
+          _currentlyPlayingAudioUrl = url;
+          _isPlayingAudio = true;
+        });
+
+        // Listen for completion
+        _audioPlayer.onPlayerComplete.listen((_) {
+          if (mounted) {
+            setState(() {
+              _isPlayingAudio = false;
+              _audioPosition = Duration.zero;
+            });
+          }
+        });
+
+        // Listen for position changes
+        _audioPlayer.onPositionChanged.listen((position) {
+          if (mounted) {
+            setState(() {
+              _audioPosition = position;
+            });
+          }
+        });
+
+        // Listen for duration
+        _audioPlayer.onDurationChanged.listen((duration) {
+          if (mounted) {
+            setState(() {
+              _audioDuration = duration;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error playing audio: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error reproduciendo audio')),
+      );
+    }
+  }
+
+  void _showFullScreenImage(String url) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white,
+                          size: 64,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickFile() async {
@@ -588,20 +762,30 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendImageMessage(File imageFile) async {
+    if (_isSendingMedia) return; // Prevent double send
     setState(() => _isSendingMedia = true);
     try {
       // TODO: Upload image to Cloudinary and get URL
       final imageUrl = 'file://${imageFile.path}'; // Replace with actual upload
 
       final currentUserId = SessionStore.currentUser?.id ?? '';
-      await _sendMessageUseCase.call(
+      final result = await _sendMessageUseCase.call(
         threadId: widget.threadId,
         senderUserId: currentUserId,
         content: '📷 Imagen enviada',
       );
 
-      // Clear preview after sending
-      setState(() => _pendingImage = null);
+      result.fold(
+        onSuccess: (sentMessage) {
+          // Track locally sent message to prevent duplicate from socket
+          _pendingMessageIds.add(sentMessage.id);
+          // Clear preview after sending
+          setState(() => _pendingImage = null);
+        },
+        onFailure: (failure) {
+          setState(() => _error = 'Error enviando imagen: ${failure.message}');
+        },
+      );
     } catch (e) {
       setState(() => _error = 'Error enviando imagen: $e');
     } finally {
@@ -668,11 +852,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _send() async {
+    if (_isSending) return; // Prevent double send
+
     final user = SessionStore.currentUser;
     final content = controller.text.trim();
     if (user == null || content.isEmpty || widget.isArchived) {
       return;
     }
+
+    setState(() => _isSending = true);
 
     final result = await _sendMessageUseCase(
       threadId: widget.threadId,
@@ -680,11 +868,16 @@ class _ChatScreenState extends State<ChatScreen> {
       content: content,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      setState(() => _isSending = false);
+      return;
+    }
 
     result.fold(
-      onSuccess: (_) {
+      onSuccess: (sentMessage) {
         controller.clear();
+        // Track locally sent message to prevent duplicate from socket
+        _pendingMessageIds.add(sentMessage.id);
         _load();
       },
       onFailure: (failure) {
@@ -693,6 +886,8 @@ class _ChatScreenState extends State<ChatScreen> {
         ).showSnackBar(SnackBar(content: Text(failure.message)));
       },
     );
+
+    setState(() => _isSending = false);
   }
 
   Color _statusColor(ChatThreadStatus status) {
@@ -992,6 +1187,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildTextMessage(ChatMessage message, bool mine) {
     final time = _formatTime(message.createdAt);
+    final content = message.content ?? '';
+
+    // Detect message type
+    final isAudio = _isAudioMessage(content);
+    final isImage = _isImageMessage(content);
+    final url = isAudio || isImage ? _extractUrl(content) : null;
 
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -1005,8 +1206,9 @@ class _ChatScreenState extends State<ChatScreen> {
               _buildBubbleTail(isMine: false, color: AppTheme.colorSurfaceSoft),
             Flexible(
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: isImage
+                    ? const EdgeInsets.all(4)
+                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
@@ -1024,14 +1226,31 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      message.content ?? '',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: mine ? Colors.white : AppTheme.colorText,
-                        height: 1.3,
+                    // Audio message
+                    if (isAudio && url != null)
+                      _buildAudioPlayer(url, mine)
+                    // Image message
+                    else if (isImage && url != null)
+                      _buildImagePreview(url)
+                    // Text message
+                    else
+                      Text(
+                        content,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: mine ? Colors.white : AppTheme.colorText,
+                          height: 1.3,
+                          shadows: mine
+                              ? [
+                                  const Shadow(
+                                    color: Colors.black26,
+                                    blurRadius: 1,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1041,8 +1260,17 @@ class _ChatScreenState extends State<ChatScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             color: mine
-                                ? Colors.white.withValues(alpha: 0.7)
+                                ? Colors.white.withOpacity(0.9)
                                 : AppTheme.colorMuted,
+                            shadows: mine
+                                ? [
+                                    const Shadow(
+                                      color: Colors.black26,
+                                      blurRadius: 1,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
                           ),
                         ),
                         if (mine) ...[
@@ -1062,6 +1290,120 @@ class _ChatScreenState extends State<ChatScreen> {
             if (mine)
               _buildBubbleTail(isMine: true, color: const Color(0xFF005C4B)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioPlayer(String url, bool mine) {
+    final isPlaying = _currentlyPlayingAudioUrl == url && _isPlayingAudio;
+    final position =
+        _currentlyPlayingAudioUrl == url ? _audioPosition : Duration.zero;
+    final duration =
+        _currentlyPlayingAudioUrl == url ? _audioDuration : Duration.zero;
+
+    String formatDuration(Duration d) {
+      final minutes = d.inMinutes.toString().padLeft(2, '0');
+      final seconds = (d.inSeconds % 60).toString().padLeft(2, '0');
+      return '$minutes:$seconds';
+    }
+
+    return GestureDetector(
+      onTap: () => _playAudio(url),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: mine
+              ? Colors.white.withOpacity(0.15)
+              : AppTheme.colorPrimary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPlaying ? Icons.pause : Icons.play_arrow,
+              color: mine ? Colors.white : AppTheme.colorPrimary,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            // Waveform simulation
+            Container(
+              width: 60,
+              height: 24,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: List.generate(6, (index) {
+                  return Container(
+                    width: 3,
+                    height: 8 + (index % 3) * 6,
+                    decoration: BoxDecoration(
+                      color: mine
+                          ? Colors.white.withOpacity(0.6)
+                          : AppTheme.colorPrimary.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              formatDuration(position) +
+                  (duration > Duration.zero
+                      ? ' / ${formatDuration(duration)}'
+                      : ''),
+              style: TextStyle(
+                fontSize: 12,
+                color:
+                    mine ? Colors.white.withOpacity(0.8) : AppTheme.colorMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview(String url) {
+    return GestureDetector(
+      onTap: () => _showFullScreenImage(url),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          url,
+          width: 200,
+          height: 200,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: 200,
+              height: 200,
+              color: AppTheme.colorSurfaceSoft,
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: 200,
+              height: 200,
+              color: AppTheme.colorSurfaceSoft,
+              child: const Icon(
+                Icons.broken_image,
+                color: AppTheme.colorMuted,
+                size: 48,
+              ),
+            );
+          },
         ),
       ),
     );

@@ -96,7 +96,8 @@ class AuthRepositoryImpl implements AuthRepository {
         role: role.trim(),
         email: email.trim(),
         phone: phone?.trim().isEmpty == true ? null : phone?.trim(),
-        countryCode: countryCode?.trim().isEmpty == true ? null : countryCode?.trim(),
+        countryCode:
+            countryCode?.trim().isEmpty == true ? null : countryCode?.trim(),
         ciNumber: ciNumber?.trim().isEmpty == true ? null : ciNumber?.trim(),
         firstName: firstName.trim(),
         lastName: lastName?.trim().isEmpty == true ? null : lastName?.trim(),
@@ -118,6 +119,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<void>> logout() async {
+    // Desconectar socket primero, luego limpiar
+    RealtimeService.instance.disconnect();
+    await Future.delayed(const Duration(milliseconds: 100));
     RealtimeService.instance.dispose();
     await SessionStore.clear();
     return const Success(null);
@@ -126,8 +130,8 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> _syncPushTokenBestEffort() async {
     try {
       await const PushNotificationService().syncTokenForCurrentUser().timeout(
-        const Duration(seconds: 6),
-      );
+            const Duration(seconds: 6),
+          );
     } catch (_) {}
   }
 }

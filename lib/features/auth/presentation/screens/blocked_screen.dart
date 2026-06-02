@@ -34,7 +34,7 @@ class BlockedScreen extends StatelessWidget {
                       const Icon(
                         Icons.block,
                         size: 80,
-                        color: AppTheme.colorDanger,
+                        color: AppTheme.colorError,
                       ),
                       const SizedBox(height: 24),
                       Text(

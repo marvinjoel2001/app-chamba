@@ -376,7 +376,6 @@ class _SupportChatViewState extends State<_SupportChatView> {
   @override
   Widget build(BuildContext context) {
     final userId = SessionStore.currentUser?.id;
-    final bottomPad = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -548,11 +547,11 @@ class _SupportChatViewState extends State<_SupportChatView> {
 
           // Input bar - Multiline with proper keyboard handling
           Container(
-            padding: EdgeInsets.only(
+            padding: const EdgeInsets.only(
               left: 12,
               right: 8,
               top: 8,
-              bottom: 8 + bottomPad,
+              bottom: 8,
             ),
             decoration: const BoxDecoration(
               color: AppTheme.colorBackgroundAccent,
