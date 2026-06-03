@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,16 +11,37 @@ import 'core/session/session_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SessionStore.hydrate();
-  await Future.wait([
-    const PushNotificationService().initialize(),
-    WorkerBackgroundService.initialize(),
-  ]);
-  await WorkerBackgroundService.restoreIfEnabled();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  
+  try {
+    await SessionStore.hydrate();
+  } catch (e) {
+    debugPrint('Error hidratando sesión: $e');
+  }
+
+  // Inicializar servicios en segundo plano de manera no bloqueante para evitar pantallas en blanco
+  // en dispositivos con problemas de red o sin servicios de Google Play.
+  unawaited(
+    const PushNotificationService().initialize().catchError((e) {
+      debugPrint('Error inicializando notificaciones push: $e');
+    }),
+  );
+
+  unawaited(
+    WorkerBackgroundService.initialize().then((_) {
+      return WorkerBackgroundService.restoreIfEnabled();
+    }).catchError((e) {
+      debugPrint('Error inicializando servicios en segundo plano: $e');
+    }),
+  );
+
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    debugPrint('Error configurando orientacion: $e');
+  }
 
   runApp(const ProviderScope(child: ChambaApp()));
 }
