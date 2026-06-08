@@ -89,6 +89,7 @@ class RealtimeService {
     _socket!.on('notification.toast', (data) {
       if (data is Map<String, dynamic>) {
         final target = data['target'] as String?;
+        final userIds = data['userIds'] as List<dynamic>?;
         final currentUser = SessionStore.currentUser;
         if (currentUser == null) return;
 
@@ -99,6 +100,10 @@ class RealtimeService {
           shouldShow = true;
         } else if (target == 'clients' && currentUser.type == 'client') {
           shouldShow = true;
+        } else if (target == 'custom' && userIds != null) {
+          if (userIds.contains(currentUser.id)) {
+            shouldShow = true;
+          }
         }
 
         if (shouldShow) {
