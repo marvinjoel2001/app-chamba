@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../config/app_config.dart';
+import '../session/session_store.dart';
+import '../services/toast_service.dart';
 
 class RealtimeService {
   RealtimeService._();
@@ -82,6 +84,46 @@ class RealtimeService {
         (data) => print('[RealtimeService] connection.ready: $data'),
       );
     }
+
+    _socket!.off('notification.toast');
+    _socket!.on('notification.toast', (data) {
+      if (data is Map<String, dynamic>) {
+        final target = data['target'] as String?;
+        final currentUser = SessionStore.currentUser;
+        if (currentUser == null) return;
+
+        bool shouldShow = false;
+        if (target == 'all') {
+          shouldShow = true;
+        } else if (target == 'workers' && currentUser.type == 'worker') {
+          shouldShow = true;
+        } else if (target == 'clients' && currentUser.type == 'client') {
+          shouldShow = true;
+        }
+
+        if (shouldShow) {
+          final typeStr = data['toastType'] as String? ?? 'info';
+          ToastType tType;
+          switch (typeStr) {
+            case 'error':
+              tType = ToastType.error;
+              break;
+            case 'success':
+              tType = ToastType.success;
+              break;
+            default:
+              tType = ToastType.info;
+              break;
+          }
+
+          ToastService.show(
+            title: data['title'] as String? ?? 'Notificación',
+            body: data['body'] as String? ?? '',
+            type: tType,
+          );
+        }
+      }
+    });
   }
 
   void joinThread(String threadId) {
