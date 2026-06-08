@@ -17,6 +17,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+
+  // Handle data-only messages in background
+  if (message.data['type'] == 'request_new') {
+    await PushNotificationService.showCallNotification(message.data);
+  }
 }
 
 // Canal para notificaciones locales
@@ -25,6 +30,16 @@ const AndroidNotificationChannel _androidChannel = AndroidNotificationChannel(
   'Notificaciones Chamba',
   description: 'Notificaciones de trabajos y mensajes',
   importance: Importance.high,
+  playSound: true,
+  enableVibration: true,
+);
+
+// Canal para llamadas (prioridad máxima)
+const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
+  'chamba_call_channel',
+  'Llamadas de Trabajo',
+  description: 'Alertas prioritarias para nuevas solicitudes de trabajo',
+  importance: Importance.max,
   playSound: true,
   enableVibration: true,
 );
@@ -67,12 +82,15 @@ class PushNotificationService {
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Crear canal de notificación para Android
+    // Crear canales de notificación para Android
     if (!kIsWeb && Platform.isAndroid) {
-      await _localNotifications
+      final plugin = await _localNotifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(_androidChannel);
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (plugin != null) {
+        await plugin.createNotificationChannel(_androidChannel);
+        await plugin.createNotificationChannel(_callChannel);
+      }
     }
 
     // Configurar notificaciones locales
@@ -92,7 +110,12 @@ class PushNotificationService {
     // Mostrar notificación local cuando llega mensaje en foreground
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint('FCM foreground message: ${message.messageId}');
-      _showLocalNotification(message);
+      if (message.data['type'] == 'request_new' && message.notification == null) {
+        // Es un mensaje tipo data-only de llamada
+        PushNotificationService.showCallNotification(message.data);
+      } else {
+        _showLocalNotification(message);
+      }
     });
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       debugPrint('FCM notification tapped: ${message.messageId}');
@@ -168,6 +191,39 @@ class PushNotificationService {
         ),
       ),
       payload: message.data.toString(),
+    );
+  }
+
+  // Muestra alerta de llamada (Full Screen Intent)
+  static Future<void> showCallNotification(Map<String, dynamic> data) async {
+    final title = data['title'] ?? '📍 Trabajo nuevo cerca';
+    final body = data['body'] ?? '¡Revisa la nueva solicitud!';
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _callChannel.id,
+          _callChannel.name,
+          channelDescription: _callChannel.description,
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          fullScreenIntent: true,
+          category: AndroidNotificationCategory.call,
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+      ),
+      payload: data.toString(),
     );
   }
 }
