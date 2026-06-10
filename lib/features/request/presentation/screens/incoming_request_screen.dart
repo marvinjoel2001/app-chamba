@@ -45,7 +45,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   // El cliente hizo una contraoferta al worker
   bool _clientCountered = false;
 
-  // AnimaciÃ³n banner oferta aceptada
+  // Animación banner oferta aceptada
   bool _showAcceptedBanner = false;
   late final AnimationController _acceptedAnimCtrl;
   late final Animation<double> _acceptedScale;
@@ -55,22 +55,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
 
-  // Filtros de bÃºsqueda
+  // Filtros de búsqueda
   String? _selectedCategory;
   String? _selectedModality; // 'hourly', 'daily', 'full'
   final List<String> _categories = [
     'Limpieza',
-    'JardinerÃ­a',
-    'PlomerÃ­a',
+    'Jardinería',
+    'Plomería',
     'Electricidad',
     'Pintura',
     'Mudanza',
-    'CarpinterÃ­a',
-    'AlbaÃ±ilerÃ­a'
+    'Carpintería',
+    'Albañilería'
   ];
   final List<Map<String, String>> _modalities = [
     {'value': 'hourly', 'label': 'Por hora'},
-    {'value': 'daily', 'label': 'Por dÃ­a'},
+    {'value': 'daily', 'label': 'Por día'},
     {'value': 'full', 'label': 'Precio fijo'},
   ];
 
@@ -90,7 +90,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           children: [
             Icon(Icons.verified_user, color: AppTheme.colorPrimary),
             SizedBox(width: 8),
-            Text('VerificaciÃ³n requerida'),
+            Text('Verificación requerida'),
           ],
         ),
         content: const Text(
@@ -152,7 +152,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (widget.isActive) _tickOfferCountdown();
     });
-    // Polling silencioso â€” no muestra spinner
+    // Polling silencioso — no muestra spinner
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted && widget.isActive) _load(silent: true);
     });
@@ -299,7 +299,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       ),
                     ),
 
-                    // TÃ­tulo
+                    // Título
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -332,9 +332,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // CategorÃ­as
+                    // Categorías
                     const Text(
-                      'CategorÃ­a',
+                      'Categoría',
                       style: TextStyle(
                         color: AppTheme.colorMuted,
                         fontSize: 12,
@@ -411,7 +411,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     const SizedBox(height: 32),
 
-                    // BotÃ³n aplicar
+                    // Botón aplicar
                     ChambaPrimaryButton(
                       label: 'Aplicar filtros',
                       icon: Icons.check,
@@ -461,7 +461,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'cancelled');
       });
-      // Banner rojo de cancelaciÃ³n
+      // Banner rojo de cancelación
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
@@ -469,7 +469,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               Icon(Icons.cancel, color: Colors.white, size: 18),
               SizedBox(width: 8),
               Text(
-                'El cliente cancelÃ³ el trabajo',
+                'El cliente canceló el trabajo',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -520,7 +520,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         }
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El cliente enviÃ³ una contraoferta')),
+        const SnackBar(content: Text('El cliente envió una contraoferta')),
       );
     }
     _load(silent: true);
@@ -563,7 +563,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (map['workerUserId']?.toString() != userId) return;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tu oferta expirÃ³. Puedes mejorarla.')),
+        const SnackBar(content: Text('Tu oferta expiró. Puedes mejorarla.')),
       );
     }
     _load(silent: true);
@@ -582,7 +582,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       if (remaining == null) continue;
       
       if (remaining <= 1) {
-        // Al menos una oferta expirÃ³, recargamos.
+        // Al menos una oferta expiró, recargamos.
         _load();
         return;
       }
@@ -610,7 +610,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
-        _error = 'SesiÃ³n expirada';
+        _error = 'Sesión expirada';
         _loading = false;
       });
       return;
@@ -724,7 +724,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       backgroundColor: AppTheme.colorBackground,
       body: Stack(
         children: [
-          // â”€â”€ MAPA DE FONDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── MAPA DE FONDO ──────────────────────────────────────────────
           Positioned.fill(
             child: AppConfig.mapboxAccessToken.trim().isEmpty
                 ? Container(
@@ -783,7 +783,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
           ),
 
-          // â”€â”€ BARRA SUPERIOR: disponibilidad â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── BARRA SUPERIOR: disponibilidad ────────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -856,7 +856,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ],
                       ),
                     ),
-                    // BotÃ³n filtros pegado a la derecha
+                    // Botón filtros pegado a la derecha
                     Positioned(
                       right: 0,
                       child: Material(
@@ -890,7 +890,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             ),
           ),
 
-          // â”€â”€ BOTTOM SHEET DRAGGABLE con solicitudes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── BOTTOM SHEET DRAGGABLE con solicitudes ────────────────────
           DraggableScrollableSheet(
             controller: _sheetCtrl,
             initialChildSize: 0.32,
@@ -906,14 +906,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   color: Color(0xFF0D1728),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                // Un Ãºnico ListView con el scrollController del sheet.
+                // Un único ListView con el scrollController del sheet.
                 // Esto hace que arrastrar desde cualquier parte expanda el sheet.
                 child: ListView(
                   controller: scrollController,
                   padding: EdgeInsets.zero,
                   physics: const ClampingScrollPhysics(),
                   children: [
-                    // â”€â”€ Handle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Handle ──────────────────────────────────────
                     Center(
                       child: Container(
                         width: 40,
@@ -925,7 +925,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ),
                       ),
                     ),
-                    // â”€â”€ Contenido â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Contenido ────────────────────────────────────
                     if (_loading && _requests.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
@@ -1008,7 +1008,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             },
           ),
 
-          // â”€â”€ BANNER OFERTA ACEPTADA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── BANNER OFERTA ACEPTADA ─────────────────────────────────────
           if (_showAcceptedBanner)
             Positioned(
               top: 0,
@@ -1052,7 +1052,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Â¡Oferta aceptada!',
+                                    '¡Oferta aceptada!',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w800,
@@ -1060,7 +1060,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     ),
                                   ),
                                   Text(
-                                    'El cliente aceptÃ³ tu oferta. DirÃ­gete a la ubicaciÃ³n.',
+                                    'El cliente aceptó tu oferta. Dirígete a la ubicación.',
                                     style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
@@ -1111,8 +1111,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           const SizedBox(height: 6),
           Text(
             _available
-                ? 'EstÃ¡s disponible. Las solicitudes aparecerÃ¡n aquÃ­.'
-                : 'EstÃ¡s ocupado. Activa disponibilidad para recibir trabajos.',
+                ? 'Estás disponible. Las solicitudes aparecerán aquí.'
+                : 'Estás ocupado. Activa disponibilidad para recibir trabajos.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
           ),
@@ -1245,7 +1245,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
                   const PopupMenuItem(
                     value: 'report',
-                    child: Text('Reportar publicaciÃ³n', style: TextStyle(color: Colors.redAccent)),
+                    child: Text('Reportar publicación', style: TextStyle(color: Colors.redAccent)),
                   ),
                 ],
               ),
@@ -1260,7 +1260,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      req['title']?.toString() ?? 'Sin tÃ­tulo',
+                      req['title']?.toString() ?? 'Sin título',
                       style: const TextStyle(
                         color: AppTheme.colorText,
                         fontSize: 18,
@@ -1269,7 +1269,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      req['description']?.toString() ?? 'Sin descripciÃ³n',
+                      req['description']?.toString() ?? 'Sin descripción',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1307,7 +1307,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  req['address']?.toString() ?? 'DirecciÃ³n no disponible',
+                  req['address']?.toString() ?? 'Dirección no disponible',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppTheme.colorText, fontSize: 14),
@@ -1414,7 +1414,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Oferta declinada', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                          Text('El cliente declinÃ³ tu oferta de Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12)),
+                          Text('El cliente declinó tu oferta de Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -1441,7 +1441,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Â¡El cliente subiÃ³ el presupuesto a Bs. $currentBudget!',
+                          '¡El cliente subió el presupuesto a Bs. $currentBudget!',
                           style: const TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1541,7 +1541,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.colorSurfaceSoft,
-        title: const Text('Reportar publicaciÃ³n', style: TextStyle(color: AppTheme.colorText)),
+        title: const Text('Reportar publicación', style: TextStyle(color: AppTheme.colorText)),
         content: TextField(
           controller: reasonCtrl,
           decoration: const InputDecoration(
@@ -1573,7 +1573,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 });
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PublicaciÃ³n reportada')),
+                    const SnackBar(content: Text('Publicación reportada')),
                   );
                 }
               } catch (e) {
@@ -1688,7 +1688,7 @@ class _AvailabilityLabel extends StatelessWidget {
   }
 }
 
-// â”€â”€ Modal de detalles del trabajo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Modal de detalles del trabajo ─────────────────────────────────────────────
 class _JobDetailsSheet extends StatelessWidget {
   const _JobDetailsSheet({required this.requestData});
 
@@ -1731,7 +1731,7 @@ class _JobDetailsSheet extends StatelessWidget {
                 ),
               ),
 
-              // TÃ­tulo
+              // Título
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -1740,7 +1740,7 @@ class _JobDetailsSheet extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              // CategorÃ­a + presupuesto
+              // Categoría + presupuesto
               Row(
                 children: [
                   if (category.isNotEmpty)
@@ -1776,10 +1776,10 @@ class _JobDetailsSheet extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // DescripciÃ³n
+              // Descripción
               if (description.isNotEmpty) ...[
                 const Text(
-                  'DescripciÃ³n',
+                  'Descripción',
                   style: TextStyle(
                     color: AppTheme.colorMuted,
                     fontSize: 12,
@@ -1798,10 +1798,10 @@ class _JobDetailsSheet extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
 
-              // DirecciÃ³n
+              // Dirección
               if (address.isNotEmpty) ...[
                 const Text(
-                  'DirecciÃ³n',
+                  'Dirección',
                   style: TextStyle(
                     color: AppTheme.colorMuted,
                     fontSize: 12,
@@ -1850,9 +1850,8 @@ class _JobDetailsSheet extends StatelessWidget {
                           : null,
                       child: client['profilePhotoUrl'] == null
                           ? Text(
-                              (client['firstName'] as String? ?? 'C')
-                                  .substring(0, 1)
-                                  .toUpperCase(),
+                              chambaInitial(client['firstName'],
+                                  fallback: 'C'),
                             )
                           : null,
                     ),

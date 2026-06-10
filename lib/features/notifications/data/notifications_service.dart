@@ -14,11 +14,13 @@ class NotificationsService {
     if (userId == null) return (items: <AppNotification>[], hasMore: false);
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.apiBaseUrl}/mobile/notifications?userId=$userId&page=$page&limit=$limit',
-        ),
-      );
+      final response = await http
+          .get(
+            Uri.parse(
+              '${AppConfig.apiBaseUrl}/mobile/notifications?userId=$userId&page=$page&limit=$limit',
+            ),
+          )
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -40,11 +42,13 @@ class NotificationsService {
     if (userId == null) return;
 
     try {
-      await http.patch(
-        Uri.parse('${AppConfig.apiBaseUrl}/mobile/notifications/read'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}),
-      );
+      await http
+          .patch(
+            Uri.parse('${AppConfig.apiBaseUrl}/mobile/notifications/read'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId}),
+          )
+          .timeout(const Duration(seconds: 12));
     } catch (e) {
       // Ignorar error de red
     }

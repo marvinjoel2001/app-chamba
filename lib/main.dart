@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/push/push_notification_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/worker_background_service.dart';
 import 'core/session/session_store.dart';
 
@@ -23,6 +24,12 @@ Future<void> main() async {
   unawaited(
     const PushNotificationService().initialize().catchError((e) {
       debugPrint('Error inicializando notificaciones push: $e');
+    }),
+  );
+
+  unawaited(
+    ConnectivityService.instance.initialize().catchError((e) {
+      debugPrint('Error inicializando monitor de conectividad: $e');
     }),
   );
 

@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+/// Devuelve la inicial de [value] en mayúscula, o [fallback] si está vacío.
+/// Evita crashes de `substring` sobre strings vacíos.
+String chambaInitial(Object? value, {String fallback = '?'}) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? fallback : text.substring(0, 1).toUpperCase();
+}
+
 class ChambaBackground extends StatelessWidget {
   const ChambaBackground({
     required this.child,

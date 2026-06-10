@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -17,7 +18,6 @@ import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/tracking_dependencies.dart';
 import '../../../support/presentation/screens/support_screen.dart';
-import '../../../review/presentation/screens/rating_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
@@ -51,7 +51,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   void _onChatMessage(dynamic data) {
-    final msg = data as Map<String, dynamic>? ?? {};
+    // El payload del socket puede llegar como Map<dynamic, dynamic>;
+    // un cast directo a Map<String, dynamic> lanza TypeError.
+    final msg = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
     if (msg['senderId'] != SessionStore.currentUser?.id) {
       if (mounted) setState(() => _unreadMessages++);
     }
@@ -80,23 +82,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   void _onJobCompleted(dynamic _) {
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => const RatingScreen(),
-        ),
-        (route) => false,
-      );
-    }
+    // Navegación centralizada: evita que varias pantallas del stack
+    // abran la calificación a la vez.
+    AppFlows.goToRating();
   }
 
   void _onJobCancelled(dynamic _) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El trabajo fue cancelado.')),
-      );
-      Navigator.of(context).pop();
-    }
+    AppFlows.goHomeAfterCancellation();
   }
 
   Future<void> _ensureActiveThread() async {
@@ -640,9 +632,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       : null,
                                   child: worker?['profilePhotoUrl'] == null
                                       ? Text(
-                                          (worker?['firstName'] ?? 'W')
-                                              .toString()
-                                              .substring(0, 1),
+                                          chambaInitial(worker?['firstName'],
+                                              fallback: 'W'),
                                           style: const TextStyle(
                                             color: AppTheme.colorText,
                                             fontWeight: FontWeight.w700,

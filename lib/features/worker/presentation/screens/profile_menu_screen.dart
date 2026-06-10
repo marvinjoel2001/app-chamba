@@ -322,8 +322,8 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                                         : NetworkImage(user!.profilePhotoUrl!),
                                     child: user?.profilePhotoUrl == null
                                         ? Text(
-                                            (user?.firstName ?? 'U')
-                                                .substring(0, 1),
+                                            chambaInitial(user?.firstName,
+                                                fallback: 'U'),
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 26,

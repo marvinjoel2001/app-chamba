@@ -46,7 +46,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _onMessageEvent(dynamic payload) {
-    _load();
+    // Refresco silencioso: no mostrar spinner cuando llega un mensaje nuevo.
+    _load(silent: true);
   }
 
   Future<void> _loadNotifications() async {
@@ -71,7 +72,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     return '${value.day}/${value.month}';
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
@@ -80,22 +81,29 @@ class _MessagesScreenState extends State<MessagesScreen> {
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    // Solo spinner en la carga inicial; los refrescos son silenciosos.
+    if (!silent || _threads.isEmpty) {
+      setState(() {
+        _loading = _threads.isEmpty;
+        _error = null;
+      });
+    }
 
     _loadNotifications();
 
-    // Cargar todos los threads (activos y archivados) en una sola lista
-    final activeResult = await MessagesDependencies.getActiveThreads(
-      userId: user.id,
-      type: ChatThreadType.active,
-    );
-    final archivedResult = await MessagesDependencies.getArchivedThreads(
-      userId: user.id,
-      type: ChatThreadType.archived,
-    );
+    // Cargar threads activos y archivados en paralelo
+    final results = await Future.wait([
+      MessagesDependencies.getActiveThreads(
+        userId: user.id,
+        type: ChatThreadType.active,
+      ),
+      MessagesDependencies.getArchivedThreads(
+        userId: user.id,
+        type: ChatThreadType.archived,
+      ),
+    ]);
+    final activeResult = results[0];
+    final archivedResult = results[1];
 
     if (!mounted) return;
 
@@ -110,6 +118,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       onFailure: (failure) {
         _isOffline = failure is NetworkFailure;
         _shouldRedirectToLogin = failure is UnauthorizedFailure;
+        _error ??= failure.message;
       },
     );
 

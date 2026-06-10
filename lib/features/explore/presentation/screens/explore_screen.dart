@@ -914,9 +914,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               : NetworkImage(user!.profilePhotoUrl!),
                           child: user?.profilePhotoUrl == null
                               ? Text(
-                                  (user?.firstName ?? 'U')
-                                      .substring(0, 1)
-                                      .toUpperCase(),
+                                  chambaInitial(user?.firstName,
+                                      fallback: 'U'),
                                 )
                               : null,
                         ),

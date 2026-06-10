@@ -13,6 +13,13 @@ class RealtimeService {
   io.Socket? _socket;
   String? _connectedUserId;
 
+  /// Threads a los que el usuario se unió; se re-emite el join al reconectar
+  /// para no perder mensajes en tiempo real tras una caída de conexión.
+  final Set<String> _joinedThreadIds = {};
+
+  /// Estado de conexión del socket, útil para mostrar avisos en UI.
+  final ValueNotifier<bool> isConnectedNotifier = ValueNotifier<bool>(false);
+
   io.Socket get socket => _socket!;
 
   bool get isConnected => _socket?.connected == true;
@@ -33,6 +40,7 @@ class RealtimeService {
       _socket!.dispose();
       _socket = null;
       _connectedUserId = null;
+      _joinedThreadIds.clear();
     }
 
     // Crear socket nuevo si no existe
@@ -43,99 +51,117 @@ class RealtimeService {
           .setQuery(userId == null || userId.isEmpty ? {} : {'userId': userId})
           .disableAutoConnect()
           .enableReconnection()
-          .setReconnectionAttempts(10)
+          .setReconnectionAttempts(1 << 30) // reintentar siempre
           .setReconnectionDelay(2000)
+          .setReconnectionDelayMax(15000)
           .build(),
     );
 
     _connectedUserId = userId;
 
-    // Siempre re-emitir join.user al reconectar (cubre hot restart y reconexiones)
-    if (userId != null && userId.isNotEmpty) {
-      // Remover listener previo para no duplicar
-      _socket!.off('connect');
-      _socket!.on('connect', (_) {
+    // Siempre re-emitir join.user y join.thread al (re)conectar
+    // (cubre hot restart, reconexiones y caídas de red).
+    _socket!.off('connect');
+    _socket!.on('connect', (_) {
+      isConnectedNotifier.value = true;
+      if (userId != null && userId.isNotEmpty) {
         _socket?.emit('join.user', {'userId': userId});
-        if (kDebugMode) {
-          print('[RealtimeService] Conectado → join.user $userId');
-        }
-      });
+      }
+      for (final threadId in _joinedThreadIds) {
+        _socket?.emit('join.thread', {'threadId': threadId});
+      }
+      if (kDebugMode) {
+        print('[RealtimeService] Conectado → join.user $userId');
+      }
+    });
+
+    _socket!.off('disconnect', _onDisconnect);
+    _socket!.on('disconnect', _onDisconnect);
+
+    if (kDebugMode) {
+      _socket!.off('connect_error', _onConnectErrorDebug);
+      _socket!.on('connect_error', _onConnectErrorDebug);
     }
 
     // Conectar si no está conectado
     if (!_socket!.connected) {
       _socket!.connect();
     } else if (userId != null && userId.isNotEmpty) {
+      isConnectedNotifier.value = true;
       // Ya conectado: emitir join inmediatamente
       _socket!.emit('join.user', {'userId': userId});
     }
 
+    _socket!.off('notification.toast');
+    _socket!.on('notification.toast', _onNotificationToast);
+  }
+
+  void _onDisconnect(dynamic reason) {
+    isConnectedNotifier.value = false;
     if (kDebugMode) {
-      _socket!.on(
-        'disconnect',
-        (reason) => print('[RealtimeService] Socket desconectado: $reason'),
-      );
-      _socket!.on(
-        'connect_error',
-        (err) => print('[RealtimeService] Error de conexión: $err'),
-      );
-      _socket!.on(
-        'connection.ready',
-        (data) => print('[RealtimeService] connection.ready: $data'),
-      );
+      print('[RealtimeService] Socket desconectado: $reason');
+    }
+  }
+
+  void _onConnectErrorDebug(dynamic err) {
+    if (kDebugMode) {
+      print('[RealtimeService] Error de conexión: $err');
+    }
+  }
+
+  void _onNotificationToast(dynamic data) {
+    // Normalizar: el payload puede llegar como Map<dynamic, dynamic>.
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+
+    final target = map['target'] as String?;
+    final userIds = map['userIds'] as List<dynamic>?;
+    final currentUser = SessionStore.currentUser;
+    if (currentUser == null) return;
+
+    bool shouldShow = false;
+    if (target == 'all') {
+      shouldShow = true;
+    } else if (target == 'workers' && currentUser.type == 'worker') {
+      shouldShow = true;
+    } else if (target == 'clients' && currentUser.type == 'client') {
+      shouldShow = true;
+    } else if (target == 'custom' && userIds != null) {
+      if (userIds.contains(currentUser.id)) {
+        shouldShow = true;
+      }
     }
 
-    _socket!.off('notification.toast');
-    _socket!.on('notification.toast', (data) {
-      if (data is Map<String, dynamic>) {
-        final target = data['target'] as String?;
-        final userIds = data['userIds'] as List<dynamic>?;
-        final currentUser = SessionStore.currentUser;
-        if (currentUser == null) return;
+    if (!shouldShow) return;
 
-        bool shouldShow = false;
-        if (target == 'all') {
-          shouldShow = true;
-        } else if (target == 'workers' && currentUser.type == 'worker') {
-          shouldShow = true;
-        } else if (target == 'clients' && currentUser.type == 'client') {
-          shouldShow = true;
-        } else if (target == 'custom' && userIds != null) {
-          if (userIds.contains(currentUser.id)) {
-            shouldShow = true;
-          }
-        }
+    final typeStr = map['toastType'] as String? ?? 'info';
+    final ToastType tType;
+    switch (typeStr) {
+      case 'error':
+        tType = ToastType.error;
+        break;
+      case 'success':
+        tType = ToastType.success;
+        break;
+      default:
+        tType = ToastType.info;
+        break;
+    }
 
-        if (shouldShow) {
-          final typeStr = data['toastType'] as String? ?? 'info';
-          ToastType tType;
-          switch (typeStr) {
-            case 'error':
-              tType = ToastType.error;
-              break;
-            case 'success':
-              tType = ToastType.success;
-              break;
-            default:
-              tType = ToastType.info;
-              break;
-          }
-
-          ToastService.show(
-            title: data['title'] as String? ?? 'Notificación',
-            body: data['body'] as String? ?? '',
-            type: tType,
-          );
-        }
-      }
-    });
+    ToastService.show(
+      title: map['title'] as String? ?? 'Notificación',
+      body: map['body'] as String? ?? '',
+      type: tType,
+    );
   }
 
   void joinThread(String threadId) {
-    if (threadId.trim().isEmpty) {
+    final normalized = threadId.trim();
+    if (normalized.isEmpty) {
       return;
     }
-    _socket?.emit('join.thread', {'threadId': threadId});
+    _joinedThreadIds.add(normalized);
+    _socket?.emit('join.thread', {'threadId': normalized});
   }
 
   void on(String event, void Function(dynamic payload) handler) {
@@ -156,11 +182,14 @@ class RealtimeService {
 
   void disconnect() {
     _socket?.disconnect();
+    isConnectedNotifier.value = false;
   }
 
   void dispose() {
     _socket?.dispose();
     _socket = null;
     _connectedUserId = null;
+    _joinedThreadIds.clear();
+    isConnectedNotifier.value = false;
   }
 }

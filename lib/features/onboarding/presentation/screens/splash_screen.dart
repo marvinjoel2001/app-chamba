@@ -23,36 +23,36 @@ class _SplashScreenState extends State<SplashScreen> {
   Timer? timer;
   String _statusText = 'Cargando...';
   bool _isSlowBackend = false;
+  bool _resolving = false;
   DateTime? _startTime;
 
   @override
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    timer = Timer.periodic(const Duration(milliseconds: 180), (tick) {
-      setState(() {
-        // Slow down progress if backend is taking long
-        final elapsed = DateTime.now().difference(_startTime!).inSeconds;
-        if (elapsed > 3 && progress >= 0.6) {
-          // Slow progress after 3 seconds to wait for backend
-          progress = (progress + 0.02).clamp(0.0, 0.95);
-          _statusText = 'Conectando con el servidor...';
-        } else if (elapsed > 8 && !_isSlowBackend) {
-          _isSlowBackend = true;
-          _statusText = 'El servidor está despertando...';
-        } else if (!_isSlowBackend) {
-          progress = (progress + 0.1).clamp(0.0, 0.8);
-        }
+    // Arranque rápido: la barra se llena en ~1 segundo y se resuelve la ruta.
+    // Si el backend tarda (p. ej. servidor dormido), la barra sigue avanzando
+    // lento y se informa al usuario, pero no se bloquea el arranque normal.
+    timer = Timer.periodic(const Duration(milliseconds: 120), (tick) {
+      if (!mounted) return;
+      final elapsedMs = DateTime.now().difference(_startTime!).inMilliseconds;
 
-        // Only proceed after minimum time and backend check
-        if (progress >= 1 && elapsed >= 2) {
-          timer?.cancel();
-          _resolveInitialRoute();
+      setState(() {
+        if (!_resolving) {
+          progress = (progress + 0.12).clamp(0.0, 0.9);
+        } else {
+          progress = (progress + 0.01).clamp(0.0, 0.95);
+          if (elapsedMs > 9000 && !_isSlowBackend) {
+            _isSlowBackend = true;
+            _statusText = 'El servidor está despertando...';
+          } else if (elapsedMs > 3500 && !_isSlowBackend) {
+            _statusText = 'Conectando con el servidor...';
+          }
         }
       });
 
-      if (progress >= 0.95 && !_isSlowBackend) {
-        timer?.cancel();
+      if (!_resolving && progress >= 0.9 && elapsedMs >= 900) {
+        _resolving = true;
         _resolveInitialRoute();
       }
     });
@@ -67,16 +67,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final user = SessionStore.currentUser;
     if (user == null) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      );
+      _go(const LoginScreen());
       return;
     }
 
     if (user.isBlocked) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const BlockedScreen()),
-      );
+      _go(const BlockedScreen());
       return;
     }
 
@@ -103,9 +99,14 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     }
 
+    _go(nextScreen);
+  }
+
+  void _go(Widget screen) {
+    timer?.cancel();
     Navigator.of(
       context,
-    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => nextScreen));
+    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => screen));
   }
 
   @override

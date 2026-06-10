@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 
@@ -92,6 +93,9 @@ class _ChatScreenState extends State<ChatScreen> {
   // Audio recording & playback
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<void>? _playerCompleteSub;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration>? _durationSub;
   String? _recordingPath;
   String? _currentlyPlayingAudioUrl;
   bool _isPlayingAudio = false;
@@ -113,12 +117,37 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtime.on('message.new', _onMessageNew);
     _scrollController.addListener(_onScroll);
     _scrollController.addListener(_markVisibleMessagesAsRead);
+    _initAudioListeners();
     _load();
+  }
+
+  void _initAudioListeners() {
+    _playerCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlayingAudio = false;
+          _audioPosition = Duration.zero;
+        });
+      }
+    });
+    _positionSub = _audioPlayer.onPositionChanged.listen((position) {
+      if (mounted) {
+        setState(() => _audioPosition = position);
+      }
+    });
+    _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
+      if (mounted) {
+        setState(() => _audioDuration = duration);
+      }
+    });
   }
 
   @override
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
+    _playerCompleteSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
     _audioPlayer.dispose();
     _audioRecorder.dispose();
     controller.dispose();
@@ -128,6 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onMessageNew(dynamic payload) {
+    if (!mounted) return;
     Map<String, dynamic> map = {};
     if (payload is Map) {
       map = Map<String, dynamic>.from(payload);
@@ -319,7 +349,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   minLines: 1,
                   textCapitalization: TextCapitalization.sentences,
                   enabled: !_isSendingMedia,
-                  onChanged: (text) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: hasPendingImage
                         ? 'Agrega una descripción...'
@@ -496,6 +525,7 @@ class _ChatScreenState extends State<ChatScreen> {
         path: path,
       );
 
+      if (!mounted) return;
       setState(() {
         _isRecording = true;
         _recordingPath = path;
@@ -510,6 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!await _audioRecorder.isRecording()) return;
 
       final path = await _audioRecorder.stop();
+      if (!mounted) return;
       setState(() => _isRecording = false);
 
       if (path != null) {
@@ -518,7 +549,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       debugPrint('Error stopping recording: $e');
-      setState(() => _isRecording = false);
+      if (mounted) setState(() => _isRecording = false);
     }
   }
 
@@ -546,6 +577,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: '🎤 Mensaje de voz [${await _getAudioDuration(path)}s]\n$audioUrl',
       );
 
+      if (!mounted) return;
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
@@ -559,9 +591,9 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
     } catch (e) {
-      setState(() => _error = 'Error enviando audio: $e');
+      if (mounted) setState(() => _error = 'Error enviando audio: $e');
     } finally {
-      setState(() => _isSendingMedia = false);
+      if (mounted) setState(() => _isSendingMedia = false);
     }
   }
 
@@ -624,41 +656,17 @@ class _ChatScreenState extends State<ChatScreen> {
         // Play new
         await _audioPlayer.stop();
         await _audioPlayer.play(UrlSource(url));
+        if (!mounted) return;
         setState(() {
           _currentlyPlayingAudioUrl = url;
           _isPlayingAudio = true;
-        });
-
-        // Listen for completion
-        _audioPlayer.onPlayerComplete.listen((_) {
-          if (mounted) {
-            setState(() {
-              _isPlayingAudio = false;
-              _audioPosition = Duration.zero;
-            });
-          }
-        });
-
-        // Listen for position changes
-        _audioPlayer.onPositionChanged.listen((position) {
-          if (mounted) {
-            setState(() {
-              _audioPosition = position;
-            });
-          }
-        });
-
-        // Listen for duration
-        _audioPlayer.onDurationChanged.listen((duration) {
-          if (mounted) {
-            setState(() {
-              _audioDuration = duration;
-            });
-          }
+          _audioPosition = Duration.zero;
+          _audioDuration = Duration.zero;
         });
       }
     } catch (e) {
       debugPrint('Error playing audio: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error reproduciendo audio')),
       );
@@ -735,7 +743,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       await _sendFileMessage(file.path!, file.name, file.size);
     } catch (e) {
-      setState(() => _error = 'Error seleccionando archivo: $e');
+      if (mounted) setState(() => _error = 'Error seleccionando archivo: $e');
     }
   }
 
@@ -760,6 +768,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: '📎 $name\n$fileUrl',
       );
 
+      if (!mounted) return;
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
@@ -773,9 +782,9 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
     } catch (e) {
-      setState(() => _error = 'Error enviando archivo: $e');
+      if (mounted) setState(() => _error = 'Error enviando archivo: $e');
     } finally {
-      setState(() => _isSendingMedia = false);
+      if (mounted) setState(() => _isSendingMedia = false);
     }
   }
 
@@ -791,12 +800,12 @@ class _ChatScreenState extends State<ChatScreen> {
         imageQuality: 85,
       );
 
-      if (picked == null) return;
+      if (picked == null || !mounted) return;
 
       // Show preview before sending
       setState(() => _pendingImage = File(picked.path));
     } catch (e) {
-      setState(() => _error = 'Error seleccionando imagen: $e');
+      if (mounted) setState(() => _error = 'Error seleccionando imagen: $e');
     }
   }
 
@@ -821,6 +830,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: '📷 Imagen enviada\n$imageUrl',
       );
 
+      if (!mounted) return;
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
@@ -835,9 +845,9 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
     } catch (e) {
-      setState(() => _error = 'Error enviando imagen: $e');
+      if (mounted) setState(() => _error = 'Error enviando imagen: $e');
     } finally {
-      setState(() => _isSendingMedia = false);
+      if (mounted) setState(() => _isSendingMedia = false);
     }
   }
 
@@ -877,10 +887,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    // Solo mostrar spinner cuando aun no hay mensajes cargados;
+    // en refrescos posteriores se actualiza en silencio.
+    final isFirstLoad = _messages.isEmpty;
+    if (isFirstLoad) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     final result = await _getThreadMessagesUseCase(threadId: widget.threadId);
     if (!mounted) return;
@@ -891,18 +906,30 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages = messages;
           _isOffline = false;
           _shouldRedirectToLogin = false;
+          _error = null;
           _loading = false;
         });
+        if (isFirstLoad) {
+          _jumpToBottom();
+        }
       },
       onFailure: (failure) {
         setState(() {
-          _error = failure.message;
+          if (isFirstLoad) _error = failure.message;
           _isOffline = failure is NetworkFailure;
           _shouldRedirectToLogin = failure is UnauthorizedFailure;
           _loading = false;
         });
       },
     );
+  }
+
+  void _jumpToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   Future<void> _send() async {
@@ -922,10 +949,7 @@ class _ChatScreenState extends State<ChatScreen> {
       content: content,
     );
 
-    if (!mounted) {
-      setState(() => _isSending = false);
-      return;
-    }
+    if (!mounted) return;
 
     result.fold(
       onSuccess: (sentMessage) {
@@ -1007,9 +1031,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           : NetworkImage(widget.counterpartAvatarUrl!),
                       child: widget.counterpartAvatarUrl == null
                           ? Text(
-                              widget.counterpartName
-                                  .substring(0, 1)
-                                  .toUpperCase(),
+                              widget.counterpartName.trim().isEmpty
+                                  ? '?'
+                                  : widget.counterpartName
+                                      .trim()
+                                      .substring(0, 1)
+                                      .toUpperCase(),
                             )
                           : null,
                     ),
@@ -1203,7 +1230,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
 
               // Message input (disabled for archived chats) - WhatsApp style
-              if (!widget.isArchived) _buildMessageInput(),
+              // ValueListenableBuilder evita reconstruir toda la pantalla en
+              // cada tecla: solo se reconstruye el input.
+              if (!widget.isArchived)
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, _, __) => _buildMessageInput(),
+                ),
 
               const SizedBox(height: 8),
             ],
@@ -1427,6 +1460,9 @@ class _ChatScreenState extends State<ChatScreen> {
           width: 200,
           height: 200,
           fit: BoxFit.cover,
+          // Decodifica la imagen a un tamano acorde al widget para no
+          // gastar memoria ni trabar el scroll con imagenes grandes.
+          cacheWidth: 480,
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Container(

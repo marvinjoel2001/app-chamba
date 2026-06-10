@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze *)",
-      "PowerShell(Get-Command *)"
+      "PowerShell(Get-Command *)",
+      "PowerShell(flutter *)",
+      "PowerShell($paths = @\\(\"$env:LOCALAPPDATA\\\\flutter\\\\bin\", \"C:\\\\flutter\\\\bin\", \"C:\\\\src\\\\flutter\\\\bin\", \"$env:USERPROFILE\\\\flutter\\\\bin\", \"$env:USERPROFILE\\\\dev\\\\flutter\\\\bin\", \"$env:USERPROFILE\\\\fvm\\\\default\\\\bin\"\\); foreach \\($p in $paths\\) { if \\(Test-Path \"$p\\\\flutter.bat\"\\) { Write-Output \"FOUND: $p\" } }; Get-ChildItem \"C:\\\\Users\\\\marvin\" -Directory -ErrorAction SilentlyContinue | Where-Object Name -match 'flutter|sdk|dev' | Select-Object -ExpandProperty FullName)",
+      "PowerShell(flutter pub *)",
+      "PowerShell(flutter analyze *)",
+      "PowerShell(git stash *)",
+      "PowerShell(flutter test *)",
+      "PowerShell(flutter build *)",
+      "PowerShell(foreach \\($p in @\\(\"$env:LOCALAPPDATA\\\\Android\\\\Sdk\", \"C:\\\\Android\\\\Sdk\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Android\\\\Sdk\", \"C:\\\\Program Files \\(x86\\)\\\\Android\\\\android-sdk\"\\)\\) { if \\(Test-Path $p\\) { Write-Output \"FOUND: $p\" } })"
     ]
   }
 }

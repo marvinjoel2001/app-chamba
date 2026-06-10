@@ -141,9 +141,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     if (mounted) {
       SessionStore.activeRequestId = null;
       SessionStore.activeThreadId = null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El trabajo fue cancelado.')),
-      );
+      // El aviso visual lo muestra IncomingRequestScreen (siempre montada en
+      // el shell del worker); aquí solo volvemos al inicio para no duplicar.
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
@@ -796,9 +795,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                       : null,
                                   child: client?['profilePhotoUrl'] == null
                                       ? Text(
-                                          (client?['firstName'] ?? 'C')
-                                              .toString()
-                                              .substring(0, 1),
+                                          chambaInitial(client?['firstName'],
+                                              fallback: 'C'),
                                           style: const TextStyle(
                                             color: AppTheme.colorText,
                                             fontWeight: FontWeight.w700,

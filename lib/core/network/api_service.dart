@@ -151,9 +151,15 @@ class ApiService {
   }
 
   Map<String, dynamic> _parseResponse(http.Response response) {
-    final payload = response.body.isEmpty
-        ? <String, dynamic>{}
-        : _decodeBody(response.body);
+    Map<String, dynamic> payload;
+    try {
+      payload = response.body.isEmpty
+          ? <String, dynamic>{}
+          : _decodeBody(response.body);
+    } on FormatException {
+      // Respuesta no-JSON (p. ej. HTML de un proxy): no exponer el error crudo.
+      payload = <String, dynamic>{};
+    }
 
     if (response.statusCode >= 400) {
       final bodyMessage = _extractBodyMessage(payload);

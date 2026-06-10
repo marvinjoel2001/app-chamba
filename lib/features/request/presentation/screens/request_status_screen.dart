@@ -5,13 +5,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/request_dependencies.dart';
 import '../../../../../features/offers/presentation/screens/offers_screen.dart';
-import '../../../review/presentation/screens/rating_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen({this.latitude, this.longitude, super.key});
@@ -89,28 +89,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onJobCompleted(dynamic _) {
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => const RatingScreen(),
-        ),
-        (route) => false,
-      );
-    }
+    // Navegación centralizada: evita que varias pantallas del stack
+    // abran la calificación a la vez.
+    AppFlows.goToRating();
   }
 
   void _onJobCancelled(dynamic _) {
-    // Limpiar sesión del trabajo activo
-    SessionStore.activeRequestId = null;
-    SessionStore.activeThreadId = null;
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El trabajo fue cancelado.')),
-      );
-      // Volver al home limpiando el stack
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    AppFlows.goHomeAfterCancellation();
   }
 
   void _onOfferEvent(dynamic payload) => _load();

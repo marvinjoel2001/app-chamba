@@ -18,7 +18,7 @@ class ToastService {
     final overlayState = ChambaApp.navigatorKey.currentState?.overlay;
     if (overlayState == null) return;
 
-    _overlayEntry?.remove();
+    _removeEntry();
     _timer?.cancel();
 
     _overlayEntry = OverlayEntry(
@@ -55,10 +55,18 @@ class ToastService {
   }
 
   static void _hide() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
+    _removeEntry();
     _timer?.cancel();
     _timer = null;
+  }
+
+  static void _removeEntry() {
+    // remove() lanza si el overlay ya fue desmontado (p. ej. hot restart);
+    // no debe tumbar la app por un toast.
+    try {
+      _overlayEntry?.remove();
+    } catch (_) {}
+    _overlayEntry = null;
   }
 
   static Widget _buildToastWidget(String title, String body, ToastType type) {

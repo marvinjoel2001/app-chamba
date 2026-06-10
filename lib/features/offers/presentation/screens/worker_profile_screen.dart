@@ -113,9 +113,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                         ),
                                   child: worker?['profilePhotoUrl'] == null
                                       ? Text(
-                                          (worker?['firstName'] ?? 'W')
-                                              .toString()
-                                              .substring(0, 1),
+                                          chambaInitial(worker?['firstName'],
+                                              fallback: 'W'),
                                         )
                                       : null,
                                 ),
