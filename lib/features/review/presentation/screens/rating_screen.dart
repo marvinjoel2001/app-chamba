@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -107,6 +108,77 @@ class _RatingScreenState extends State<RatingScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _showReportDialog(String workerId) async {
+    final reasonCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    bool submitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: AppTheme.colorBackgroundAccent,
+          title: const Text('Reportar Problema', style: TextStyle(color: AppTheme.colorError)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(labelText: 'Razón (ej. Fraude, Llegó tarde)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Descripción detallada'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
+            ),
+            ElevatedButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      if (reasonCtrl.text.trim().isEmpty) return;
+                      setStateDialog(() => submitting = true);
+                      try {
+                        await MobileBackendService.instance.createDispute(
+                          requestId: SessionStore.activeRequestId,
+                          reportedBy: SessionStore.currentUser!.id,
+                          reportedUser: workerId,
+                          reason: reasonCtrl.text.trim(),
+                          description: descCtrl.text.trim(),
+                        );
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Reporte enviado con éxito.'), backgroundColor: AppTheme.colorSuccess),
+                        );
+                      } catch (e) {
+                        if (!ctx.mounted) return;
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.colorError),
+                        );
+                        setStateDialog(() => submitting = false);
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.colorError),
+              child: submitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Enviar Reporte', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -219,6 +291,29 @@ class _RatingScreenState extends State<RatingScreen> {
                         child: const Text(
                           'Omitir por ahora',
                           style: TextStyle(color: AppTheme.colorMuted),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final user = SessionStore.currentUser;
+                          final reqId = SessionStore.activeRequestId;
+                          if (user == null || reqId == null) return;
+                          try {
+                            final offers = (await ReviewDependencies.getOffers(requestId: reqId, clientUserId: user.id)).fold(onSuccess: (v)=>v.payload, onFailure: (_)=>null);
+                            if (offers == null) return;
+                            final offerList = offers['offers'] as List<dynamic>? ?? const [];
+                            final accepted = offerList.cast<Map<String, dynamic>>().firstWhere((item) => item['status'] == 'accepted', orElse: () => <String, dynamic>{});
+                            final worker = accepted['worker'] as Map<String, dynamic>?;
+                            final workerId = worker?['id'] as String?;
+                            if (workerId != null) {
+                              await _showReportDialog(workerId);
+                            }
+                          } catch (_) {}
+                        },
+                        child: const Text(
+                          'Reportar Problema',
+                          style: TextStyle(color: AppTheme.colorError, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

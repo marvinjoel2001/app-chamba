@@ -15,6 +15,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../state/request_dependencies.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 
 class JobInProgressScreen extends StatefulWidget {
   const JobInProgressScreen({required this.requestId, super.key});
@@ -442,6 +443,81 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
+  }
+
+  Future<void> _showReportDialog() async {
+    final reasonCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    bool submitting = false;
+
+    final isWorker = SessionStore.currentUser?.type == 'worker';
+    final targetUser = isWorker ? _tracking?['client']?['id'] : _tracking?['worker']?['id'];
+    if (targetUser == null) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: AppTheme.colorBackgroundAccent,
+          title: const Text('Reportar Problema', style: TextStyle(color: AppTheme.colorError)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(labelText: 'Razón (ej. Fraude, Inseguridad)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Descripción detallada'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
+            ),
+            ElevatedButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      if (reasonCtrl.text.trim().isEmpty) return;
+                      setStateDialog(() => submitting = true);
+                      try {
+                        await MobileBackendService.instance.createDispute(
+                          requestId: widget.requestId,
+                          reportedBy: SessionStore.currentUser!.id,
+                          reportedUser: targetUser,
+                          reason: reasonCtrl.text.trim(),
+                          description: descCtrl.text.trim(),
+                        );
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Reporte enviado con éxito.'), backgroundColor: AppTheme.colorSuccess),
+                        );
+                      } catch (e) {
+                        if (!ctx.mounted) return;
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.colorError),
+                        );
+                        setStateDialog(() => submitting = false);
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.colorError),
+              child: submitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Enviar Reporte', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -955,12 +1031,25 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                               ],
                             ),
                             const SizedBox(height: 10),
-                            TextButton(
-                              onPressed: _cancelJob,
-                              child: const Text(
-                                'Cancelar trabajo',
-                                style: TextStyle(color: AppTheme.colorError),
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                TextButton(
+                                  onPressed: _cancelJob,
+                                  child: const Text(
+                                    'Cancelar trabajo',
+                                    style: TextStyle(color: AppTheme.colorError),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                TextButton(
+                                  onPressed: _showReportDialog,
+                                  child: const Text(
+                                    'Reportar Problema',
+                                    style: TextStyle(color: AppTheme.colorError, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
