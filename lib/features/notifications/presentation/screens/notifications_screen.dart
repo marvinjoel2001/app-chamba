@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../data/notifications_service.dart';
 import '../../domain/models/app_notification.dart';
+import '../../../messages/presentation/screens/messages_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -96,6 +97,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.location_on;
       case 'job_finished':
         return Icons.flag;
+      case 'counter_offer':
+        return Icons.monetization_on;
+      case 'offer_rejected':
+        return Icons.cancel;
+      case 'new_review':
+        return Icons.star;
+      case 'arrival_confirmed':
+        return Icons.verified_user;
+      case 'dispute_resolved':
+        return Icons.gavel;
+      case 'dispute_created':
+        return Icons.warning;
+      case 'verification_update':
+        return Icons.how_to_reg;
+      case 'job_cancelled':
+        return Icons.block;
+      case 'support_message':
+        return Icons.support_agent;
       default:
         return Icons.notifications;
     }
@@ -104,15 +123,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Color _getColorForType(String type) {
     switch (type) {
       case 'offer_new':
+      case 'support_message':
         return AppTheme.colorInfo;
       case 'offer_accepted':
+      case 'arrival_confirmed':
         return AppTheme.colorSuccess;
       case 'request_new':
+      case 'dispute_created':
         return AppTheme.colorWarning;
       case 'worker_arrived':
+      case 'verification_update':
         return AppTheme.colorPrimary;
       case 'job_finished':
         return Colors.purple;
+      case 'counter_offer':
+        return Colors.green;
+      case 'offer_rejected':
+      case 'job_cancelled':
+        return AppTheme.colorError;
+      case 'new_review':
+        return Colors.amber;
+      case 'dispute_resolved':
+        return Colors.teal;
       default:
         return AppTheme.colorMuted;
     }
@@ -161,6 +193,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ? Colors.transparent
                             : AppTheme.colorPrimary.withOpacity(0.1),
                         child: ListTile(
+                          onTap: () {
+                            if (item.data != null && item.data!['deep_link'] != null) {
+                              final deepLink = item.data!['deep_link'] as String;
+                              if (deepLink.startsWith('/chat') || deepLink.startsWith('/support')) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const MessagesScreen()),
+                                );
+                              } else {
+                                // Default fallback para otros deep links: volver al home
+                                Navigator.of(context).popUntil((r) => r.isFirst);
+                              }
+                            }
+                          },
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 8),
                           leading: CircleAvatar(

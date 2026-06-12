@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
-
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -9,6 +10,8 @@ import '../config/firebase_config.dart';
 import '../services/mobile_backend_service.dart';
 import '../../firebase_options.dart';
 import '../session/session_store.dart';
+import '../../app.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -36,11 +39,12 @@ const AndroidNotificationChannel _androidChannel = AndroidNotificationChannel(
 
 // Canal para llamadas (prioridad máxima)
 const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
-  'chamba_call_channel',
+  'chamba_call_channel_v2', // Change ID to force Android to apply new sound
   'Llamadas de Trabajo',
   description: 'Alertas prioritarias para nuevas solicitudes de trabajo',
   importance: Importance.max,
   playSound: true,
+  sound: const RawResourceAndroidNotificationSound('chamba_ringtone'),
   enableVibration: true,
 );
 
@@ -111,14 +115,16 @@ class PushNotificationService {
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint('FCM foreground message: ${message.messageId}');
       if (message.data['type'] == 'request_new' && message.notification == null) {
-        // Es un mensaje tipo data-only de llamada
-        PushNotificationService.showCallNotification(message.data);
+        // Foreground: No mostramos banner nativo porque la pantalla "IncomingRequestScreen"
+        // ya se actualiza en tiempo real vía WebSocket y mostrará un Snackbar y degradado.
+        debugPrint('Ignorando banner nativo para request_new en foreground');
       } else {
         _showLocalNotification(message);
       }
     });
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       debugPrint('FCM notification tapped: ${message.messageId}');
+      _handleNotificationTap(message.data);
     });
 
     final token = await messaging.getToken();
@@ -127,6 +133,16 @@ class PushNotificationService {
     messaging.onTokenRefresh.listen((token) async {
       await _syncTokenWithBackend(token);
     });
+  }
+
+  static void _handleNotificationTap(Map<String, dynamic> data) {
+    final context = ChambaApp.navigatorKey.currentContext;
+    if (context == null) return;
+
+    // Navegar al Centro de Notificaciones al tocar (estilo TikTok)
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
   }
 
   Future<void> syncTokenForCurrentUser() async {
@@ -199,8 +215,11 @@ class PushNotificationService {
     final title = data['title'] ?? '📍 Trabajo nuevo cerca';
     final body = data['body'] ?? '¡Revisa la nueva solicitud!';
 
+    // Fixed ID to prevent multiple simultaneous call notifications and infinite loop overlaps
+    const int callNotificationId = 8888;
+
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      callNotificationId,
       title,
       body,
       NotificationDetails(
@@ -212,14 +231,17 @@ class PushNotificationService {
           importance: Importance.max,
           priority: Priority.max,
           playSound: true,
+          sound: const RawResourceAndroidNotificationSound('chamba_ringtone'),
           fullScreenIntent: true,
           category: AndroidNotificationCategory.call,
           visibility: NotificationVisibility.public,
+          additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT (repite el sonido)
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          sound: 'chamba_ringtone.mp3',
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),

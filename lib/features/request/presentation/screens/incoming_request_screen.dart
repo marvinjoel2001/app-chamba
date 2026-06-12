@@ -442,7 +442,43 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
-  void _onNewRequest(dynamic payload) => _load(silent: true);
+  void _onNewRequest(dynamic payload) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.new_releases, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                '¡Nueva solicitud cercana!',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: AppTheme.colorSuccess,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+    _load(silent: true);
+  }
+
+  String _timeAgo(String? isoDate) {
+    if (isoDate == null) return '';
+    try {
+      final date = DateTime.parse(isoDate).toLocal();
+      final diff = DateTime.now().difference(date);
+      if (diff.inMinutes < 1) return 'Hace un momento';
+      if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
+      if (diff.inHours < 24) return 'Hace ${diff.inHours} h';
+      return 'Hace ${diff.inDays} d';
+    } catch (_) {
+      return '';
+    }
+  }
 
   void _onJobCompleted(dynamic _) {
     SessionStore.activeRequestId = null;
@@ -1193,12 +1229,26 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final clientRating = (client['rating'] as num?)?.toDouble() ?? 0.0;
     final clientReviews = (client['reviews'] as num?)?.toInt() ?? 0;
     final isVerified = client['isVerified'] == true;
+    final createdAt = req['createdAt']?.toString();
+    final isNew = createdAt != null && DateTime.now().difference(DateTime.parse(createdAt).toLocal()).inMinutes < 2;
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.colorGlassBorderSoft),
+        border: Border.all(
+          color: isNew ? AppTheme.colorSuccess.withOpacity(0.5) : AppTheme.colorGlassBorderSoft,
+        ),
+        gradient: isNew
+            ? LinearGradient(
+                colors: [
+                  AppTheme.colorSuccess.withOpacity(0.15),
+                  AppTheme.colorSurfaceSoft,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1259,32 +1309,49 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, color: AppTheme.colorMuted),
-                color: AppTheme.colorSurfaceSoft,
-                onSelected: (val) {
-                  final reqId = req['id'].toString();
-                  final clientId = client['id'].toString();
-                  if (val == 'dismiss') {
-                    _dismissRequest(reqId);
-                  } else if (val == 'block') {
-                    _blockClient(clientId);
-                  } else if (val == 'report') {
-                    _reportRequest(reqId);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'dismiss',
-                    child: Text('No me interesa', style: TextStyle(color: AppTheme.colorText)),
-                  ),
-                  const PopupMenuItem(
-                    value: 'block',
-                    child: Text('Bloquear cliente', style: TextStyle(color: AppTheme.colorText)),
-                  ),
-                  const PopupMenuItem(
-                    value: 'report',
-                    child: Text('Reportar publicación', style: TextStyle(color: Colors.redAccent)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (createdAt != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8, top: 4),
+                      child: Text(
+                        _timeAgo(createdAt),
+                        style: TextStyle(
+                          color: isNew ? AppTheme.colorSuccess : AppTheme.colorMuted,
+                          fontSize: 10,
+                          fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: AppTheme.colorMuted),
+                    color: AppTheme.colorSurfaceSoft,
+                    onSelected: (val) {
+                      final reqId = req['id'].toString();
+                      final clientId = client['id'].toString();
+                      if (val == 'dismiss') {
+                        _dismissRequest(reqId);
+                      } else if (val == 'block') {
+                        _blockClient(clientId);
+                      } else if (val == 'report') {
+                        _reportRequest(reqId);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'dismiss',
+                        child: Text('No me interesa', style: TextStyle(color: AppTheme.colorText)),
+                      ),
+                      const PopupMenuItem(
+                        value: 'block',
+                        child: Text('Bloquear cliente', style: TextStyle(color: AppTheme.colorText)),
+                      ),
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Text('Reportar publicación', style: TextStyle(color: Colors.redAccent)),
+                      ),
+                    ],
                   ),
                 ],
               ),
