@@ -519,6 +519,8 @@ class _OffersScreenState extends State<OffersScreen> {
                               onAcceptOffer: _acceptOffer,
                               requestDescription:
                                   _request?['description']?.toString(),
+                              requestPriceType:
+                                  _request?['priceType']?.toString(),
                               formattedCountdown:
                                   _formatCountdown(secondsRemaining),
                               formattedPublishedAgo: _formatPublishedAgo(),
@@ -805,6 +807,7 @@ class _WorkerOfferCard extends StatelessWidget {
     required this.requestDescription,
     required this.formattedCountdown,
     required this.formattedPublishedAgo,
+    this.requestPriceType,
   });
 
   final Map<String, dynamic> offer;
@@ -819,6 +822,7 @@ class _WorkerOfferCard extends StatelessWidget {
   final String? requestDescription;
   final String formattedCountdown;
   final String formattedPublishedAgo;
+  final String? requestPriceType;
 
   @override
   Widget build(BuildContext context) {
@@ -985,6 +989,15 @@ class _WorkerOfferCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (requestPriceType != null && requestPriceType!.isNotEmpty)
+                      Text(
+                        requestPriceType!,
+                        style: const TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(width: 8),

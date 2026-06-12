@@ -64,9 +64,16 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
   Future<void> _updateDeviceLocation() async {
     try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) return;
+
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
+        try {
+          perm = await Geolocator.requestPermission();
+        } catch (_) {
+          return;
+        }
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) return;

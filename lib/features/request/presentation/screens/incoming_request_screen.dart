@@ -189,9 +189,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   Future<void> _startLocationStream() async {
     try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) return;
+
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
+        try {
+          perm = await Geolocator.requestPermission();
+        } catch (_) {
+          return;
+        }
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
@@ -352,9 +359,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                           label: Text(category),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setModalState(() {
-                              _selectedCategory = selected ? category : null;
-                            });
+                            final value = selected ? category : null;
+                            setModalState(() => _selectedCategory = value);
+                            setState(() => _selectedCategory = value);
                           },
                           selectedColor: AppTheme.colorPrimary.withOpacity(0.3),
                           backgroundColor: AppTheme.colorSurfaceSoft,
@@ -392,9 +399,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                           label: Text(label),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setModalState(() {
-                              _selectedModality = selected ? value : null;
-                            });
+                            final v = selected ? value : null;
+                            setModalState(() => _selectedModality = v);
+                            setState(() => _selectedModality = v);
                           },
                           selectedColor:
                               AppTheme.colorHighlight.withOpacity(0.3),
@@ -416,11 +423,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       label: 'Aplicar filtros',
                       icon: Icons.check,
                       onPressed: () {
-                        setState(() {
-                          // Apply filters to state
-                        });
+                        final cat = _selectedCategory;
+                        final mod = _selectedModality;
                         Navigator.of(context).pop();
-                        _load(silent: true);
+                        setState(() {
+                          _selectedCategory = cat;
+                          _selectedModality = mod;
+                        });
                       },
                     ),
                   ],
@@ -957,33 +966,61 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.colorPrimary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '${_requests.length}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 12,
+                                  Builder(builder: (context) {
+                                    final filtered = _requests.where((req) {
+                                      if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
+                                        if (req['category']?.toString() != _selectedCategory) return false;
+                                      }
+                                      if (_selectedModality != null && _selectedModality!.isNotEmpty) {
+                                        final pt = req['priceType']?.toString().toLowerCase() ?? '';
+                                        if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
+                                        if (_selectedModality == 'daily' && !pt.contains('d')) return false;
+                                        if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
+                                      }
+                                      return true;
+                                    }).toList();
+                                    
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.colorPrimary,
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                    ),
-                                  ),
+                                      child: Text(
+                                        '${filtered.length}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    );
+                                  }),
                                 ],
                               ),
                             ),
-                            ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              itemCount: _requests.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 16),
-                              itemBuilder: (context, index) {
-                                final req = _requests[index];
-                                final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+                            Builder(builder: (context) {
+                              final filtered = _requests.where((req) {
+                                if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
+                                  if (req['category']?.toString() != _selectedCategory) return false;
+                                }
+                                if (_selectedModality != null && _selectedModality!.isNotEmpty) {
+                                  final pt = req['priceType']?.toString().toLowerCase() ?? '';
+                                  if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
+                                  if (_selectedModality == 'daily' && !pt.contains('d')) return false;
+                                  if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
+                                }
+                                return true;
+                              }).toList();
+                              return ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                                itemBuilder: (context, index) {
+                                  final req = filtered[index];
+                                  final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
                                 final offerStatus = workerOffer?['status']?.toString();
                                 final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
                                 final hasPendingOffer = offerStatus == 'pending';
@@ -998,7 +1035,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   clientCountered: false, // You can enhance this if needed
                                 );
                               },
-                            ),
+                            );
+                           }),
                           ],
                         ),
                       ),
@@ -1130,9 +1168,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     required bool isAcceptedOffer,
     required bool clientCountered,
   }) {
+    final lifetime = (req['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
     final offerProgress = secondsRemaining == null
         ? null
-        : (secondsRemaining / _offerLifetimeSeconds).clamp(0.0, 1.0).toDouble();
+        : (secondsRemaining / lifetime).clamp(0.0, 1.0).toDouble();
 
     final distanceText = req['distanceKm'] == null
         ? null
@@ -1284,9 +1323,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    'Presupuesto',
-                    style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                  Text(
+                    req['priceType']?.toString() ?? 'Presupuesto',
+                    style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
                   ),
                   Text(
                     'Bs. $currentBudget',
@@ -1472,10 +1511,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: TextButton.icon(
+                child: FilledButton.icon(
                   onPressed: () => _showCounterOfferSheet(req['id'].toString()),
                   icon: const Icon(Icons.handshake),
-                  label: const Text('Proponer otro precio', style: TextStyle(color: AppTheme.colorPrimary)),
+                  label: const Text(
+                    'Proponer otro precio',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.colorHighlight,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
             ]
@@ -1703,6 +1750,7 @@ class _JobDetailsSheet extends StatelessWidget {
     final category = requestData['category']?.toString() ?? '';
     final photos = requestData['photos'] as List<dynamic>? ?? const [];
     final client = requestData['client'] as Map<String, dynamic>?;
+    final priceType = requestData['priceType']?.toString() ?? 'Precio fijo';
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -1764,13 +1812,25 @@ class _JobDetailsSheet extends StatelessWidget {
                     ),
                   const Spacer(),
                   if (budget != null)
-                    Text(
-                      'Bs $budget',
-                      style: const TextStyle(
-                        color: AppTheme.colorHighlight,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          priceType,
+                          style: const TextStyle(
+                            color: AppTheme.colorMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          'Bs $budget',
+                          style: const TextStyle(
+                            color: AppTheme.colorHighlight,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),

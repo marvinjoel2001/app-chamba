@@ -138,7 +138,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        try {
+          permission = await Geolocator.requestPermission();
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _locationBlockMessage = 'Debes activar el GPS para dar permisos.';
+            _checkingLocation = false;
+          });
+          return;
+        }
       }
 
       if (permission == LocationPermission.denied ||

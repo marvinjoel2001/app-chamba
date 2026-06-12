@@ -62,7 +62,11 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
   }
 
   Future<void> _requestPermission(RequiredAppPermission permission) async {
-    await AppPermissionsService.requestPermission(permission);
+    try {
+      await AppPermissionsService.requestPermission(permission);
+    } catch (_) {
+      // GPS desactivado u otro error — simplemente refrescar el estado
+    }
     await _refreshPermissions();
   }
 

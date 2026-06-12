@@ -69,10 +69,20 @@ class _RadarScreenState extends State<RadarScreen> {
     final user = SessionStore.currentUser;
     if (user == null) return;
 
+    // Check if location service is enabled first
+    final isEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!isEnabled) {
+      return;
+    }
+
     // Check permissions first
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      try {
+        permission = await Geolocator.requestPermission();
+      } catch (_) {
+        return;
+      }
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -191,7 +201,11 @@ class _RadarScreenState extends State<RadarScreen> {
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        try {
+          permission = await Geolocator.requestPermission();
+        } catch (_) {
+          return null;
+        }
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {

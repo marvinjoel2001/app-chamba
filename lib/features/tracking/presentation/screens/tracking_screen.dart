@@ -261,8 +261,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
       // Limpiar sesión del cliente
       SessionStore.activeRequestId = null;
       SessionStore.activeThreadId = null;
-      // Volver al inicio (no solo pop — evita pantalla negra)
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      // Volver al inicio usando AppFlows para evitar doble pop (y pantalla negra) al recibir el socket
+      AppFlows.goHomeAfterCancellation(message: 'Trabajo cancelado exitosamente');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

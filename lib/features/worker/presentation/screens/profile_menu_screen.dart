@@ -315,22 +315,26 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                                     : null,
                                 child: Hero(
                                   tag: 'profile_photo',
-                                  child: CircleAvatar(
-                                    radius: 44,
-                                    backgroundImage: user?.profilePhotoUrl == null
-                                        ? null
-                                        : NetworkImage(user!.profilePhotoUrl!),
-                                    child: user?.profilePhotoUrl == null
-                                        ? Text(
+                                  child: user?.profilePhotoUrl == null
+                                      ? CircleAvatar(
+                                          radius: 44,
+                                          child: Text(
                                             chambaInitial(user?.firstName,
                                                 fallback: 'U'),
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 26,
                                             ),
-                                          )
-                                        : null,
-                                  ),
+                                          ),
+                                        )
+                                      : ClipOval(
+                                          child: ChambaNetworkImage(
+                                            url: user!.profilePhotoUrl!,
+                                            width: 88,
+                                            height: 88,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
                                 ),
                               ),
                               Positioned(

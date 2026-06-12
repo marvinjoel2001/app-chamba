@@ -37,9 +37,9 @@ class ChatThreadModel extends ChatThread {
       jobDescription: request['description']?.toString() ?? '',
       jobStatus: _parseStatus(
           request['status']?.toString() ?? json['requestStatus']?.toString()),
-      agreedPrice:
-          (request['budget'] as num? ?? json['agreedPrice'] as num? ?? 0)
-              .toDouble(),
+      agreedPrice: _parseDouble(request['budget']) ??
+          _parseDouble(json['agreedPrice']) ??
+          0.0,
       counterpartName: _formatCounterpartName(counterpart),
       counterpartFirstName: counterpart['firstName']?.toString(),
       counterpartLastName: counterpart['lastName']?.toString(),
@@ -52,7 +52,7 @@ class ChatThreadModel extends ChatThread {
       lastMessage: json['lastMessage']?.toString(),
       hasUnreadMessages: json['hasUnreadMessages'] as bool? ?? false,
       type: _parseType(
-          json['type']?.toString() ?? json['archived'] as bool? ?? false),
+          json['type']?.toString() ?? json['archived']),
     );
   }
 
@@ -131,6 +131,13 @@ class ChatThreadModel extends ChatThread {
     final lastName = counterpart['lastName']?.toString() ?? '';
     final fullName = '$firstName $lastName'.trim();
     return fullName.isEmpty ? 'Usuario' : fullName;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   static DateTime? _parseDate(String? raw) {

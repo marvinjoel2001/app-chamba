@@ -402,33 +402,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
         child: Row(
           children: [
             // Avatar circular
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isWorker
-                    ? AppTheme.colorPrimary.withValues(alpha: 0.2)
-                    : AppTheme.colorSuccess.withValues(alpha: 0.2),
-                image: avatarUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(avatarUrl),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: avatarUrl == null
-                  ? Center(
-                      child: Text(
-                        avatarText.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
-                  : null,
+            ChambaNetworkAvatar(
+              url: avatarUrl,
+              radius: 28,
+              fallbackText: avatarText.toUpperCase(),
             ),
             const SizedBox(width: 12),
 

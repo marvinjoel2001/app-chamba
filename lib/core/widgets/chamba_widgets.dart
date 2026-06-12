@@ -522,3 +522,88 @@ class _DotGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+class ChambaNetworkImage extends StatelessWidget {
+  const ChambaNetworkImage({
+    required this.url,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    super.key,
+  });
+
+  final String url;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      url,
+      width: width,
+      height: height,
+      fit: fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          width: width,
+          height: height,
+          color: AppTheme.colorSurfaceSoft,
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: width,
+          height: height,
+          color: AppTheme.colorSurfaceSoft,
+          child: const Center(
+            child: Icon(Icons.broken_image, color: AppTheme.colorMuted, size: 20),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ChambaNetworkAvatar extends StatelessWidget {
+  const ChambaNetworkAvatar({
+    required this.url,
+    this.radius = 24,
+    this.fallbackText = '?',
+    super.key,
+  });
+
+  final String? url;
+  final double radius;
+  final String fallbackText;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: AppTheme.colorSurfaceSoft,
+        child: Text(
+          fallbackText,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.colorText),
+        ),
+      );
+    }
+    return ClipOval(
+      child: ChambaNetworkImage(
+        url: url!,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+}

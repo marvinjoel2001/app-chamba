@@ -104,9 +104,15 @@ class AppPermissionsService {
   ) async {
     switch (permission) {
       case RequiredAppPermission.location:
-        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
           await Geolocator.openLocationSettings();
+          // Try to wait a bit or just assume they might have changed it
+          await Future.delayed(const Duration(seconds: 1));
+          serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (!serviceEnabled) {
+            throw Exception('gps_disabled');
+          }
         }
         await Geolocator.requestPermission();
         break;

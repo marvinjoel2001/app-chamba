@@ -180,7 +180,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        try {
+          permission = await Geolocator.requestPermission();
+        } catch (_) {
+          _locationBlockMessage = 'Debes activar el GPS para pedir permisos de ubicacion.';
+          _canOpenLocationSettings = true;
+          return null;
+        }
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
@@ -663,6 +669,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               controller: _promptController,
               minLines: 4,
               maxLines: 5,
+              readOnly: _analyzingPrompt,
               textInputAction: TextInputAction.newline,
               keyboardType: TextInputType.multiline,
               decoration: const InputDecoration(

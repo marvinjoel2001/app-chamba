@@ -239,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       child: Image.file(
                         _pendingImage!,
                         height: 200,
@@ -1024,21 +1024,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                     ),
-                    CircleAvatar(
+                    ChambaNetworkAvatar(
+                      url: widget.counterpartAvatarUrl,
                       radius: 22,
-                      backgroundImage: widget.counterpartAvatarUrl == null
-                          ? null
-                          : NetworkImage(widget.counterpartAvatarUrl!),
-                      child: widget.counterpartAvatarUrl == null
-                          ? Text(
-                              widget.counterpartName.trim().isEmpty
-                                  ? '?'
-                                  : widget.counterpartName
-                                      .trim()
-                                      .substring(0, 1)
-                                      .toUpperCase(),
-                            )
-                          : null,
+                      fallbackText: widget.counterpartName.trim().isEmpty
+                          ? '?'
+                          : widget.counterpartName
+                              .trim()
+                              .substring(0, 1)
+                              .toUpperCase(),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1455,42 +1449,11 @@ class _ChatScreenState extends State<ChatScreen> {
       onTap: () => _showFullScreenImage(url),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          url,
+        child: ChambaNetworkImage(
+          url: url,
           width: 200,
           height: 200,
           fit: BoxFit.cover,
-          // Decodifica la imagen a un tamano acorde al widget para no
-          // gastar memoria ni trabar el scroll con imagenes grandes.
-          cacheWidth: 480,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              width: 200,
-              height: 200,
-              color: AppTheme.colorSurfaceSoft,
-              child: Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: 200,
-              height: 200,
-              color: AppTheme.colorSurfaceSoft,
-              child: const Icon(
-                Icons.broken_image,
-                color: AppTheme.colorMuted,
-                size: 48,
-              ),
-            );
-          },
         ),
       ),
     );

@@ -33,6 +33,18 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
 
   double get _base => widget.originalBudget ?? 100;
 
+  String _priceTypeSuffix() {
+    final raw = widget.requestData?['priceType']?.toString() ??
+        widget.requestData?['price_type']?.toString() ??
+        '';
+    if (raw.contains('hora')) return '/hora';
+    if (raw.contains('full') || raw.contains('fijo')) return ' (precio fijo)';
+    return '/día';
+  }
+
+  String _priceLabel() =>
+      'Oferta original: Bs ${_base.toInt()}${_priceTypeSuffix()}';
+
   @override
   void initState() {
     super.initState();
@@ -103,16 +115,19 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       // Navigator.of(context).pushNamed('/verification');
       return;
     }
-    // Validación: Worker debe ofertar MAYOR que el precio base del cliente
-    final basePriceInt = _base.toInt();
+    // Aplicar edición manual pendiente si la hay
+    if (_editingManually) {
+      final parsed = double.tryParse(_manualCtrl.text.trim());
+      if (parsed != null && parsed > 0) {
+        _selectedAmount = parsed;
+        _editingManually = false;
+      }
+    }
+    // Validación: la oferta debe ser mayor a 0
     final selectedInt = _selectedAmount.toInt();
-    if (selectedInt <= basePriceInt) {
+    if (selectedInt <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Tu oferta debe ser mayor al presupuesto del cliente (Bs $basePriceInt)',
-          ),
-        ),
+        const SnackBar(content: Text('Ingresa un monto válido.')),
       );
       return;
     }
@@ -204,7 +219,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                       borderRadius: BorderRadius.circular(40),
                     ),
                     child: Text(
-                      'Oferta original: Bs ${_base.toInt()}/día',
+                      _priceLabel(),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -270,7 +285,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   )
                 else
                   Text(
-                    'Bs ${_selectedAmount.toInt()}/día',
+                    'Bs ${_selectedAmount.toInt()}${_priceTypeSuffix()}',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -398,6 +413,8 @@ class _JobDetailsSheet extends StatelessWidget {
     final description = requestData['description']?.toString() ?? '';
     final address = requestData['address']?.toString() ?? '';
     final budget = requestData['budget'];
+    final priceType = requestData['priceType']?.toString() ??
+        requestData['price_type']?.toString() ?? '';
     final category = requestData['category']?.toString() ?? '';
     final distanceKm = requestData['distanceKm'];
     final photos = requestData['photos'] as List<dynamic>? ?? const [];
@@ -463,13 +480,26 @@ class _JobDetailsSheet extends StatelessWidget {
                     ),
                   const Spacer(),
                   if (budget != null)
-                    Text(
-                      'Bs $budget',
-                      style: const TextStyle(
-                        color: AppTheme.colorHighlight,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (priceType.isNotEmpty)
+                          Text(
+                            priceType,
+                            style: const TextStyle(
+                              color: AppTheme.colorMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        Text(
+                          'Bs $budget',
+                          style: const TextStyle(
+                            color: AppTheme.colorHighlight,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -565,24 +595,12 @@ class _JobDetailsSheet extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    CircleAvatar(
+                    ChambaNetworkAvatar(
+                      url: client['profilePhotoUrl'] as String?,
                       radius: 22,
-                      backgroundColor: AppTheme.colorSurfaceSoft,
-                      backgroundImage: client['profilePhotoUrl'] != null
-                          ? NetworkImage(client['profilePhotoUrl'] as String)
-                          : null,
-                      child: client['profilePhotoUrl'] == null
-                          ? Text(
-                              (client['firstName'] ?? 'C').toString().substring(
-                                    0,
-                                    1,
-                                  ),
-                              style: const TextStyle(
-                                color: AppTheme.colorText,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
+                      fallbackText: (client['firstName'] ?? 'C')
+                          .toString()
+                          .substring(0, 1),
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -622,21 +640,48 @@ class _JobDetailsSheet extends StatelessWidget {
                       final url =
                           (photo is Map ? photo['url'] : photo)?.toString();
                       if (url == null) return const SizedBox.shrink();
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.network(
-                          url,
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => Scaffold(
+                                backgroundColor: Colors.black,
+                                body: SafeArea(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      InteractiveViewer(
+                                        child: ChambaNetworkImage(
+                                          url: url,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: IconButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: ChambaNetworkImage(
+                            url: url,
                             width: 120,
                             height: 120,
-                            color: AppTheme.colorSurfaceSoft,
-                            child: const Icon(
-                              Icons.broken_image,
-                              color: AppTheme.colorMuted,
-                            ),
+                            fit: BoxFit.cover,
                           ),
                         ),
                       );
