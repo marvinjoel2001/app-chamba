@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
@@ -35,6 +36,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String? _error;
   String? _locationBlockMessage;
   bool _canOpenLocationSettings = false;
+  bool _isListening = false;
+  late stt.SpeechToText _speechToText;
   List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
@@ -54,6 +57,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+    _speechToText = stt.SpeechToText();
     // Escuchar eventos de trabajo completado/cancelado para limpiar el banner
     _realtime.on('job.completed', _onJobFinished);
     _realtime.on('job.cancelled', _onJobFinished);
@@ -672,9 +676,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
               readOnly: _analyzingPrompt,
               textInputAction: TextInputAction.newline,
               keyboardType: TextInputType.multiline,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText:
                     'Aqui escriba lo que buscas. Ejemplo: necesito que alguien me pinte la casa.',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isListening ? Icons.mic : Icons.mic_none,
+                    color: _isListening ? Colors.red : AppTheme.colorMuted,
+                  ),
+                  onPressed: _listenToSpeech,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -686,6 +697,42 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       ),
     );
+  }
+
+  void _listenToSpeech() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize(
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speechToText.listen(
+          onResult: (val) {
+            if (mounted) {
+              setState(() {
+                _promptController.text = val.recognizedWords;
+              });
+            }
+          },
+          localeId: 'es_ES',
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reconocimiento de voz no disponible')),
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speechToText.stop();
+    }
   }
 
   Widget _buildWorkerPanel(BuildContext context) {

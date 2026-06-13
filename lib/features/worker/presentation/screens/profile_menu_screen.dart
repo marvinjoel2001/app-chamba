@@ -15,9 +15,10 @@ import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
-import 'worker_history_screen.dart';
+import '../../../history/presentation/screens/job_history_screen.dart';
 import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 
 class ProfileMenuScreen extends StatefulWidget {
   const ProfileMenuScreen({
@@ -43,6 +44,29 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
 
   final ImagePicker _imagePicker = ImagePicker();
   bool _updatingPhoto = false;
+  int _unreadSupportCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadSupportCount();
+  }
+
+  Future<void> _loadUnreadSupportCount() async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    try {
+      final result = await MobileBackendService.instance.getUserActiveDisputes(user.id);
+      final disputes = result['disputes'] as List<dynamic>? ?? [];
+      int count = 0;
+      for (final d in disputes) {
+        count += (d['unreadCount'] as num?)?.toInt() ?? 0;
+      }
+      if (mounted) {
+        setState(() => _unreadSupportCount = count);
+      }
+    } catch (_) {}
+  }
 
   bool get _isWorker => SessionStore.currentUser?.type == 'worker';
 
@@ -443,7 +467,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const WorkerHistoryScreen(),
+                        builder: (_) => const JobHistoryScreen(),
                       ),
                     );
                   },
@@ -485,6 +509,18 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                     );
                   },
                 ),
+                _NavTile(
+                  title: 'Historial de trabajos',
+                  subtitle: 'Revisa tus trabajos finalizados o cancelados',
+                  icon: Icons.history,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const JobHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
               ],
               const SizedBox(height: 8),
               const _SectionTitle(label: 'Soporte'),
@@ -492,6 +528,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                 title: 'Soporte',
                 subtitle: 'Reporta un problema o contacta con soporte',
                 icon: Icons.support_agent,
+                badgeCount: _unreadSupportCount,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -532,12 +569,14 @@ class _NavTile extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -549,7 +588,22 @@ class _NavTile extends StatelessWidget {
           leading: CircleAvatar(child: Icon(icon)),
           title: Text(title),
           subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: badgeCount > 0
+              ? Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    badgeCount.toString(),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold),
+                  ),
+                )
+              : const Icon(Icons.chevron_right),
           onTap: onTap,
         ),
       ),

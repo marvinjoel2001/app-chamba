@@ -53,4 +53,27 @@ class NotificationsService {
       // Ignorar error de red
     }
   }
+
+  static Future<int> getUnreadCount() async {
+    final userId = SessionStore.currentUser?.id;
+    if (userId == null) return 0;
+
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              '${AppConfig.apiBaseUrl}/mobile/notifications/unread-count?userId=$userId',
+            ),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return (data['count'] as num?)?.toInt() ?? 0;
+      }
+    } catch (e) {
+      // Ignorar error de red
+    }
+    return 0;
+  }
 }

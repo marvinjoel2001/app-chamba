@@ -14,6 +14,17 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+    
+    // Fix for older Flutter plugins that don't specify a namespace
+    project.pluginManager.withPlugin("com.android.library") {
+        val androidExt = project.extensions.findByName("android") as? com.android.build.gradle.LibraryExtension
+        if (androidExt != null && androidExt.namespace == null) {
+            val groupStr = project.group.toString()
+            if (groupStr.isNotEmpty()) {
+                androidExt.namespace = groupStr
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

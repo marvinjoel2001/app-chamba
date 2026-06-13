@@ -62,6 +62,29 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> loginWithGoogle({required String idToken}) {
+    return _api.post('/auth/google', body: {'idToken': idToken});
+  }
+
+  Future<Map<String, dynamic>> registerWithGoogle({
+    required String email,
+    required String firstName,
+    String? lastName,
+    required String googleId,
+    required String type,
+  }) {
+    return _api.post(
+      '/auth/google/register',
+      body: {
+        'email': email,
+        'firstName': firstName,
+        'lastName': lastName,
+        'googleId': googleId,
+        'type': type,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> explore({
     required String userId,
     double? latitude,
@@ -530,8 +553,14 @@ class MobileBackendService {
 
   Future<Map<String, dynamic>> getDisputeMessages({
     required String disputeId,
+    String? readBy,
   }) {
-    return _api.get('/mobile/disputes/$disputeId/messages');
+    final query = readBy != null ? '?readBy=$readBy' : '';
+    return _api.get('/mobile/disputes/$disputeId/messages$query');
+  }
+
+  Future<Map<String, dynamic>> getUserActiveDisputes(String userId) {
+    return _api.get('/mobile/disputes/user/$userId');
   }
 
   Future<Map<String, dynamic>> sendDisputeMessage({
@@ -548,5 +577,15 @@ class MobileBackendService {
         'content': content,
       },
     );
+  }
+
+  // --- History ---
+
+  Future<Map<String, dynamic>> getWorkerHistory({required String workerUserId}) {
+    return _api.get('/mobile/worker/history?workerUserId=$workerUserId');
+  }
+
+  Future<Map<String, dynamic>> getClientHistory({required String clientUserId}) {
+    return _api.get('/mobile/client/history?clientUserId=$clientUserId');
   }
 }

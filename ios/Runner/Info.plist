@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.899491855193-cu0bpde89qq24q1dhg71bq2lrfhlcipr</string>
+			</array>
+		</dict>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -59,6 +70,10 @@
 	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Necesitamos tu micrófono para que puedas dictar lo que buscas por voz.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Necesitamos acceso al reconocimiento de voz para transcribir tu dictado.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

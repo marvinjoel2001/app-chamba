@@ -16,6 +16,9 @@ import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 import 'register_screen.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../../../../core/services/mobile_backend_service.dart';
+import 'google_account_type_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -117,6 +120,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         _checkingIdentifier = false;
       });
+    }
+  }
+
+  Future<void> _continueWithGoogle() async {
+    setState(() => _checkingIdentifier = true);
+    try {
+      final googleSignIn = GoogleSignIn();
+      final account = await googleSignIn.signIn();
+      if (account == null) {
+        setState(() => _checkingIdentifier = false);
+        return;
+      }
+      
+      final auth = await account.authentication;
+      if (auth.idToken == null) {
+        throw Exception('No se pudo obtener el token de Google');
+      }
+
+      final result = await MobileBackendService.instance.loginWithGoogle(idToken: auth.idToken!);
+      
+      if (result['requiresRegistration'] == true) {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => GoogleAccountTypeScreen(
+              googleData: result['googleData'],
+            ),
+          ),
+        );
+      } else {
+        final userData = result['user'] as Map<String, dynamic>;
+
+        await SessionStore.setCurrentUser(SessionUser.fromJson(userData));
+
+        if (!mounted) return;
+        _handleAuthenticated();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingIdentifier = false);
     }
   }
 
@@ -370,14 +417,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 const SizedBox(height: 16),
                                 // Botón Google
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    // TODO: Implementar login con Google
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Login con Google próximamente')),
-                                    );
-                                  },
+                                  onPressed: _checkingIdentifier || authState.isLoading
+                                      ? null
+                                      : _continueWithGoogle,
                                   icon: Container(
                                     width: 24,
                                     height: 24,

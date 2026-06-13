@@ -59,6 +59,9 @@ dependencies:
   path_provider: ^2.1.5
   audioplayers: ^6.1.0
   flutter_svg: ^2.2.0
+  google_sign_in: ^6.2.2
+  speech_to_text: ^7.4.0
+  flutter_app_badger: ^1.5.0
 
 dependency_overrides:
   geolocator_android: ^4.4.0

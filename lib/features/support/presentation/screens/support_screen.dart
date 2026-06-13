@@ -66,6 +66,35 @@ class SupportScreen extends StatefulWidget {
 class _SupportScreenState extends State<SupportScreen> {
   String? _disputeId;
   String? _selectedReason;
+  List<dynamic> _activeDisputes = [];
+  bool _isLoadingDisputes = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveDisputes();
+  }
+
+  Future<void> _loadActiveDisputes() async {
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoadingDisputes = false);
+      return;
+    }
+    try {
+      final result = await MobileBackendService.instance.getUserActiveDisputes(user.id);
+      if (mounted) {
+        setState(() {
+          _activeDisputes = result['disputes'] ?? [];
+          _isLoadingDisputes = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingDisputes = false);
+      }
+    }
+  }
 
   Future<void> _submitReason(String reason) async {
     final user = SessionStore.currentUser;
@@ -123,18 +152,83 @@ class _SupportScreenState extends State<SupportScreen> {
       ),
       body: ChambaBackground(
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                '¿Qué problema tienes?',
-                style: TextStyle(
-                  color: AppTheme.colorText,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
+          child: _isLoadingDisputes
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (_activeDisputes.isNotEmpty) ...[
+                      const Text(
+                        'Mis reportes activos',
+                        style: TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._activeDisputes.map((d) {
+                        final unreadCount =
+                            (d['unreadCount'] as num?)?.toInt() ?? 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: GlassCard(
+                            child: ListTile(
+                              onTap: () {
+                                setState(() {
+                                  _disputeId = d['id'].toString();
+                                  _selectedReason = d['reason'].toString();
+                                });
+                              },
+                              title: Text(
+                                d['reason']?.toString() ?? 'Soporte',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.colorText),
+                              ),
+                              subtitle: Text(
+                                'Estado: ${d['status'] == 'open' ? 'Abierto' : 'Resuelto'}',
+                                style: const TextStyle(
+                                    color: AppTheme.colorMuted, fontSize: 12),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (unreadCount > 0)
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        unreadCount.toString(),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.chevron_right,
+                                      color: AppTheme.colorMuted),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+                    const Text(
+                      '¿Qué problema tienes?',
+                      style: TextStyle(
+                        color: AppTheme.colorText,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
               const Text(
                 'Selecciona la opción que mejor describa tu situación.',
                 style: TextStyle(color: AppTheme.colorMuted, fontSize: 14),
@@ -183,10 +277,10 @@ class _SupportScreenState extends State<SupportScreen> {
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 }
@@ -241,6 +335,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
     try {
       final result = await MobileBackendService.instance.getDisputeMessages(
         disputeId: widget.disputeId,
+        readBy: 'user',
       );
       final newMsgs = (result['messages'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>() ??
@@ -318,6 +413,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
     try {
       final result = await MobileBackendService.instance.getDisputeMessages(
         disputeId: widget.disputeId,
+        readBy: 'user',
       );
       final msgs = (result['messages'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>() ??

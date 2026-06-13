@@ -4,6 +4,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
+import '../../../../core/session/unread_notifications_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
@@ -40,6 +41,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
     if (widget.role == 'worker') {
       WorkerBackgroundService.setEnabled(true);
     }
+    
+    // Iniciar polling de notificaciones no leidas
+    UnreadNotificationsNotifier.instance;
   }
 
   @override
