@@ -103,12 +103,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-      _locationBlockMessage = null;
-      _canOpenLocationSettings = false;
-    });
+    final isInitialLoad = _categories.isEmpty;
+
+    if (isInitialLoad) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _locationBlockMessage = null;
+        _canOpenLocationSettings = false;
+      });
+    } else {
+      setState(() {
+        _error = null;
+        _locationBlockMessage = null;
+        _canOpenLocationSettings = false;
+      });
+    }
 
     try {
       final currentLocation = await _resolveCurrentLocationRequired();

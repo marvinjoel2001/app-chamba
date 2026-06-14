@@ -222,197 +222,232 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageInput() {
     final bool hasText = controller.text.isNotEmpty;
     final bool hasPendingImage = _pendingImage != null;
+    final bool hasPendingAudio = !_isRecording && _recordingPath != null;
 
-    return Column(
-      children: [
-        // Image preview before sending (WhatsApp style)
-        if (hasPendingImage)
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.colorSurfaceSoft,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
+    if (hasPendingImage) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppTheme.colorSurfaceSoft,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Stack(
               children: [
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.file(
-                        _pendingImage!,
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: _cancelPendingImage,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.file(
+                    _pendingImage!,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        focusNode: _focusNode,
-                        decoration: const InputDecoration(
-                          hintText: 'Agregar leyenda...',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                        ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: _cancelPendingImage,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(Icons.close, color: Colors.white, size: 20),
                     ),
-                    if (_isSendingMedia)
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppTheme.colorPrimary,
-                        child: IconButton(
-                          onPressed: () => _sendImageMessage(_pendingImage!),
-                          icon: const Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-
-        // Regular message input
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppTheme.colorSurfaceSoft,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Emoji button
-              IconButton(
-                onPressed: _toggleEmojiPicker,
-                icon: Icon(
-                  _showEmojiPicker
-                      ? Icons.keyboard
-                      : Icons.emoji_emotions_outlined,
-                  color: AppTheme.colorMuted,
-                ),
-              ),
-
-              // File/Attach button (disabled when image pending)
-              IconButton(
-                onPressed: hasPendingImage ? null : _showAttachmentMenu,
-                icon: Icon(
-                  Icons.add_circle_outline,
-                  color: hasPendingImage
-                      ? AppTheme.colorMuted.withOpacity(0.3)
-                      : AppTheme.colorMuted,
-                ),
-              ),
-
-              // Text input or disabled when sending media
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: _focusNode,
-                  keyboardType: TextInputType.multiline,
-                  maxLines: 5,
-                  minLines: 1,
-                  textCapitalization: TextCapitalization.sentences,
-                  enabled: !_isSendingMedia,
-                  decoration: InputDecoration(
-                    hintText: hasPendingImage
-                        ? 'Agrega una descripción...'
-                        : 'Escribe un mensaje...',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 12,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    focusNode: _focusNode,
+                    decoration: const InputDecoration(
+                      hintText: 'Agregar leyenda...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8),
                     ),
                   ),
                 ),
-              ),
-
-              // Send or Voice button
-              if (hasText || hasPendingImage)
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppTheme.colorPrimary,
-                  child: IconButton(
-                    onPressed: _isSendingMedia
-                        ? null
-                        : (hasPendingImage
-                            ? () => _sendImageMessage(_pendingImage!)
-                            : _send),
-                    icon: _isSendingMedia
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTapDown: (_) => _startRecording(),
-                  onTapUp: (_) => _stopRecording(),
-                  onTapCancel: () => _stopRecording(),
-                  child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: _isRecording
-                        ? AppTheme.colorError
-                        : AppTheme.colorPrimary,
-                    child: Icon(
-                      _isRecording ? Icons.mic : Icons.mic_none,
-                      color: Colors.white,
-                      size: 20,
+                if (_isSendingMedia)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppTheme.colorPrimary,
+                    child: IconButton(
+                      onPressed: () => _sendImageMessage(_pendingImage!),
+                      icon: const Icon(Icons.send, color: Colors.white, size: 18),
                     ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
-      ],
+      );
+    }
+
+    if (_isRecording) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.colorSurfaceSoft,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.mic, color: AppTheme.colorError),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Grabando audio...',
+                style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.colorError),
+              ),
+            ),
+            IconButton(
+              onPressed: _cancelRecording,
+              icon: const Icon(Icons.delete_outline, color: AppTheme.colorMuted),
+            ),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.colorError,
+              child: IconButton(
+                onPressed: () => _stopRecording(send: false),
+                icon: const Icon(Icons.stop, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (hasPendingAudio) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.colorSurfaceSoft,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.audio_file, color: AppTheme.colorPrimary),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Audio listo',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            IconButton(
+              onPressed: _cancelRecording,
+              icon: const Icon(Icons.delete_outline, color: AppTheme.colorMuted),
+            ),
+            if (_isSendingMedia)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppTheme.colorPrimary,
+                child: IconButton(
+                  onPressed: () {
+                    _sendVoiceMessage(_recordingPath!);
+                    setState(() => _recordingPath = null);
+                  },
+                  icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.colorSurfaceSoft,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          IconButton(
+            onPressed: _toggleEmojiPicker,
+            icon: Icon(
+              _showEmojiPicker ? Icons.keyboard : Icons.emoji_emotions_outlined,
+              color: AppTheme.colorMuted,
+            ),
+          ),
+          IconButton(
+            onPressed: _showAttachmentMenu,
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: AppTheme.colorMuted,
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: _focusNode,
+              keyboardType: TextInputType.multiline,
+              maxLines: 5,
+              minLines: 1,
+              textCapitalization: TextCapitalization.sentences,
+              enabled: !_isSendingMedia,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                hintText: 'Escribe un mensaje...',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              ),
+            ),
+          ),
+          if (hasText)
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppTheme.colorPrimary,
+              child: IconButton(
+                onPressed: _isSendingMedia ? null : _send,
+                icon: _isSendingMedia
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send, color: Colors.white, size: 20),
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: _startRecording,
+              child: const CircleAvatar(
+                radius: 22,
+                backgroundColor: AppTheme.colorPrimary,
+                child: Icon(Icons.mic_none, color: Colors.white, size: 20),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -535,7 +570,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _stopRecording({bool send = false}) async {
     try {
       if (!await _audioRecorder.isRecording()) return;
 
@@ -543,13 +578,27 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() => _isRecording = false);
 
-      if (path != null) {
-        // Send voice message
+      if (send && path != null) {
         await _sendVoiceMessage(path);
+        setState(() => _recordingPath = null);
+      } else if (path != null) {
+        setState(() => _recordingPath = path);
       }
     } catch (e) {
       debugPrint('Error stopping recording: $e');
       if (mounted) setState(() => _isRecording = false);
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    if (await _audioRecorder.isRecording()) {
+      await _audioRecorder.stop();
+    }
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordingPath = null;
+      });
     }
   }
 
@@ -581,9 +630,11 @@ class _ChatScreenState extends State<ChatScreen> {
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
-          setState(() {
-            _messages = [..._messages, sentMessage];
-          });
+          if (!_messages.any((m) => m.id == sentMessage.id)) {
+            setState(() {
+              _messages = [..._messages, sentMessage];
+            });
+          }
           _scrollToBottom();
         },
         onFailure: (failure) {
@@ -772,9 +823,11 @@ class _ChatScreenState extends State<ChatScreen> {
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
-          setState(() {
-            _messages = [..._messages, sentMessage];
-          });
+          if (!_messages.any((m) => m.id == sentMessage.id)) {
+            setState(() {
+              _messages = [..._messages, sentMessage];
+            });
+          }
           _scrollToBottom();
         },
         onFailure: (failure) {
@@ -834,10 +887,14 @@ class _ChatScreenState extends State<ChatScreen> {
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
-          setState(() {
-            _pendingImage = null;
-            _messages = [..._messages, sentMessage];
-          });
+          if (!_messages.any((m) => m.id == sentMessage.id)) {
+            setState(() {
+              _pendingImage = null;
+              _messages = [..._messages, sentMessage];
+            });
+          } else {
+            setState(() => _pendingImage = null);
+          }
           _scrollToBottom();
         },
         onFailure: (failure) {
@@ -955,9 +1012,11 @@ class _ChatScreenState extends State<ChatScreen> {
       onSuccess: (sentMessage) {
         controller.clear();
         _pendingMessageIds.add(sentMessage.id);
-        setState(() {
-          _messages = [..._messages, sentMessage];
-        });
+        if (!_messages.any((m) => m.id == sentMessage.id)) {
+          setState(() {
+            _messages = [..._messages, sentMessage];
+          });
+        }
         _scrollToBottom();
       },
       onFailure: (failure) {

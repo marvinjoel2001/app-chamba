@@ -484,7 +484,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     SessionStore.activeRequestId = null;
                     SessionStore.activeThreadId = null;
                     if (!context.mounted) return;
-                    Navigator.of(context).pop();
+                    AppFlows.goHomeAfterCancellation(message: 'Solicitud cancelada');
                   },
                   child: const Text(
                     'Cancelar solicitud',

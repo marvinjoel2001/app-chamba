@@ -180,10 +180,51 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
     if (c.contains('limpie')) return Icons.cleaning_services;
     if (c.contains('carp')) return Icons.carpenter;
     if (c.contains('jard')) return Icons.yard;
-    if (c.contains('transport')) return Icons.local_shipping;
+    if (c.contains('transport') || c.contains('entrega')) return Icons.local_shipping;
     if (c.contains('mecán') || c.contains('mecan')) return Icons.build;
     if (c.contains('construc')) return Icons.construction;
     return Icons.handyman;
+  }
+
+  Color _categoryColor(String? category) {
+    final c = (category ?? '').toLowerCase();
+    if (c.contains('limpie')) return const Color(0xFFB388FF); // Purple Accent
+    if (c.contains('entrega') || c.contains('transport')) return const Color(0xFFFFB74D); // Orange
+    if (c.contains('elec')) return const Color(0xFF64B5F6); // Blue
+    return const Color(0xFF4DB6AC); // Teal
+  }
+
+  void _showFilterMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111C30),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _DateFilter.values.map((f) {
+              return ListTile(
+                title: Text(
+                  f.label,
+                  style: TextStyle(
+                    color: _filter == f ? const Color(0xFF651FFF) : Colors.white,
+                    fontWeight: _filter == f ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                trailing: _filter == f ? const Icon(Icons.check, color: Color(0xFF651FFF)) : null,
+                onTap: () {
+                  setState(() => _filter = f);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -197,343 +238,411 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ──────────────────────────────────────────────────
+            // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Row(
                 children: [
                   Text(
                     'Mi Billetera',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: AppTheme.colorText,
-                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
                   ),
                   const Spacer(),
                   IconButton(
                     onPressed: _load,
-                    icon: const Icon(Icons.refresh, color: AppTheme.colorMuted),
+                    icon: const Icon(Icons.refresh, color: Colors.white70),
                   ),
                 ],
               ),
             ),
 
-            // ── Card de ganancias totales ─────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1A237E), // Indigo deep
-                      Color(0xFF0D47A1), // Blue dark
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Ganancias totales',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Bs ${total.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.trending_up,
-                                color: Colors.white70,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${filtered.length} trabajo${filtered.length == 1 ? '' : 's'} en el período',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _load,
+                color: const Color(0xFF651FFF),
+                backgroundColor: const Color(0xFF111C30),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Main Card
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF3B1F70), // Dark purple
+                              Color(0xFF1E103C), // Very dark purple
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          // Botón retirar fondos (placeholder - oculto temporalmente)
-                          // SizedBox(
-                          //   width: double.infinity,
-                          //   child: ElevatedButton.icon(
-                          //     onPressed: () {
-                          //       ScaffoldMessenger.of(context).showSnackBar(
-                          //         const SnackBar(
-                          //           content: Text(
-                          //             'Función de retiro próximamente disponible.',
-                          //           ),
-                          //         ),
-                          //       );
-                          //     },
-                          //     icon: const Icon(
-                          //       Icons.account_balance,
-                          //       color: Colors.black,
-                          //       size: 18,
-                          //     ),
-                          //     label: const Text(
-                          //       'Retirar Fondos',
-                          //       style: TextStyle(
-                          //         color: Colors.black,
-                          //         fontWeight: FontWeight.w700,
-                          //       ),
-                          //     ),
-                          //     style: ElevatedButton.styleFrom(
-                          //       backgroundColor: Colors.white,
-                          //       foregroundColor: const Color(0xFF1A237E),
-                          //       padding: const EdgeInsets.symmetric(
-                          //         vertical: 14,
-                          //       ),
-                          //       shape: RoundedRectangleBorder(
-                          //         borderRadius: BorderRadius.circular(14),
-                          //       ),
-                          //       elevation: 2,
-                          //     ),
-                          //   ),
-                          // ),
-                        ],
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF5E35B1).withOpacity(0.2),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              right: -10,
+                              bottom: -20,
+                              child: Opacity(
+                                opacity: 0.9,
+                                child: Image.asset(
+                                  'assets/images/icon/billetera.png',
+                                  width: 110,
+                                ),
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Ganancias disponibles',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Icon(Icons.remove_red_eye_outlined, color: Colors.white.withOpacity(0.7), size: 20),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _loading
+                                    ? const SizedBox(
+                                        height: 40,
+                                        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                                      )
+                                    : Text(
+                                        'Bs ${total.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -1,
+                                        ),
+                                      ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Disponible para retirar',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Container(
+                                  height: 1,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      total > 0 ? Icons.trending_up : Icons.remove,
+                                      color: total > 0 ? const Color(0xFF00E676) : Colors.white.withOpacity(0.5),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      total > 0 ? '+18% vs. semana pasada' : '— 0% vs. semana pasada',
+                                      style: TextStyle(
+                                        color: total > 0 ? const Color(0xFF00E676) : Colors.white.withOpacity(0.5),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.5), size: 18),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-              ),
-            ),
-            if (_isOffline)
-              const Padding(
-                padding: EdgeInsets.only(left: 16, right: 16, top: 8),
-                child: Text(
-                  'Sin conexión. Mostrando últimos datos sincronizados.',
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildActionButton(
+                                icon: Icons.download_rounded,
+                                label: 'Retirar',
+                                color: const Color(0xFF651FFF),
+                                textColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildActionButton(
+                                icon: Icons.receipt_long_rounded,
+                                label: 'Historial',
+                                color: const Color(0xFF1E2336),
+                                textColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildActionButton(
+                                icon: Icons.bar_chart_rounded,
+                                label: 'Estadísticas',
+                                color: const Color(0xFF1E2336),
+                                textColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Filter Dropdown
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: GestureDetector(
+                          onTap: _showFilterMenu,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111C30),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_today_outlined, color: Colors.white70, size: 18),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _filter.label,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                                const Spacer(),
+                                const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      if (_error != null && !_loading)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Center(
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(color: AppTheme.colorError),
+                            ),
+                          ),
+                        ),
+
+                      if (!_loading && total == 0 && filtered.isEmpty)
+                        _buildEmptyState()
+                      else if (!_loading && filtered.isNotEmpty) ...[
+                        _buildSummary(filtered),
+                        const SizedBox(height: 24),
+                        _buildRecentActivity(filtered),
+                      ],
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
-            if (_shouldRedirectToLogin)
-              const Padding(
-                padding: EdgeInsets.only(left: 16, right: 16, top: 8),
-                child: Text('Sesión expirada. Inicia sesión nuevamente.'),
-              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            const SizedBox(height: 16),
+  Widget _buildActionButton({required IconData icon, required String label, required Color color, required Color textColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: textColor, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // ── Filtros de fecha ─────────────────────────────────────
-            SizedBox(
-              height: 38,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: _DateFilter.values.map((f) {
-                  final selected = _filter == f;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _filter = f),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+  Widget _buildSummary(List<WorkerJob> jobs) {
+    int totalJobs = jobs.length;
+    double avg = totalJobs > 0 ? jobs.fold(0.0, (sum, j) => sum + j.amount) / totalJobs : 0;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Resumen', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111C30),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSummaryItem(Icons.work, '$totalJobs', 'Trabajos', const Color(0xFFB388FF)),
+                Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                _buildSummaryItem(Icons.attach_money, 'Bs ${avg.toStringAsFixed(0)}', 'Promedio', const Color(0xFFB388FF)),
+                Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                _buildSummaryItem(Icons.access_time_filled, '23h 45m', 'Horas', const Color(0xFFB388FF)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(IconData icon, String value, String label, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 12),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildRecentActivity(List<WorkerJob> jobs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Actividad reciente', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('Ver todo', style: TextStyle(color: const Color(0xFFB388FF), fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF111C30),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: Column(
+              children: jobs.take(3).map((job) {
+                final isLast = job == jobs.take(3).last;
+                return Column(
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Container(
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xFF1A237E)
-                              : AppTheme.colorSurfaceSoft,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0xFF3949AB)
-                                : AppTheme.colorGlassBorderSoft,
-                          ),
+                          color: _categoryColor(job.category).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          f.label,
-                          style: TextStyle(
-                            color:
-                                selected ? Colors.white : AppTheme.colorMuted,
-                            fontSize: 13,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
+                        child: Icon(_categoryIcon(job.category), color: _categoryColor(job.category)),
+                      ),
+                      title: Text(job.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(_formatDate(job.acceptedAt), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Bs ${job.amount.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF00E676), fontWeight: FontWeight.w700, fontSize: 14)),
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.3), size: 16),
+                        ],
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
+                    if (!isLast) Divider(height: 1, color: Colors.white.withOpacity(0.05), indent: 70, endIndent: 16),
+                  ],
+                );
+              }).toList(),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 16),
-
-            // ── Lista de trabajos ────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Trabajos Completados',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111C30),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.auto_awesome, color: const Color(0xFFB388FF).withOpacity(0.2), size: 100),
+                Image.asset('assets/images/icon/billetera.png', width: 80),
+              ],
             ),
-            const SizedBox(height: 10),
-
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: AppTheme.colorError),
-                          ),
-                        )
-                      : filtered.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.work_off,
-                                    color: AppTheme.colorMuted,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Sin trabajos en este período',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(color: AppTheme.colorMuted),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (context, i) {
-                                final job = filtered[i];
-                                final title = job.title;
-                                final amount = job.amount;
-                                final address = job.address;
-                                final category = job.category;
-                                final date = _formatDate(job.acceptedAt);
-
-                                return Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF111C30),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: AppTheme.colorGlassBorderSoft,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // Ícono de categoría
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF1A237E)
-                                              .withOpacity(0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: Icon(
-                                          _categoryIcon(category),
-                                          color: const Color(0xFF3949AB),
-                                          size: 22,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Info
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              title,
-                                              style: const TextStyle(
-                                                color: AppTheme.colorText,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 15,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            if (address.isNotEmpty) ...[
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                address,
-                                                style: const TextStyle(
-                                                  color: AppTheme.colorMuted,
-                                                  fontSize: 12,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.calendar_today,
-                                                  color: AppTheme.colorMuted,
-                                                  size: 12,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  date,
-                                                  style: const TextStyle(
-                                                    color: AppTheme.colorMuted,
-                                                    fontSize: 11,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Monto
-                                      Text(
-                                        '+ Bs ${amount.toStringAsFixed(0)}',
-                                        style: const TextStyle(
-                                          color: Color(0xFF00E676),
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Todavía no tienes ganancias',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Acepta tu primer trabajo y\ncomienza a generar ingresos.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Usually goes to explore or radar screen
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF651FFF),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Buscar trabajos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
             ),
           ],
         ),
