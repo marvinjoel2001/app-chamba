@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -35,6 +38,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   Timer? _pollTimer;
   Timer? _locationTimer;
   LatLng? _deviceLocation; // ubicación real del GPS
+
+  List<LatLng> _routePoints = [];
+  LatLng? _lastRouteFetchPos;
 
   @override
   void initState() {
@@ -175,6 +181,22 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           _tracking = res;
           _loading = false;
         });
+        
+        final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
+        final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
+        final destLat = (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+        final destLng = (_tracking?['destination']?['longitude'] as num?)?.toDouble();
+
+        final workerPos = _deviceLocation ?? (workerLat != null && workerLng != null ? LatLng(workerLat, workerLng) : null);
+        if (workerPos != null && destLat != null && destLng != null) {
+          final destPos = LatLng(destLat, destLng);
+          if (_lastRouteFetchPos == null ||
+              (workerPos.latitude - _lastRouteFetchPos!.latitude).abs() > 0.0005 ||
+              (workerPos.longitude - _lastRouteFetchPos!.longitude).abs() > 0.0005) {
+            _lastRouteFetchPos = workerPos;
+            _fetchRoute(workerPos, destPos);
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -184,6 +206,28 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         });
       }
     }
+  }
+
+  Future<void> _fetchRoute(LatLng start, LatLng end) async {
+    final token = AppConfig.mapboxAccessToken.trim();
+    if (token.isEmpty) return;
+    try {
+      final url = Uri.parse(
+          'https://api.mapbox.com/directions/v5/mapbox/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?geometries=geojson&access_token=$token');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
+          final coords = data['routes'][0]['geometry']['coordinates'] as List;
+          final points = coords.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
+          if (mounted) {
+            setState(() {
+              _routePoints = points;
+            });
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   /// Calcula la distancia en metros entre dos coordenadas usando la fórmula de Haversine
@@ -601,7 +645,19 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                         },
                       ),
                       // Línea de ruta entre worker y destino
-                      if (destPos != null)
+                      if (_routePoints.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _routePoints,
+                              color: AppTheme.colorPrimary.withValues(
+                                alpha: 0.8,
+                              ),
+                              strokeWidth: 4,
+                            ),
+                          ],
+                        )
+                      else if (destPos != null)
                         PolylineLayer(
                           polylines: [
                             Polyline(

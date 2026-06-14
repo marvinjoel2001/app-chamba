@@ -156,6 +156,17 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  bool _isDuplicateMessage(String messageId, String? content, String senderId, DateTime? createdAt) {
+    if (messageId.isNotEmpty && _messages.any((m) => m.id == messageId)) return true;
+    final now = DateTime.now();
+    final time = createdAt ?? now;
+    return _messages.any((m) => 
+      m.content == content && 
+      m.senderUserId == senderId && 
+      (m.createdAt ?? now).difference(time).inSeconds.abs() < 5
+    );
+  }
+
   void _onMessageNew(dynamic payload) {
     if (!mounted) return;
     Map<String, dynamic> map = {};
@@ -178,7 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (messageId != null && senderId != null) {
       // Prevent duplicates - check if message already exists
-      if (_messages.any((m) => m.id == messageId)) {
+      if (_isDuplicateMessage(messageId, content, senderId, DateTime.now())) {
         return;
       }
 
@@ -630,7 +641,7 @@ class _ChatScreenState extends State<ChatScreen> {
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
-          if (!_messages.any((m) => m.id == sentMessage.id)) {
+          if (!_isDuplicateMessage(sentMessage.id, sentMessage.content, sentMessage.senderUserId, sentMessage.createdAt)) {
             setState(() {
               _messages = [..._messages, sentMessage];
             });
@@ -823,7 +834,7 @@ class _ChatScreenState extends State<ChatScreen> {
       result.fold(
         onSuccess: (sentMessage) {
           _pendingMessageIds.add(sentMessage.id);
-          if (!_messages.any((m) => m.id == sentMessage.id)) {
+          if (!_isDuplicateMessage(sentMessage.id, sentMessage.content, sentMessage.senderUserId, sentMessage.createdAt)) {
             setState(() {
               _messages = [..._messages, sentMessage];
             });
@@ -1012,7 +1023,7 @@ class _ChatScreenState extends State<ChatScreen> {
       onSuccess: (sentMessage) {
         controller.clear();
         _pendingMessageIds.add(sentMessage.id);
-        if (!_messages.any((m) => m.id == sentMessage.id)) {
+        if (!_isDuplicateMessage(sentMessage.id, sentMessage.content, sentMessage.senderUserId, sentMessage.createdAt)) {
           setState(() {
             _messages = [..._messages, sentMessage];
           });

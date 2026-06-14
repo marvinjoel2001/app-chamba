@@ -58,6 +58,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   // Filtros de búsqueda
   String? _selectedCategory;
   String? _selectedModality; // 'hourly', 'daily', 'full'
+
+  final Set<String> _notifiedAcceptedRequests = {};
+
+  bool get hasAcceptedRequest {
+    for (final req in _requests) {
+      final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+      if (workerOffer?['status'] == 'accepted') return true;
+    }
+    return false;
+  }
   final List<String> _categories = [
     'Limpieza',
     'Jardinería',
@@ -703,17 +713,21 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
       
       // Chequear si alguna oferta fue aceptada
-      bool anyAccepted = false;
+      bool newlyAccepted = false;
       for (final req in fetchedRequests) {
         final offerStatus = (req['workerOffer'] as Map?)?['status']?.toString();
-        if (offerStatus == 'accepted') {
-          anyAccepted = true;
-          SessionStore.activeRequestId = req['id']?.toString();
+        final reqId = req['id']?.toString();
+        if (offerStatus == 'accepted' && reqId != null) {
+          SessionStore.activeRequestId = reqId;
+          if (!_notifiedAcceptedRequests.contains(reqId)) {
+            _notifiedAcceptedRequests.add(reqId);
+            newlyAccepted = true;
+          }
           break;
         }
       }
       
-      if (anyAccepted && !_showAcceptedBanner && mounted) {
+      if (newlyAccepted && !_showAcceptedBanner && mounted) {
         setState(() => _showAcceptedBanner = true);
         _acceptedAnimCtrl.forward(from: 0);
         Future.delayed(const Duration(seconds: 5), () {
@@ -721,7 +735,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         });
       }
       
-      if (anyAccepted && mounted) {
+      if (newlyAccepted && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _sheetCtrl.isAttached) {
             _sheetCtrl.animateTo(
@@ -939,10 +953,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           DraggableScrollableSheet(
             controller: _sheetCtrl,
             initialChildSize: 0.32,
-            minChildSize: 0.12,
+            minChildSize: 0.15,
             maxChildSize: 0.85,
             snap: true,
-            snapSizes: const [0.32, 0.85],
+            snapSizes: const [0.15, 0.85],
             builder: (context, scrollController) {
               final navPadding =
                   92.0 + MediaQuery.viewPaddingOf(context).bottom;
@@ -989,53 +1003,65 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                              child: Row(
-                                children: [
-                                  const Text(
-                                    'Solicitudes disponibles',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
+                            if (!hasAcceptedRequest)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    const Text(
+                                      'Solicitudes disponibles',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Builder(builder: (context) {
-                                    final filtered = _requests.where((req) {
-                                      if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
-                                        if (req['category']?.toString() != _selectedCategory) return false;
-                                      }
-                                      if (_selectedModality != null && _selectedModality!.isNotEmpty) {
-                                        final pt = req['priceType']?.toString().toLowerCase() ?? '';
-                                        if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
-                                        if (_selectedModality == 'daily' && !pt.contains('d')) return false;
-                                        if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
-                                      }
-                                      return true;
-                                    }).toList();
-                                    
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.colorPrimary,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '${filtered.length}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 12,
+                                    const SizedBox(width: 8),
+                                    Builder(builder: (context) {
+                                      final filtered = _requests.where((req) {
+                                        if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
+                                          if (req['category']?.toString() != _selectedCategory) return false;
+                                        }
+                                        if (_selectedModality != null && _selectedModality!.isNotEmpty) {
+                                          final pt = req['priceType']?.toString().toLowerCase() ?? '';
+                                          if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
+                                          if (_selectedModality == 'daily' && !pt.contains('d')) return false;
+                                          if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
+                                        }
+                                        return true;
+                                      }).toList();
+                                      
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.colorPrimary,
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
-                                      ),
-                                    );
-                                  }),
-                                ],
+                                        child: Text(
+                                          '${filtered.length}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
                               ),
-                            ),
                             Builder(builder: (context) {
+                              if (hasAcceptedRequest) {
+                                final acceptedReq = _requests.firstWhere((req) {
+                                  final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+                                  return workerOffer?['status'] == 'accepted';
+                                });
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: _buildFloatingAcceptedCard(acceptedReq),
+                                );
+                              }
+
                               final filtered = _requests.where((req) {
                                 if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
                                   if (req['category']?.toString() != _selectedCategory) return false;
@@ -1057,22 +1083,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                 itemBuilder: (context, index) {
                                   final req = filtered[index];
                                   final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
-                                final offerStatus = workerOffer?['status']?.toString();
-                                final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
-                                final hasPendingOffer = offerStatus == 'pending';
-                                final isAcceptedOffer = offerStatus == 'accepted';
-                                return _buildRequestCard(
-                                  req: req,
-                                  workerOffer: workerOffer,
-                                  offerStatus: offerStatus,
-                                  secondsRemaining: secondsRemaining,
-                                  hasPendingOffer: hasPendingOffer,
-                                  isAcceptedOffer: isAcceptedOffer,
-                                  clientCountered: false, // You can enhance this if needed
-                                );
-                              },
-                            );
-                           }),
+                                  final offerStatus = workerOffer?['status']?.toString();
+                                  final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
+                                  final hasPendingOffer = offerStatus == 'pending';
+                                  final isAcceptedOffer = offerStatus == 'accepted';
+                                  return _buildRequestCard(
+                                    req: req,
+                                    workerOffer: workerOffer,
+                                    offerStatus: offerStatus,
+                                    secondsRemaining: secondsRemaining,
+                                    hasPendingOffer: hasPendingOffer,
+                                    isAcceptedOffer: isAcceptedOffer,
+                                    clientCountered: false, // You can enhance this if needed
+                                  );
+                                },
+                              );
+                            }),
                           ],
                         ),
                       ),
@@ -1191,6 +1217,62 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingAcceptedCard(Map<String, dynamic> req) {
+    return GestureDetector(
+      onTap: () {
+        final reqId = req['id']?.toString();
+        if (reqId != null) _openJobInProgress(reqId);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.colorPrimary.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.colorPrimary.withOpacity(0.4),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.colorPrimary.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.handyman,
+                  color: AppTheme.colorPrimary, size: 24),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trabajo en curso',
+                    style: TextStyle(
+                      color: AppTheme.colorPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Toca para ir al seguimiento',
+                    style: TextStyle(
+                        color: AppTheme.colorMuted, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: AppTheme.colorPrimary, size: 28),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app.dart';
 import '../../features/review/presentation/screens/rating_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
+import '../../features/shell/presentation/screens/main_shell_screen.dart';
 import '../services/toast_service.dart';
 import '../session/session_store.dart';
 
@@ -44,10 +45,13 @@ class AppFlows {
     final nav = ChambaApp.navigatorKey.currentState;
     if (nav == null) return;
     
-    // Instead of popUntil, we reset the entire navigation stack to the splash screen.
-    // This avoids black screens if the stack was manipulated or missing the home route.
+    // Volver al inicio asegurando que se carga la pantalla principal
     nav.pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
+      MaterialPageRoute(
+        builder: (_) => MainShellScreen(
+          role: SessionStore.currentUser?.type ?? 'client',
+        ),
+      ),
       (route) => false,
     );
     
