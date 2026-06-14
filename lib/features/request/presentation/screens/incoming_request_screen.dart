@@ -516,23 +516,33 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'cancelled');
       });
+
+      final map = payload is Map ? Map<String, dynamic>.from(payload) : {};
+      final cancelerId = map['cancelerUserId']?.toString();
+      final myId = SessionStore.currentUser?.id;
+
+      final isMe = cancelerId != null && cancelerId == myId;
+      final message = isMe ? 'Cancelaste el trabajo' : 'El cliente canceló el trabajo';
+      final bgColor = isMe ? AppTheme.colorMuted : AppTheme.colorError;
+      final icon = isMe ? Icons.info_outline : Icons.cancel;
+
       // Banner rojo de cancelación
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.cancel, color: Colors.white, size: 18),
-              SizedBox(width: 8),
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
               Text(
-                'El cliente canceló el trabajo',
-                style: TextStyle(
+                message,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          backgroundColor: AppTheme.colorError,
+          backgroundColor: bgColor,
           duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(

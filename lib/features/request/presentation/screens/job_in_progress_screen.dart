@@ -617,7 +617,6 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         children: [
           // ── MAPA ──────────────────────────────────────────────────────
           Positioned.fill(
-            bottom: 300,
             child: AppConfig.mapboxAccessToken.trim().isEmpty
                 ? Container(
                     color: AppTheme.colorBackgroundAccent,
@@ -838,45 +837,81 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                     _mapController.move(center, 15);
                   },
                 ),
+                const SizedBox(height: 8),
+                _MapBtn(
+                  icon: Icons.route,
+                  onTap: () {
+                    if (destPos != null) {
+                      _mapController.fitCamera(
+                        CameraFit.bounds(
+                          bounds: LatLngBounds.fromPoints([workerPos, destPos]),
+                          padding: const EdgeInsets.only(top: 100, left: 50, right: 50, bottom: 300),
+                        ),
+                      );
+                    } else {
+                      final center = _deviceLocation ?? mapCenter;
+                      _mapController.move(center, 15);
+                    }
+                  },
+                ),
               ],
             ),
           ),
 
           // ── BOTTOM CARD ───────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0D1728),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Text(
+          DraggableScrollableSheet(
+            initialChildSize: 0.35,
+            minChildSize: 0.10,
+            maxChildSize: 0.55,
+            snap: true,
+            snapSizes: const [0.10, 0.35, 0.55],
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0D1728),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 10,
+                      offset: Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.colorMuted.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
                           _error!,
                           style: const TextStyle(color: AppTheme.colorError),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorMuted
-                                      .withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                            Row(
+                        ),
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -1114,9 +1149,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-            ),
+                        ],
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
