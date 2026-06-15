@@ -204,34 +204,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Icono redondo grande
+                    // Icono de la app con sombreado
                     Center(
                       child: Container(
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  AppTheme.colorPrimary.withValues(alpha: 0.5),
-                              blurRadius: 50,
-                              spreadRadius: 15,
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: AppTheme.colorPrimary.withValues(alpha: 0.4),
+                              blurRadius: 40,
+                              spreadRadius: 5,
                             ),
                           ],
                         ),
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.colorGlassDarkSoft,
-                          ),
-                          padding: const EdgeInsets.all(24),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/icon/icon.png',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
+                        child: Image.asset(
+                          'assets/images/icon/icon.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),

@@ -1185,6 +1185,80 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
 
+              // Job Summary Card
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.jobTitle,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.monetization_on, size: 14, color: AppTheme.colorSuccess),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${widget.agreedPrice} Bs. Acordado',
+                          style: const TextStyle(color: AppTheme.colorSuccess, fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.colorPrimary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            widget.category ?? 'Trabajo',
+                            style: const TextStyle(
+                              color: AppTheme.colorPrimary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 16),
+                    Row(
+                      children: [
+                        ChambaNetworkAvatar(
+                          url: widget.counterpartAvatarUrl,
+                          radius: 12,
+                          fallbackText: widget.counterpartName.trim().isEmpty ? '?' : widget.counterpartName.trim().substring(0, 1).toUpperCase(),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Trabajador: ${widget.counterpartName}',
+                            style: const TextStyle(fontSize: 13, color: Colors.black87),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
@@ -1351,80 +1425,110 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (!mine)
-              _buildBubbleTail(isMine: false, color: bubbleColor),
-            Flexible(
-              child: Container(
-                padding: isImage
-                    ? const EdgeInsets.all(4)
-                    : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.75,
-                ),
-                decoration: BoxDecoration(
-                  color: bubbleColor,
-                  boxShadow: mine ? [] : [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(mine ? 20 : 4),
-                    bottomRight: Radius.circular(mine ? 4 : 20),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Audio message
-                    if (isAudio && url != null)
-                      _buildAudioPlayer(url, mine)
-                    // Image message
-                    else if (isImage && url != null)
-                      _buildImagePreview(url)
-                    // Text message
-                    else
-                      Text(
-                        content,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: textColor,
-                          height: 1.3,
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          time,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: mine
-                                ? Colors.white.withOpacity(0.7)
-                                : Colors.grey,
-                          ),
-                        ),
-                        if (mine) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.done_all,
-                            size: 14,
-                            color: Colors.white.withOpacity(0.7),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+            if (!mine) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: ChambaNetworkAvatar(
+                  url: widget.counterpartAvatarUrl,
+                  radius: 14,
+                  fallbackText: widget.counterpartName.trim().isEmpty ? '?' : widget.counterpartName.trim().substring(0, 1).toUpperCase(),
                 ),
               ),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (!mine)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, bottom: 4),
+                      child: Text(
+                        widget.counterpartName,
+                        style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (!mine) _buildBubbleTail(isMine: false, color: bubbleColor),
+                      Flexible(
+                        child: Container(
+                          padding: isImage
+                              ? const EdgeInsets.all(4)
+                              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.70,
+                          ),
+                          decoration: BoxDecoration(
+                            color: bubbleColor,
+                            boxShadow: mine ? [] : [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(20),
+                              topRight: const Radius.circular(20),
+                              bottomLeft: Radius.circular(mine ? 20 : 4),
+                              bottomRight: Radius.circular(mine ? 4 : 20),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Audio message
+                              if (isAudio && url != null)
+                                _buildAudioPlayer(url, mine)
+                              // Image message
+                              else if (isImage && url != null)
+                                _buildImagePreview(url)
+                              // Text message
+                              else
+                                Text(
+                                  content,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: textColor,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    time,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: mine
+                                          ? Colors.white.withOpacity(0.7)
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                  if (mine) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.done_all,
+                                      size: 14,
+                                      color: Colors.white.withOpacity(0.7),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (mine) _buildBubbleTail(isMine: true, color: bubbleColor),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            if (mine)
-              _buildBubbleTail(isMine: true, color: bubbleColor),
           ],
         ),
       ),
