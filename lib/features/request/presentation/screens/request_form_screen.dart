@@ -62,6 +62,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   PaymentMethod? _selectedPaymentMethod;
   bool _loadingPaymentMethods = true;
 
+  final ScrollController _scrollController = ScrollController();
+  double _scrollProgress = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -71,12 +74,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         .toList();
     _initializeLocation();
     _loadPaymentMethods();
+
+    _scrollController.addListener(() {
+      if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
+        setState(() {
+          _scrollProgress = (_scrollController.offset / _scrollController.position.maxScrollExtent).clamp(0.0, 1.0);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
     _budgetController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -437,25 +449,41 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
-          child: GlassCard(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                )
+              ]
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.location_off,
                   size: 36,
-                  color: AppTheme.colorText,
+                  color: Colors.redAccent,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   _locationBlockMessage!,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: const TextStyle(fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 14),
-                ChambaPrimaryButton(
-                  label: 'Permitir ubicacion',
+                ElevatedButton(
                   onPressed: _initializeLocation,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.colorPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Permitir ubicacion', style: TextStyle(color: Colors.white)),
                 ),
                 if (_canOpenLocationSettings) ...[
                   const SizedBox(height: 8),
@@ -475,343 +503,631 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       );
     }
 
-    return SingleChildScrollView(
-      child: GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Que necesitas?',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              minLines: 4,
-              maxLines: null,
-              readOnly: true,
-              enableInteractiveSelection: false,
-              decoration: const InputDecoration(
-                hintText:
-                    'Tu solicitud se analizara desde la pantalla anterior.',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Categorias sugeridas',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _suggestedCategories.isEmpty
-                  ? const [ChambaChip(label: 'General', selected: true)]
-                  : _suggestedCategories.asMap().entries.map((entry) {
-                      final category = entry.value;
-                      final label =
-                          category['name']?.toString().trim().isNotEmpty == true
-                              ? category['name'].toString().trim()
-                              : 'General';
-                      return ChambaChip(label: label, selected: entry.key == 0);
-                    }).toList(),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Ubicacion actual',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: AppTheme.glassContainerDecoration(radius: 18),
-              child: Row(
-                children: [
-                  const Icon(Icons.my_location, color: AppTheme.colorHighlight),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _resolvedAddress ?? 'Ubicacion actual',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _loading ? null : _initializeLocation,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Precio propuesto',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _budgetController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(prefixText: 'Bs  '),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: ['Precio fijo', 'Por hora', 'Por dia']
-                  .map(
-                    (option) => ChambaChip(
-                      label: option,
-                      selected: priceType == option,
-                      onTap: () {
-                        setState(() {
-                          priceType = option;
-                        });
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 8),
-            // Descripción dinámica del tipo de precio seleccionado
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                key: ValueKey(priceType),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.colorPrimary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.colorPrimary.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: AppTheme.colorTextOnPurple,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        priceType == 'Precio fijo'
-                            ? 'Precio fijo: el monto indicado es el total que se pagará al finalizar todo el trabajo, sin importar el tiempo que tome.'
-                            : priceType == 'Por hora'
-                                ? 'Por hora: el monto indicado se pagará por cada hora de trabajo. El total dependerá del tiempo que dure el servicio.'
-                                : 'Por día: el monto indicado se pagará por cada día completo de trabajo realizado.',
-                        style: const TextStyle(
-                          color: AppTheme.colorMuted,
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Payment Method Selector
-            Text(
-              'Método de pago',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (_loadingPaymentMethods)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_paymentMethods.isEmpty)
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: [
+        // Qué necesitas?
+        const Text(
+          '¿Qué necesitas?',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey[200]!),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.colorSurfaceSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.colorPrimary.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                child: const Row(
+                child: const Icon(
+                  Icons.edit_outlined,
+                  color: AppTheme.colorPrimary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Icon(Icons.payments_outlined, color: AppTheme.colorMuted),
-                    SizedBox(width: 8),
-                    Text('Efectivo (único método disponible)'),
-                  ],
-                ),
-              )
-            else
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _paymentMethods.map((method) {
-                  final isSelected = _selectedPaymentMethod?.id == method.id;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedPaymentMethod = method;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF4CAF50).withValues(alpha: 0.2)
-                            : AppTheme.colorSurfaceSoft,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF4CAF50)
-                              : Colors.transparent,
-                          width: 2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.payments_outlined,
-                            color: isSelected
-                                ? const Color(0xFF4CAF50)
-                                : AppTheme.colorMuted,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            method.name,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? const Color(0xFF4CAF50)
-                                  : AppTheme.colorText,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
+                    TextField(
+                      controller: _descriptionController,
+                      minLines: 2,
+                      maxLines: null,
+                      readOnly: true,
+                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                      decoration: const InputDecoration(
+                        hintText: 'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                        filled: true,
+                        fillColor: Colors.transparent,
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Fotos del trabajo (${_pendingImages.length}/5)',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _loading ? null : _pickImages,
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text('Agregar'),
-                ),
-              ],
-            ),
-            if (_pendingImages.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 84,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _pendingImages.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final image = _pendingImages[index];
-                    return Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.memory(
-                            image.bytes,
-                            width: 84,
-                            height: 84,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: _loading
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _pendingImages.removeAt(index);
-                                    });
-                                  },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppTheme.colorBackgroundAlt.withValues(
-                                  alpha: 0.92,
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                              padding: const EdgeInsets.all(4),
-                              child: const Icon(
-                                Icons.close,
-                                color: AppTheme.colorText,
-                                size: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_descriptionController.text.length}/120',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                    )
+                  ],
                 ),
               ),
             ],
-            const SizedBox(height: 24),
-            ChambaPrimaryButton(
-              label: _loading ? 'Publicando...' : 'Publicar solicitud',
-              icon: Icons.send,
-              onPressed: _loading ? null : _submit,
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        // Categoría del servicio
+        const Text(
+          'Categoría del servicio',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _suggestedCategories.isEmpty
+              ? const [_CategoryPill(label: 'General', selected: true)]
+              : _suggestedCategories.map((category) {
+                  final label = category['name']?.toString().trim().isNotEmpty == true
+                          ? category['name'].toString().trim()
+                          : 'General';
+                  // Simulamos que todas están pre-seleccionadas si son sugeridas por la IA,
+                  // o permitimos que el usuario las seleccione. Por simplicidad visual,
+                  // las mostraremos todas "activas" o la primera activa si se desea.
+                  return _CategoryPill(
+                    label: label,
+                    selected: true, // Mostrar todas sugeridas como activas según el pedido
+                  );
+                }).toList(),
+        ),
+        const SizedBox(height: 24),
+
+        // Ubicación del servicio
+        const Text(
+          'Ubicación del servicio',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey[100]!),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Placeholder del mapa
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.location_on,
+                    color: AppTheme.colorPrimary,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _resolvedAddress ?? 'Ubicación actual',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Ubicación detectada',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: _loading ? null : _initializeLocation,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Cambiar ubicación',
+                            style: TextStyle(
+                              color: AppTheme.colorPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.chevron_right, size: 14, color: AppTheme.colorPrimary),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Presupuesto estimado
+        const Text(
+          'Presupuesto estimado',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey[100]!),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.colorPrimary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.wallet, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Bs ',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _budgetController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: Colors.grey[400], size: 20),
+                onPressed: () => _budgetController.clear(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _PriceTypeOption(label: 'Precio fijo', subtitle: 'Total del trabajo', isSelected: priceType == 'Precio fijo', onTap: () => setState(() => priceType = 'Precio fijo'))),
+            const SizedBox(width: 8),
+            Expanded(child: _PriceTypeOption(label: 'Por hora', subtitle: 'Pago por hora', isSelected: priceType == 'Por hora', onTap: () => setState(() => priceType = 'Por hora'))),
+            const SizedBox(width: 8),
+            Expanded(child: _PriceTypeOption(label: 'Por día', subtitle: 'Pago por día', isSelected: priceType == 'Por día', onTap: () => setState(() => priceType = 'Por día'))),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.colorPrimary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, color: AppTheme.colorPrimary, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'El precio es referencial. Podrás acordar el monto final con el trabajador seleccionado.',
+                  style: TextStyle(
+                    color: AppTheme.colorPrimary.withOpacity(0.8),
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Método de pago
+        const Text(
+          'Método de pago',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey[100]!),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.money, color: Colors.green, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Efectivo',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Pagarás al finalizar el trabajo',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_down, color: Colors.grey[400]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Fotos del trabajo
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            const Text(
+              'Fotos del trabajo ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF090D16),
+              ),
+            ),
+            Text(
+              '(opcional)',
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: _loading ? null : _pickImages,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppTheme.colorPrimary.withOpacity(0.3), style: BorderStyle.none),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                // Dash simulation wrapper
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.colorPrimary.withOpacity(0.3)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.camera_alt, color: AppTheme.colorPrimary, size: 28),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Agrega fotos para que los trabajadores entiendan mejor lo que necesitas.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Agregar fotos',
+                        style: TextStyle(
+                          color: AppTheme.colorPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_pendingImages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 84,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _pendingImages.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final image = _pendingImages[index];
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        image.bytes,
+                        width: 84,
+                        height: 84,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: _loading ? null : () {
+                          setState(() {
+                            _pendingImages.removeAt(index);
+                          });
+                        },
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 32),
+        
+        // Botón Publicar
+        ElevatedButton(
+          onPressed: _loading ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.colorPrimary,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_loading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                )
+              else
+                const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                _loading ? 'Publicando...' : 'Publicar solicitud',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ChambaBackground(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    IconButton(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Nueva solicitud',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nueva solicitud',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF090D16),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Cuéntanos qué necesitas',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Expanded(child: _buildLocationState(context)),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
+            
+            // Progress Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: _scrollProgress < 0.1 ? 32 : 8,
+                    height: _scrollProgress < 0.1 ? 6 : 8,
+                    decoration: BoxDecoration(
+                      color: AppTheme.colorPrimary,
+                      borderRadius: BorderRadius.circular(_scrollProgress < 0.1 ? 3 : 4),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 24,
+                    height: 2,
+                    color: _scrollProgress >= 0.1 ? AppTheme.colorPrimary.withOpacity(0.5) : Colors.grey[200],
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 32 : 8,
+                    height: _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 6 : 8,
+                    decoration: BoxDecoration(
+                      color: _scrollProgress >= 0.1 ? AppTheme.colorPrimary : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(_scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 3 : 4),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 24,
+                    height: 2,
+                    color: _scrollProgress >= 0.8 ? AppTheme.colorPrimary.withOpacity(0.5) : Colors.grey[200],
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: _scrollProgress >= 0.8 ? 32 : 8,
+                    height: _scrollProgress >= 0.8 ? 6 : 8,
+                    decoration: BoxDecoration(
+                      color: _scrollProgress >= 0.8 ? AppTheme.colorPrimary : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(_scrollProgress >= 0.8 ? 3 : 4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Body
+            Expanded(child: _buildLocationState(context)),
+          ],
         ),
       ),
     );
@@ -835,11 +1151,11 @@ class _ImageSourceBottomSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.colorBackgroundAlt,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -849,27 +1165,30 @@ class _ImageSourceBottomSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 8),
+            margin: const EdgeInsets.only(top: 12),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.grey[300],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'Agregar fotos',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Selecciona una opcion',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppTheme.colorMuted),
+            'Selecciona una opción',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
           ),
           const SizedBox(height: 24),
           _OptionTile(
@@ -936,7 +1255,7 @@ class _OptionTile extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
+                color: color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -951,19 +1270,106 @@ class _OptionTile extends StatelessWidget {
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 13, color: AppTheme.colorMuted),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                   ),
                 ],
               ),
             ),
             Icon(
               Icons.chevron_right,
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({
+    required this.label,
+    required this.selected,
+  });
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? AppTheme.colorPrimary.withOpacity(0.1) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? Colors.transparent : Colors.grey[300]!,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? AppTheme.colorPrimary : Colors.black87,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+class _PriceTypeOption extends StatelessWidget {
+  const _PriceTypeOption({
+    required this.label,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.colorPrimary.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.colorPrimary : Colors.grey[200]!,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppTheme.colorPrimary : Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isSelected ? AppTheme.colorPrimary.withOpacity(0.6) : Colors.grey[500],
+                fontSize: 9,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

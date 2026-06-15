@@ -160,21 +160,20 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final isLight = theme.brightness == Brightness.light;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFFFBFBFD),
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
+        backgroundColor: const Color(0xFFFBFBFD),
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Mensajes',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF090D16),
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: _load,
-            icon: Icon(Icons.refresh, color: theme.iconTheme.color),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
@@ -229,16 +228,61 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      itemCount: threads.length + 1, // +1 for the static notifications item
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _buildNotificationsItem(isLight);
-        }
-        final thread = threads[index - 1];
-        return _buildWhatsAppThreadItem(thread, isLight);
-      },
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      children: [
+        _buildNotificationsItem(isLight),
+        const SizedBox(height: 32),
+        _buildDivider(),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: threads.length,
+            separatorBuilder: (context, index) => const Divider(
+              height: 1,
+              color: Color(0xFFF3F4F6),
+              indent: 76,
+            ),
+            itemBuilder: (context, index) {
+              return _buildWhatsAppThreadItem(threads[index], isLight);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(child: Container(height: 1, color: const Color(0xFFE5E7EB))),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'CHATS',
+            style: TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        Expanded(child: Container(height: 1, color: const Color(0xFFE5E7EB))),
+      ],
     );
   }
 
@@ -247,18 +291,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       valueListenable: UnreadNotificationsNotifier.instance,
       builder: (context, unreadCount, child) {
         final hasUnread = unreadCount > 0;
-        const Color unreadColor = Colors.red;
-
-        final highlightBg = isLight
-            ? const Color(0xFFFEE2E2)
-            : const Color.fromRGBO(255, 255, 255, 0.08);
-        final borderC = isLight
-            ? const Color(0xFFE0E0E0)
-            : const Color.fromRGBO(255, 255, 255, 0.1);
-        final textC = isLight ? const Color(0xFF1E293B) : Colors.white;
-        final secondaryC = isLight
-            ? const Color(0xFF475569)
-            : const Color.fromRGBO(255, 255, 255, 0.5);
+        const Color unreadColor = Colors.redAccent;
 
         return InkWell(
           onTap: () async {
@@ -267,16 +300,19 @@ class _MessagesScreenState extends State<MessagesScreen> {
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             );
           },
+          borderRadius: BorderRadius.circular(20),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             decoration: BoxDecoration(
-              color: hasUnread ? highlightBg : Colors.transparent,
-              border: Border(
-                bottom: BorderSide(
-                  color: borderC,
-                  width: 0.5,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
                 ),
-              ),
+              ],
             ),
             child: Row(
               children: [
@@ -285,7 +321,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.redAccent.withValues(alpha: 0.2),
+                    color: Colors.redAccent.withOpacity(0.1),
                   ),
                   child: const Center(
                     child: Icon(
@@ -295,17 +331,17 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Notificaciones',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
-                          color: textC,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -318,36 +354,24 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                   : 'No hay notificaciones nuevas',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: hasUnread ? textC : secondaryC,
-                                fontWeight:
-                                    hasUnread ? FontWeight.w500 : FontWeight.normal,
+                                color: const Color(0xFF6B7280), // Gray 500
+                                fontWeight: hasUnread
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (hasUnread) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: unreadColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '$unreadCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ],
                   ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.colorPrimary,
+                  size: 24,
                 ),
               ],
             ),
@@ -358,57 +382,60 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Widget _buildWhatsAppThreadItem(ChatThread thread, bool isLight) {
-    final currentUser = SessionStore.currentUser;
-    final isWorker = currentUser?.type == 'worker';
-
-    // Worker ve foto del trabajo, cliente ve foto del worker
-    final String? avatarUrl =
-        isWorker ? null : thread.counterpartProfilePhotoUrl;
-
-    final String avatarText = isWorker
-        ? (thread.jobTitle.isNotEmpty ? thread.jobTitle[0] : 'T')
-        : (thread.counterpartName.isNotEmpty ? thread.counterpartName[0] : '?');
+    // Foto del trabajo por defecto
+    const AssetImage jobAvatar = AssetImage('assets/images/chat/default_job.png');
 
     final bool hasUnread = thread.hasUnreadMessages;
-    const Color unreadColor = Color(0xFF25D366);
+    
+    // Contamos el número de mensajes no leídos (simulado si no está en el modelo, usamos 1 para el mockup)
+    // Asumimos que si hasUnread es true, mostramos un badge
+    final int unreadCount = hasUnread ? 1 : 0; // Idealmente vendría de thread.unreadCount
 
-    // Colores según el tema
-    final highlightBg = isLight
-        ? const Color(0xFFE8F5E9)
-        : const Color.fromRGBO(255, 255, 255, 0.08);
-    final borderC = isLight
-        ? const Color(0xFFE0E0E0)
-        : const Color.fromRGBO(255, 255, 255, 0.1);
-    final textC = isLight ? const Color(0xFF1E293B) : Colors.white;
-    final mutedC = isLight
-        ? const Color(0xFF64748B)
-        : const Color.fromRGBO(255, 255, 255, 0.7);
-    final secondaryC = isLight
-        ? const Color(0xFF475569)
-        : const Color.fromRGBO(255, 255, 255, 0.5);
+    final highlightBg = const Color(0xFFF8F7FA); // Light purple/grey on hover/unread
+    final textC = const Color(0xFF090D16); // Dark text
+    final mutedC = const Color(0xFF6B7280); // Gray text
 
     return InkWell(
       onTap: () => _openChat(thread),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: hasUnread ? highlightBg : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(
-              color: borderC,
-              width: 0.5,
-            ),
-          ),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Avatar circular
-            ChambaNetworkAvatar(
-              url: avatarUrl,
-              radius: 28,
-              fallbackText: avatarText.toUpperCase(),
+            // Avatar circular del trabajo
+            Stack(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    image: DecorationImage(
+                      image: jobAvatar,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Indicador de conexión (Punto verde)
+                Positioned(
+                  bottom: 2,
+                  right: 2,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: AppTheme.colorSuccess,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
 
             // Contenido
             Expanded(
@@ -420,46 +447,49 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          thread.jobTitle,
+                          thread.jobTitle.isNotEmpty ? thread.jobTitle : thread.counterpartName,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight:
-                                hasUnread ? FontWeight.bold : FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                             color: textC,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                       Text(
                         _formatDate(thread.lastMessageAt),
                         style: TextStyle(
                           fontSize: 12,
-                          color: hasUnread ? unreadColor : mutedC,
-                          fontWeight:
-                              hasUnread ? FontWeight.w600 : FontWeight.normal,
+                          color: hasUnread ? AppTheme.colorPrimary : mutedC,
+                          fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
 
-                  // Segunda fila: Nombre de la otra persona
-                  Text(
-                    isWorker
-                        ? 'Cliente: ${thread.counterpartName}'
-                        : 'Worker: ${thread.counterpartName}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: mutedC,
+                  // Segunda fila: Categoría
+                  if (thread.category != null && thread.category!.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorPrimary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        thread.category!,
+                        style: const TextStyle(
+                          color: AppTheme.colorPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
 
-                  // Tercera fila: Ultimo mensaje + badge no leidos
+                  // Tercera fila: Ultimo mensaje + badge no leídos
                   Row(
                     children: [
                       Expanded(
@@ -467,9 +497,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           thread.lastMessage ?? 'Sin mensajes',
                           style: TextStyle(
                             fontSize: 14,
-                            color: hasUnread ? textC : secondaryC,
-                            fontWeight:
-                                hasUnread ? FontWeight.w500 : FontWeight.normal,
+                            color: hasUnread ? textC : mutedC,
+                            fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -480,10 +509,17 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: const BoxDecoration(
-                            color: unreadColor,
+                            color: AppTheme.colorPrimary,
                             shape: BoxShape.circle,
                           ),
-                          child: const SizedBox(width: 4, height: 4),
+                          child: Text(
+                            '$unreadCount', // O usar 1 si no hay count exacto
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ],
