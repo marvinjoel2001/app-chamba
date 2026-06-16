@@ -1189,6 +1189,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.transparent,
                   ),
                 ),
               ),
@@ -1216,10 +1218,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             keyboardType: TextInputType.number,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             decoration: const InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+                filled: true,
+                fillColor: Colors.transparent,
+              ),
           ),
         ],
       ),
@@ -1584,3 +1588,4 @@ class _PriceTypeOption extends StatelessWidget {
     );
   }
 }
+
