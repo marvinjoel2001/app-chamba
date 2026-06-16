@@ -204,29 +204,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Icono de la app con sombreado
+                    // Icono de la app enmarcado en un puntero de mapa
                     Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
+                      child: SizedBox(
+                        width: 140,
+                        height: 150,
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Pin principal
+                            Icon(
+                              Icons.location_on,
+                              size: 140,
+                              color: AppTheme.colorPrimary,
+                              shadows: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 10),
+                                ),
+                                BoxShadow(
+                                  color: AppTheme.colorPrimary.withValues(alpha: 0.4),
+                                  blurRadius: 30,
+                                  spreadRadius: 5,
+                                ),
+                              ],
                             ),
-                            BoxShadow(
-                              color: AppTheme.colorPrimary.withValues(alpha: 0.4),
-                              blurRadius: 40,
-                              spreadRadius: 5,
+                            // Imagen circular dentro del pin
+                            Positioned(
+                              top: 18,
+                              child: Container(
+                                width: 64,
+                                height: 64,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Image.asset(
+                                  'assets/images/icon/icon.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
                           ],
-                        ),
-                        child: Image.asset(
-                          'assets/images/icon/icon.png',
-                          fit: BoxFit.contain,
                         ),
                       ),
                     ),

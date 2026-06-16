@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -242,6 +244,155 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     } catch (_) {}
 
     return 'Ubicacion actual';
+  }
+
+  Future<void> _showLocationMap() async {
+    if (_latitude == null || _longitude == null) {
+      await _initializeLocation();
+      if (_latitude == null || _longitude == null) return;
+    }
+
+    final mapController = MapController();
+    bool isUpdating = false;
+
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tu ubicación actual',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Text(
+                      'Esta es la ubicación donde se realizará el trabajo. Solo usamos tu ubicación real para evitar solicitudes falsas.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        if (AppConfig.mapboxAccessToken.isNotEmpty)
+                          FlutterMap(
+                            mapController: mapController,
+                            options: MapOptions(
+                              initialCenter: LatLng(_latitude!, _longitude!),
+                              initialZoom: 15,
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                              ),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                userAgentPackageName: 'com.example.mobile',
+                                additionalOptions: {
+                                  'accessToken': AppConfig.mapboxAccessToken,
+                                },
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(_latitude!, _longitude!),
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: AppTheme.colorPrimary,
+                                      size: 40,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          )
+                        else
+                          const Center(child: Text('Mapa no disponible')),
+                        if (isUpdating)
+                          Container(
+                            color: Colors.white.withOpacity(0.5),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: isUpdating
+                              ? null
+                              : () async {
+                                  setModalState(() => isUpdating = true);
+                                  await _initializeLocation();
+                                  if (_latitude != null && _longitude != null) {
+                                    mapController.move(
+                                      LatLng(_latitude!, _longitude!),
+                                      15,
+                                    );
+                                  }
+                                  setModalState(() => isUpdating = false);
+                                },
+                          icon: const Icon(Icons.my_location),
+                          label: const Text('Actualizar con mi GPS actual'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.colorPrimary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Confirmar y cerrar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadPaymentMethods() async {
@@ -667,12 +818,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     ),
                     const SizedBox(height: 8),
                     GestureDetector(
-                      onTap: _loading ? null : _initializeLocation,
+                      onTap: _loading ? null : _showLocationMap,
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Cambiar ubicación',
+                            'Ver / Actualizar ubicación',
                             style: TextStyle(
                               color: AppTheme.colorPrimary,
                               fontSize: 12,
@@ -785,7 +936,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'El precio es referencial. Podrás acordar el monto final con el trabajador seleccionado.',
+                  priceType == 'Por hora'
+                      ? 'Se calculará el pago en base a las horas trabajadas. Podrás acordar la tarifa final con el trabajador.'
+                      : priceType == 'Por día'
+                          ? 'Se calculará el pago por cada día de trabajo. Podrás acordar la tarifa final con el trabajador.'
+                          : 'El precio es referencial. Podrás acordar el monto final con el trabajador seleccionado.',
                   style: TextStyle(
                     color: AppTheme.colorPrimary.withOpacity(0.8),
                     fontSize: 11,

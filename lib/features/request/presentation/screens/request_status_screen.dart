@@ -43,6 +43,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   double _currentBudget = 0;
   double _draftBudget = 0;
+  String _sortBy = 'recent';
 
   // Animación de ondas radar
   late final AnimationController _radarCtrl;
@@ -395,7 +396,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   List<Map<String, dynamic>> _visibleOffers() {
-    return _offers
+    final list = _offers
         .where((o) {
           final offer = o as Map<String, dynamic>;
           final status = offer['status'] as String?;
@@ -403,6 +404,55 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         })
         .map((o) => Map<String, dynamic>.from(o as Map<String, dynamic>))
         .toList();
+
+    if (_sortBy == 'lowest_price') {
+      list.sort((a, b) => (double.tryParse(a['amount'].toString()) ?? 0)
+          .compareTo(double.tryParse(b['amount'].toString()) ?? 0));
+    } else if (_sortBy == 'highest_price') {
+      list.sort((a, b) => (double.tryParse(b['amount'].toString()) ?? 0)
+          .compareTo(double.tryParse(a['amount'].toString()) ?? 0));
+    }
+    return list;
+  }
+
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF151D29),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Más recientes', style: TextStyle(color: Colors.white)),
+                trailing: _sortBy == 'recent' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                onTap: () {
+                  setState(() => _sortBy = 'recent');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Menor precio', style: TextStyle(color: Colors.white)),
+                trailing: _sortBy == 'lowest_price' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                onTap: () {
+                  setState(() => _sortBy = 'lowest_price');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Mayor precio', style: TextStyle(color: Colors.white)),
+                trailing: _sortBy == 'highest_price' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                onTap: () {
+                  setState(() => _sortBy = 'highest_price');
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _sendImproveOffer() async {
@@ -411,14 +461,22 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     if (user == null || requestId == null) return;
 
     if (_draftBudget <= _currentBudget) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Tu nueva oferta debe ser mayor a Bs ${_currentBudget.toStringAsFixed(0)}',
+      final prevDraft = _draftBudget;
+      await _editOfferAmount();
+      if (_draftBudget == prevDraft) {
+        // Usuario canceló o no cambió el valor
+        return;
+      }
+      if (_draftBudget <= _currentBudget) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Tu nueva oferta debe ser mayor a Bs ${_currentBudget.toStringAsFixed(0)}',
+            ),
           ),
-        ),
-      );
-      return;
+        );
+        return;
+      }
     }
 
     setState(() => _updatingBudget = true);
@@ -661,12 +719,17 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF151D29),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    ),
-                    child: Column(
+                  Positioned(
+                    top: 70,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF151D29),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      child: Column(
                       children: [
                         const SizedBox(height: 12),
                         Container(
@@ -714,11 +777,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                         ),
                                         const Spacer(),
                                         TextButton.icon(
-                                          onPressed: () {},
+                                          onPressed: _showSortOptions,
                                           icon: const Icon(Icons.tune,
                                               color: Colors.white, size: 16),
-                                          label: const Text('Más recientes',
-                                              style: TextStyle(color: Colors.white)),
+                                          label: Text(
+                                            _sortBy == 'lowest_price' ? 'Menor precio' : 
+                                            _sortBy == 'highest_price' ? 'Mayor precio' : 'Más recientes',
+                                            style: const TextStyle(color: Colors.white),
+                                          ),
                                           style: TextButton.styleFrom(
                                             backgroundColor: const Color(0xFF1A2436),
                                             shape: RoundedRectangleBorder(
@@ -777,10 +843,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       ],
                     ),
                   ),
+                  ),
 
                   // ── TARJETA FLOTANTE (Sobre el bottom sheet) ──────────────────────────
                   Positioned(
-                    top: -70,
+                    top: 0,
                     left: 16,
                     right: 16,
                     child: Container(
@@ -863,12 +930,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     initialLongitude: widget.longitude,
                                   ),
                                 ),
-                              );
+                              ).then((_) => _load());
                             },
                             icon: const Icon(Icons.edit,
-                                size: 14, color: Color(0xFF8A2BE2)),
+                                size: 14, color: Colors.amber),
                             label: const Text('Editar',
-                                style: TextStyle(color: Color(0xFF8A2BE2))),
+                                style: TextStyle(color: Colors.amber)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: Color(0xFF2D2347)),
                               shape: RoundedRectangleBorder(
@@ -935,7 +1002,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   Widget _buildBudgetCard() {
-    final displayBudget = _currentBudget <= 0 ? _draftBudget : _currentBudget;
+    final displayBudget = _draftBudget;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -944,80 +1011,74 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF8A2BE2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.account_balance_wallet,
-                    color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tu presupuesto',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
-                    ),
-                    Text(
-                      'Bs ${displayBudget.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: _editOfferAmount,
-                icon: const Icon(Icons.edit, size: 14, color: Color(0xFF8A2BE2)),
-                label: const Text('Editar',
-                    style: TextStyle(color: Color(0xFF8A2BE2))),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF2D2347)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF8A2BE2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.account_balance_wallet,
+                color: Colors.white, size: 20),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(Icons.trending_up,
-                  color: Colors.white.withValues(alpha: 0.6), size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Mejora tu oferta para tener más posibilidades',
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tu presupuesto',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                      color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                 ),
-              ),
-              ElevatedButton(
-                onPressed: _updatingBudget ? null : _sendImproveOffer,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8A2BE2),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                Text(
+                  'Bs ${displayBudget.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: Text(_updatingBudget ? 'Enviando...' : 'Mejorar oferta'),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: _updatingBudget ? null : _sendImproveOffer,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.monetization_on_outlined, size: 18, color: Colors.white),
+                Positioned(
+                  right: -4,
+                  top: -2,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00D26A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, size: 10, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            label: Text(
+              _updatingBudget ? '...' : 'Mejorar Oferta',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-            ],
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00D26A),
+              foregroundColor: Colors.white,
+              elevation: 4,
+              shadowColor: const Color(0xFF00D26A).withValues(alpha: 0.4),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
           ),
         ],
       ),
