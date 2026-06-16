@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -59,6 +60,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   List<LatLng> _workerLocations = [];
   List<String?> _workerAvatars = [];
   List<LatLng> _currentRoutePoints = [];
+  bool _isCancelling = false;
 
   @override
   void initState() {
@@ -585,8 +587,192 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     });
   }
 
+  Future<void> _cancelRequest() async {
+    final requestId = _request?['id']?.toString();
+    final userId = SessionStore.currentUser?.id;
+    if (requestId == null || userId == null) return;
+    
+    setState(() => _isCancelling = true);
+    
+    try {
+      (await RequestDependencies.cancelJob(
+        requestId: requestId,
+        userId: userId,
+      )).fold(
+        onSuccess: (_) {
+          AppFlows.goHomeAfterCancellation();
+        },
+        onFailure: (failure) => throw Exception(failure.message),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cancelar: ${e.toString().replaceAll('Exception: ', '')}')),
+        );
+      }
+    }
+  }
+
+  void _showCancelConfirmation() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF151D29),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 40),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '¿Cancelar solicitud?',
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Se cancelará la búsqueda y todos los trabajadores dejarán de recibir esta solicitud.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _cancelRequest();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Sí, cancelar solicitud', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('No, volver', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _shareRequest() {
+    final requestId = _request?['id']?.toString() ?? '';
+    final link = 'https://app.chamba.com/request/$requestId';
+    Clipboard.setData(ClipboardData(text: link));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Enlace copiado al portapapeles')),
+    );
+  }
+
+  void _editRequest() {
+    final description = _request?['description']?.toString() ?? '';
+    final title = _request?['title']?.toString();
+    final address = _request?['address']?.toString();
+    
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RequestFormScreen(
+          initialPrompt: description,
+          modality: _request?['modality']?.toString() ?? 'fixed',
+          initialTitle: title,
+          initialAddress: address,
+          initialLatitude: widget.latitude,
+          initialLongitude: widget.longitude,
+        ),
+      ),
+    ).then((_) => _load());
+  }
+
+  void _showRequestMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF151D29),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.white, size: 20),
+                title: const Text('Editar solicitud', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editRequest();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share, color: Colors.white, size: 20),
+                title: const Text('Compartir solicitud', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareRequest();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                title: const Text('Cancelar solicitud', style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showCancelConfirmation();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isCancelling) {
+      return const Scaffold(
+        backgroundColor: AppTheme.colorBackground,
+        body: Center(child: CircularProgressIndicator(color: Colors.redAccent)),
+      );
+    }
     final lat = widget.latitude ?? -16.5002;
     final lng = widget.longitude ?? -68.1342;
     final mapCenter = LatLng(lat, lng);
@@ -955,35 +1141,32 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                               ],
                             ),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              final description = _request?['description']?.toString() ?? '';
-                              final title = _request?['title']?.toString();
-                              final address = _request?['address']?.toString();
-                              
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => RequestFormScreen(
-                                    initialPrompt: description,
-                                    modality: _request?['modality']?.toString() ?? 'fixed',
-                                    initialTitle: title,
-                                    initialAddress: address,
-                                    initialLatitude: widget.latitude,
-                                    initialLongitude: widget.longitude,
-                                  ),
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: _editRequest,
+                                icon: const Icon(Icons.edit, size: 14, color: Colors.white),
+                                label: const Text('Editar', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
-                              ).then((_) => _load());
-                            },
-                            icon: const Icon(Icons.edit,
-                                size: 14, color: Colors.amber),
-                            label: const Text('Editar',
-                                style: TextStyle(color: Colors.amber)),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF2D2347)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: _showRequestMenu,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.more_horiz, color: Color(0xFF8A2BE2), size: 18),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
