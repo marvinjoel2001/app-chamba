@@ -5,7 +5,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
-import 'verification_checkpoint_screen.dart';
+import 'work_modalities_screen.dart';
 import '../../domain/entities/worker_category.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
@@ -256,10 +256,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
           SnackBar(content: Text('Habilidades guardadas: ${selected.length}')),
         );
         if (widget.forceToHomeAfterSave) {
-          // Redirigir al checkpoint de verificación
+          // Siguiente paso del registro: elegir modalidades de cobro.
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute<void>(
-              builder: (_) => const VerificationCheckpointScreen(),
+              builder: (_) =>
+                  const WorkModalitiesScreen(forceToHomeAfterSave: true),
             ),
             (_) => false,
           );

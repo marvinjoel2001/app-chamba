@@ -16,6 +16,10 @@ class WorkerDependencies {
   );
   static final getWorkerSkills = GetWorkerSkillsUseCase(_repository);
   static final updateWorkerSkills = UpdateWorkerSkillsUseCase(_repository);
+  static final getWorkerModalities = GetWorkerModalitiesUseCase(_repository);
+  static final updateWorkerModalities = UpdateWorkerModalitiesUseCase(
+    _repository,
+  );
   static final getWorkerHistory = GetWorkerHistoryUseCase(_repository);
   static final getWorkerCategories = GetWorkerCategoriesUseCase(_repository);
   static final createWorkerCategory = CreateWorkerCategoryUseCase(_repository);

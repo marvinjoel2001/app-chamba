@@ -14,7 +14,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/explore_dependencies.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
-import '../../../request/presentation/screens/request_form_screen.dart';
+import '../../../request/presentation/screens/request_modality_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 
@@ -347,7 +347,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => RequestFormScreen(
+          builder: (_) => RequestModalityScreen(
             initialPrompt: prompt,
             initialTitle: preview['title']?.toString(),
             suggestedCategories:

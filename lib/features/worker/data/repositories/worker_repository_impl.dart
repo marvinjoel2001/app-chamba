@@ -3,6 +3,7 @@ import '../../../../core/errors/result.dart';
 import '../../domain/entities/worker_availability.dart';
 import '../../domain/entities/worker_category.dart';
 import '../../domain/entities/worker_job.dart';
+import '../../domain/entities/worker_modalities.dart';
 import '../../domain/entities/worker_radar_summary.dart';
 import '../../domain/entities/worker_skill.dart';
 import '../../domain/repositories/worker_repository.dart';
@@ -10,6 +11,7 @@ import '../datasources/worker_remote_datasource.dart';
 import '../models/worker_availability_model.dart';
 import '../models/worker_category_model.dart';
 import '../models/worker_job_model.dart';
+import '../models/worker_modalities_model.dart';
 import '../models/worker_radar_summary_model.dart';
 import '../models/worker_skill_model.dart';
 
@@ -79,6 +81,40 @@ class WorkerRepositoryImpl implements WorkerRepository {
           .where((skill) => skill.name.trim().isNotEmpty)
           .toList(growable: false);
       return Success(normalized);
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
+
+  @override
+  Future<Result<WorkerModalities>> workerModalities({
+    required String workerUserId,
+  }) async {
+    try {
+      final response = await _remote.workerModalities(
+        workerUserId: workerUserId,
+      );
+      return Success(WorkerModalitiesModel.fromJson(response));
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
+
+  @override
+  Future<Result<WorkerModalities>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  }) async {
+    try {
+      final response = await _remote.updateWorkerModalities(
+        workerUserId: workerUserId,
+        modalities: modalities,
+        hourlyRate: hourlyRate,
+        dailyRate: dailyRate,
+      );
+      return Success(WorkerModalitiesModel.fromJson(response));
     } catch (error) {
       return Error(mapToFailure(error));
     }

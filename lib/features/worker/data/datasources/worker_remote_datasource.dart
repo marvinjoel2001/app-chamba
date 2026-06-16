@@ -15,6 +15,17 @@ abstract class WorkerRemoteDataSource {
     required List<String> skills,
   });
 
+  Future<Map<String, dynamic>> workerModalities({
+    required String workerUserId,
+  });
+
+  Future<Map<String, dynamic>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  });
+
   Future<Map<String, dynamic>> workerHistory({required String workerUserId});
 
   Future<Map<String, dynamic>> categories();
@@ -70,6 +81,28 @@ class WorkerRemoteDataSourceImpl implements WorkerRemoteDataSource {
     return _backendService.updateWorkerSkills(
       workerUserId: workerUserId,
       skills: skills,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> workerModalities({
+    required String workerUserId,
+  }) {
+    return _backendService.workerModalities(workerUserId: workerUserId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  }) {
+    return _backendService.updateWorkerModalities(
+      workerUserId: workerUserId,
+      modalities: modalities,
+      hourlyRate: hourlyRate,
+      dailyRate: dailyRate,
     );
   }
 

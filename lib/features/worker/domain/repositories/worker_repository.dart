@@ -2,6 +2,7 @@ import '../../../../core/errors/result.dart';
 import '../entities/worker_availability.dart';
 import '../entities/worker_category.dart';
 import '../entities/worker_job.dart';
+import '../entities/worker_modalities.dart';
 import '../entities/worker_radar_summary.dart';
 import '../entities/worker_skill.dart';
 
@@ -22,6 +23,17 @@ abstract class WorkerRepository {
   Future<Result<List<WorkerSkill>>> updateWorkerSkills({
     required String workerUserId,
     required List<String> skills,
+  });
+
+  Future<Result<WorkerModalities>> workerModalities({
+    required String workerUserId,
+  });
+
+  Future<Result<WorkerModalities>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
   });
 
   Future<Result<List<WorkerJob>>> workerHistory({required String workerUserId});

@@ -2,6 +2,7 @@ import '../../../../core/errors/result.dart';
 import '../entities/worker_availability.dart';
 import '../entities/worker_category.dart';
 import '../entities/worker_job.dart';
+import '../entities/worker_modalities.dart';
 import '../entities/worker_radar_summary.dart';
 import '../entities/worker_skill.dart';
 import '../repositories/worker_repository.dart';
@@ -54,6 +55,36 @@ class UpdateWorkerSkillsUseCase {
     return _repository.updateWorkerSkills(
       workerUserId: workerUserId,
       skills: skills,
+    );
+  }
+}
+
+class GetWorkerModalitiesUseCase {
+  GetWorkerModalitiesUseCase(this._repository);
+
+  final WorkerRepository _repository;
+
+  Future<Result<WorkerModalities>> call({required String workerUserId}) {
+    return _repository.workerModalities(workerUserId: workerUserId);
+  }
+}
+
+class UpdateWorkerModalitiesUseCase {
+  UpdateWorkerModalitiesUseCase(this._repository);
+
+  final WorkerRepository _repository;
+
+  Future<Result<WorkerModalities>> call({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  }) {
+    return _repository.updateWorkerModalities(
+      workerUserId: workerUserId,
+      modalities: modalities,
+      hourlyRate: hourlyRate,
+      dailyRate: dailyRate,
     );
   }
 }

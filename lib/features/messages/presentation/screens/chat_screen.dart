@@ -17,7 +17,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
-import '../../../request/presentation/screens/request_form_screen.dart';
+import '../../../request/presentation/screens/request_modality_screen.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
 import '../../domain/usecases/messages_usecases.dart';
@@ -1077,7 +1077,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => RequestFormScreen(
+        builder: (_) => RequestModalityScreen(
           initialPrompt: 'Volver a contratar: ${widget.jobTitle}',
           preselectedCategory: widget.category,
           preselectedWorkerId: widget.workerId,

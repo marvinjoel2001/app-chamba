@@ -117,6 +117,12 @@ class MobileBackendService {
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
     String? paymentMethod,
+    String? modality,
+    int? estimatedHours,
+    double? hourlyRate,
+    int? days,
+    double? dailyRate,
+    String? startDate,
   }) {
     final body = <String, dynamic>{
       'clientUserId': clientUserId,
@@ -131,6 +137,12 @@ class MobileBackendService {
       'photosBase64': photosBase64,
       'photos': photos,
       'paymentMethod': paymentMethod,
+      'modality': modality,
+      'estimatedHours': estimatedHours,
+      'hourlyRate': hourlyRate,
+      'days': days,
+      'dailyRate': dailyRate,
+      'startDate': startDate,
     };
     if (category != null && category.trim().isNotEmpty) {
       body['category'] = category;
@@ -397,6 +409,32 @@ class MobileBackendService {
     return _api.post(
       '/mobile/worker/skills',
       body: {'workerUserId': workerUserId, 'skills': skills},
+    );
+  }
+
+  Future<Map<String, dynamic>> workerModalities({
+    required String workerUserId,
+  }) {
+    return _api.get(
+      '/mobile/worker/modalities',
+      queryParameters: {'workerUserId': workerUserId},
+    );
+  }
+
+  Future<Map<String, dynamic>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  }) {
+    return _api.post(
+      '/mobile/worker/modalities',
+      body: {
+        'workerUserId': workerUserId,
+        'modalities': modalities,
+        'hourlyRate': hourlyRate,
+        'dailyRate': dailyRate,
+      },
     );
   }
 

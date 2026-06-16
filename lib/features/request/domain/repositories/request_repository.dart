@@ -17,6 +17,12 @@ abstract class RequestRepository {
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
     String? paymentMethod,
+    String? modality,
+    int? estimatedHours,
+    double? hourlyRate,
+    int? days,
+    double? dailyRate,
+    String? startDate,
   });
 
   Future<Result<RequestPayloadEntity>> requestStatus({

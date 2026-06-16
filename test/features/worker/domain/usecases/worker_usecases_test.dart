@@ -4,6 +4,7 @@ import 'package:mobile/core/errors/result.dart';
 import 'package:mobile/features/worker/domain/entities/worker_availability.dart';
 import 'package:mobile/features/worker/domain/entities/worker_category.dart';
 import 'package:mobile/features/worker/domain/entities/worker_job.dart';
+import 'package:mobile/features/worker/domain/entities/worker_modalities.dart';
 import 'package:mobile/features/worker/domain/entities/worker_radar_summary.dart';
 import 'package:mobile/features/worker/domain/entities/worker_skill.dart';
 import 'package:mobile/features/worker/domain/repositories/worker_repository.dart';
@@ -68,6 +69,25 @@ class _FakeWorkerRepository implements WorkerRepository {
     required String workerUserId,
     required List<String> skills,
   }) async => const Success(<WorkerSkill>[]);
+
+  @override
+  Future<Result<WorkerModalities>> workerModalities({
+    required String workerUserId,
+  }) async => const Success(WorkerModalities.empty());
+
+  @override
+  Future<Result<WorkerModalities>> updateWorkerModalities({
+    required String workerUserId,
+    required List<String> modalities,
+    double? hourlyRate,
+    double? dailyRate,
+  }) async => Success(
+        WorkerModalities(
+          modalities: modalities.toSet(),
+          hourlyRate: hourlyRate,
+          dailyRate: dailyRate,
+        ),
+      );
 
   @override
   Future<Result<void>> uploadProfilePhoto({

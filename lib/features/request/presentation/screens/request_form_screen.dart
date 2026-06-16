@@ -20,6 +20,7 @@ import 'request_status_screen.dart';
 class RequestFormScreen extends StatefulWidget {
   const RequestFormScreen({
     required this.initialPrompt,
+    required this.modality,
     this.initialTitle,
     this.suggestedCategories = const [],
     this.initialLatitude,
@@ -29,6 +30,8 @@ class RequestFormScreen extends StatefulWidget {
     this.preselectedWorkerId,
     super.key,
   });
+
+  final String modality;
 
   final String initialPrompt;
   final String? initialTitle;
@@ -44,9 +47,14 @@ class RequestFormScreen extends StatefulWidget {
 }
 
 class _RequestFormScreenState extends State<RequestFormScreen> {
-  String priceType = 'Precio fijo';
+  late String priceType;
   late final TextEditingController _descriptionController;
   final _budgetController = TextEditingController(text: '100');
+  final _estimatedHoursController = TextEditingController(text: '2');
+  final _hourlyRateController = TextEditingController(text: '20');
+  final _daysController = TextEditingController(text: '1');
+  final _dailyRateController = TextEditingController(text: '100');
+  String? _startDate;
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PendingImage> _pendingImages = [];
   late final List<Map<String, dynamic>> _suggestedCategories;
@@ -70,6 +78,13 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.modality == 'hourly') {
+      priceType = 'Por hora';
+    } else if (widget.modality == 'daily') {
+      priceType = 'Por día';
+    } else {
+      priceType = 'Precio fijo';
+    }
     _descriptionController = TextEditingController(text: widget.initialPrompt);
     _suggestedCategories = widget.suggestedCategories
         .map((item) => Map<String, dynamic>.from(item))
@@ -90,6 +105,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   void dispose() {
     _descriptionController.dispose();
     _budgetController.dispose();
+    _estimatedHoursController.dispose();
+    _hourlyRateController.dispose();
+    _daysController.dispose();
+    _dailyRateController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -512,12 +531,28 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     }
 
     final description = _descriptionController.text.trim();
-    final budget = double.tryParse(_budgetController.text.trim()) ?? 0;
+    double budget = 0;
+    int? estimatedHours;
+    double? hourlyRate;
+    int? days;
+    double? dailyRate;
+
+    if (widget.modality == 'hourly') {
+      estimatedHours = int.tryParse(_estimatedHoursController.text.trim()) ?? 0;
+      hourlyRate = double.tryParse(_hourlyRateController.text.trim()) ?? 0;
+      budget = (estimatedHours * hourlyRate).toDouble();
+    } else if (widget.modality == 'daily') {
+      days = int.tryParse(_daysController.text.trim()) ?? 0;
+      dailyRate = double.tryParse(_dailyRateController.text.trim()) ?? 0;
+      budget = (days * dailyRate).toDouble();
+    } else {
+      budget = double.tryParse(_budgetController.text.trim()) ?? 0;
+    }
 
     if (description.isEmpty || budget <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Completa la descripcion y un presupuesto valido.'),
+          content: Text('Completa la descripcion y verifica que los montos sean mayores a 0.'),
         ),
       );
       return;
@@ -554,6 +589,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         longitude: _longitude!,
         photos: uploadedPhotos,
         paymentMethod: _selectedPaymentMethod?.name ?? 'Efectivo',
+        modality: widget.modality,
+        estimatedHours: estimatedHours,
+        hourlyRate: hourlyRate,
+        days: days,
+        dailyRate: dailyRate,
+        startDate: _startDate,
       ))
           .fold(
             onSuccess: (value) => value,
@@ -845,7 +886,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
         // Presupuesto estimado
         const Text(
-          'Presupuesto estimado',
+          'Presupuesto',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -853,76 +894,26 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[100]!),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
+        if (widget.modality == 'fixed') ...[
+          _buildAmountField('Monto total', _budgetController),
+        ] else if (widget.modality == 'hourly') ...[
+          Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppTheme.colorPrimary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.wallet, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Bs ',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _budgetController,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.close, color: Colors.grey[400], size: 20),
-                onPressed: () => _budgetController.clear(),
-              ),
+              Expanded(child: _buildNumberField('Horas estimadas', _estimatedHoursController)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildAmountField('Pago por hora', _hourlyRateController)),
             ],
           ),
-        ),
+        ] else if (widget.modality == 'daily') ...[
+          Row(
+            children: [
+              Expanded(child: _buildNumberField('Días de trabajo', _daysController)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildAmountField('Pago por día', _dailyRateController)),
+            ],
+          ),
+        ],
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _PriceTypeOption(label: 'Precio fijo', subtitle: 'Total del trabajo', isSelected: priceType == 'Precio fijo', onTap: () => setState(() => priceType = 'Precio fijo'))),
-            const SizedBox(width: 8),
-            Expanded(child: _PriceTypeOption(label: 'Por hora', subtitle: 'Pago por hora', isSelected: priceType == 'Por hora', onTap: () => setState(() => priceType = 'Por hora'))),
-            const SizedBox(width: 8),
-            Expanded(child: _PriceTypeOption(label: 'Por día', subtitle: 'Pago por día', isSelected: priceType == 'Por día', onTap: () => setState(() => priceType = 'Por día'))),
-          ],
-        ),
-        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
@@ -1171,6 +1162,67 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         ),
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  Widget _buildAmountField(String label, TextEditingController controller) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Row(
+            children: [
+              const Text('Bs ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNumberField(String label, TextEditingController controller) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

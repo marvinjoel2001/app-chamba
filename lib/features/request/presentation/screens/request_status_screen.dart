@@ -55,7 +55,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   late final AnimationController _routeCtrl;
   int _currentWorkerIndex = 0;
   bool _isWorkerThinking = false;
+  bool _isSimulating = true;
   List<LatLng> _workerLocations = [];
+  List<String?> _workerAvatars = [];
   List<LatLng> _currentRoutePoints = [];
 
   @override
@@ -109,6 +111,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       LatLng(baseLat - 0.004, baseLng - 0.006),
       LatLng(baseLat - 0.008, baseLng + 0.003),
     ];
+    _workerAvatars = [
+      'https://i.pravatar.cc/150?img=11',
+      'https://i.pravatar.cc/150?img=12',
+      'https://i.pravatar.cc/150?img=13',
+    ];
 
     _startPingLoop();
     _load();
@@ -152,7 +159,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   Future<void> _startPingLoop() async {
     while (mounted) {
-      if (_workerLocations.isEmpty) {
+      if (_workerLocations.isEmpty || !_isSimulating) {
         await Future.delayed(const Duration(seconds: 2));
         continue;
       }
@@ -300,15 +307,31 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       final nearbyWorkers = response['nearbyWorkers'] as List<dynamic>? ?? [];
       final notifiedWorkers = request?['notifiedWorkers'] as List<dynamic>? ?? [];
 
-      // Extraer locaciones reales de donde estén disponibles
+      // Extraer locaciones reales y avatares
       final allWorkers = [...offersList.map((o) => o['worker']), ...nearbyWorkers, ...notifiedWorkers];
-      final realLocations = allWorkers.where((w) => w != null).map((w) {
+      final realMarkers = <Map<String, dynamic>>[];
+      for (final w in allWorkers) {
+        if (w == null) continue;
         final loc = w['location'] as Map<String, dynamic>? ?? w;
         final lat = (loc['latitude'] as num?)?.toDouble() ?? (w['latitude'] as num?)?.toDouble();
         final lng = (loc['longitude'] as num?)?.toDouble() ?? (w['longitude'] as num?)?.toDouble();
-        if (lat != null && lng != null) return LatLng(lat, lng);
-        return null;
-      }).whereType<LatLng>().toSet().toList(); // toSet() para evitar duplicados
+        
+        if (lat != null && lng != null) {
+          final user = w['user'] as Map<String, dynamic>? ?? {};
+          final avatar = user['profileImage']?.toString();
+          realMarkers.add({
+            'location': LatLng(lat, lng),
+            'avatar': avatar,
+          });
+        }
+      }
+      
+      final uniqueMarkers = <Map<String, dynamic>>[];
+      for (final m in realMarkers) {
+        if (!uniqueMarkers.any((um) => um['location'] == m['location'])) {
+          uniqueMarkers.add(m);
+        }
+      }
 
       final currentBudget = (request?['budget'] as num?)?.toDouble() ?? 0;
       final shouldResetDraft =
@@ -318,8 +341,25 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         setState(() {
           _request = request;
           _offers = offersList;
-          if (realLocations.isNotEmpty) {
-            _workerLocations = realLocations;
+          if (uniqueMarkers.isNotEmpty) {
+            _isSimulating = false;
+            _workerLocations = uniqueMarkers.map((m) => m['location'] as LatLng).toList();
+            _workerAvatars = uniqueMarkers.map((m) => m['avatar'] as String?).toList();
+            _currentRoutePoints = [];
+          } else {
+            _isSimulating = true;
+            final baseLat = widget.latitude ?? -16.5002;
+            final baseLng = widget.longitude ?? -68.1342;
+            _workerLocations = [
+              LatLng(baseLat + 0.005, baseLng + 0.005),
+              LatLng(baseLat - 0.004, baseLng - 0.006),
+              LatLng(baseLat - 0.008, baseLng + 0.003),
+            ];
+            _workerAvatars = [
+              'https://i.pravatar.cc/150?img=11',
+              'https://i.pravatar.cc/150?img=12',
+              'https://i.pravatar.cc/150?img=13',
+            ];
           }
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
@@ -631,15 +671,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                               ),
                             ),
                           ),
-                          // Fake worker avatars
-                          if (_workerLocations.isNotEmpty)
+                          // Fake or real worker avatars
+                          if (_workerLocations.isNotEmpty && offers.isEmpty)
                             ...List.generate(_workerLocations.length, (index) {
-                              final isThisWorkerThinking = _isWorkerThinking && _currentWorkerIndex == index;
+                              final isThisWorkerThinking = _isSimulating && _isWorkerThinking && _currentWorkerIndex == index;
+                              final avatarUrl = _workerAvatars.length > index ? _workerAvatars[index] : null;
                               return Marker(
                                 point: _workerLocations[index],
                                 width: 44,
                                 height: 44,
-                                child: _buildMapAvatar('https://i.pravatar.cc/150?img=${11 + index}', isThisWorkerThinking),
+                                child: _buildMapAvatar(avatarUrl, isThisWorkerThinking),
                               );
                             }),
                         ],
@@ -924,6 +965,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                 MaterialPageRoute<void>(
                                   builder: (_) => RequestFormScreen(
                                     initialPrompt: description,
+                                    modality: _request?['modality']?.toString() ?? 'fixed',
                                     initialTitle: title,
                                     initialAddress: address,
                                     initialLatitude: widget.latitude,
@@ -956,7 +998,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     );
   }
 
-  Widget _buildMapAvatar(String url, bool isThinking) {
+  Widget _buildMapAvatar(String? url, bool isThinking) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -972,7 +1014,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             ],
           ),
           child: CircleAvatar(
-            backgroundImage: NetworkImage(url),
+            backgroundColor: Colors.grey[800],
+            backgroundImage: url != null ? NetworkImage(url) : null,
+            child: url == null ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
           ),
         ),
         if (isThinking)
@@ -1003,6 +1047,22 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   Widget _buildBudgetCard() {
     final displayBudget = _draftBudget;
+    final modality = _request?['modality']?.toString() ?? 'fixed';
+    final estimatedHours = _request?['estimatedHours']?.toString() ?? '0';
+    final hourlyRate = _request?['hourlyRate']?.toString() ?? '0';
+    final days = _request?['days']?.toString() ?? '0';
+    final dailyRate = _request?['dailyRate']?.toString() ?? '0';
+
+    String title = 'Tu presupuesto';
+    String subtitle = 'Bs ${displayBudget.toStringAsFixed(0)}';
+
+    if (modality == 'hourly') {
+      title = 'Pago por hora ($estimatedHours hrs)';
+      subtitle = 'Bs $hourlyRate / hr (Total: Bs ${displayBudget.toStringAsFixed(0)})';
+    } else if (modality == 'daily') {
+      title = 'Pago por día ($days días)';
+      subtitle = 'Bs $dailyRate / día (Total: Bs ${displayBudget.toStringAsFixed(0)})';
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1028,15 +1088,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tu presupuesto',
+                  title,
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                 ),
                 Text(
-                  'Bs ${displayBudget.toStringAsFixed(0)}',
+                  subtitle,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

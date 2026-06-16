@@ -15,6 +15,7 @@ import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
+import 'work_modalities_screen.dart';
 import '../../../history/presentation/screens/job_history_screen.dart';
 import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
@@ -480,6 +481,18 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const SkillsSelectionScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _NavTile(
+                  title: 'Modalidades de trabajo',
+                  subtitle: 'Cómo cobras: por trabajo, hora o día',
+                  icon: Icons.payments_outlined,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const WorkModalitiesScreen(),
                       ),
                     );
                   },
