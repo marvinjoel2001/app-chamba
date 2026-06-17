@@ -18,6 +18,7 @@ import '../../../offers/presentation/state/offers_dependencies.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
+import '../../../offers/presentation/screens/worker_profile_screen.dart';
 import 'request_form_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
@@ -114,9 +115,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       LatLng(baseLat - 0.008, baseLng + 0.003),
     ];
     _workerAvatars = [
-      'https://i.pravatar.cc/150?img=11',
-      'https://i.pravatar.cc/150?img=12',
-      'https://i.pravatar.cc/150?img=13',
+      '',
+      '',
+      '',
     ];
 
     _startPingLoop();
@@ -358,9 +359,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               LatLng(baseLat - 0.008, baseLng + 0.003),
             ];
             _workerAvatars = [
-              'https://i.pravatar.cc/150?img=11',
-              'https://i.pravatar.cc/150?img=12',
-              'https://i.pravatar.cc/150?img=13',
+              '',
+              '',
+              '',
             ];
           }
           _offerLifetimeSeconds =
@@ -403,38 +404,45 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     final user = SessionStore.currentUser;
     if (user == null) return;
 
-    (await OffersDependencies.acceptOffer(
-      offerId: item['id'] as String,
-      clientUserId: user.id,
-    )).fold(
-      onSuccess: (value) => value,
-      onFailure: (failure) => throw Exception(failure.message),
-    );
-
-    final requestId = _request?['id']?.toString();
-    final workerId = worker['id']?.toString();
-    if (requestId != null && workerId != null) {
-      SessionStore.activeRequestId = requestId;
-      await _syncActiveThreadForAcceptedOffer(
-        userId: user.id,
-        workerId: workerId,
-        requestId: requestId,
+    try {
+      (await OffersDependencies.acceptOffer(
+        offerId: item['id'] as String,
+        clientUserId: user.id,
+      )).fold(
+        onSuccess: (value) => value,
+        onFailure: (failure) => throw Exception(failure.message),
       );
+
+      final requestId = _request?['id']?.toString();
+      final workerId = worker['id']?.toString();
+      if (requestId != null && workerId != null) {
+        SessionStore.activeRequestId = requestId;
+        await _syncActiveThreadForAcceptedOffer(
+          userId: user.id,
+          workerId: workerId,
+          requestId: requestId,
+        );
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Oferta aceptada')));
+
+      await _load();
+
+      if (!mounted) return;
+
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const TrackingScreen()));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al aceptar oferta: $e'), backgroundColor: Colors.red));
     }
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Oferta aceptada')));
-
-    await _load();
-
-    if (!mounted) return;
-
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const TrackingScreen()));
   }
 
   List<Map<String, dynamic>> _visibleOffers() {
@@ -685,7 +693,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   void _shareRequest() {
     final requestId = _request?['id']?.toString() ?? '';
-    final link = 'https://app.chamba.com/request/$requestId';
+    final baseUrl = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/api$'), '');
+    final link = '$baseUrl/request/$requestId';
     Clipboard.setData(ClipboardData(text: link));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Enlace copiado al portapapeles')),
@@ -1331,12 +1340,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   Widget _buildOfferItem(dynamic offerData) {
     final offer = offerData as Map<String, dynamic>;
     final worker = offer['worker'] as Map<String, dynamic>? ?? {};
-    final user = worker['user'] as Map<String, dynamic>? ?? {};
-    final name = '${user['firstName'] ?? ''} ${(user['lastName']?.toString().isNotEmpty == true) ? user['lastName'].toString()[0] + '.' : ''}'.trim();
-    final avatar = user['profileImage']?.toString();
+    final name = '${worker['firstName'] ?? ''} ${(worker['lastName']?.toString().isNotEmpty == true) ? worker['lastName'].toString()[0] + '.' : ''}'.trim();
+    final avatar = worker['profilePhotoUrl']?.toString();
     final amount = offer['amount']?.toString() ?? '0';
-    final rating = (worker['rating'] as num?)?.toDouble() ?? 5.0;
-    final ratingCount = (worker['ratingCount'] as num?)?.toInt() ?? 0;
+    final rating = (worker['averageRating'] as num?)?.toDouble() ?? 5.0;
+    final ratingCount = (worker['completedJobs'] as num?)?.toInt() ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1414,7 +1422,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               Row(
                 children: [
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      final workerId = worker['id']?.toString();
+                      if (workerId != null) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => WorkerProfileScreen(workerId: workerId),
+                          ),
+                        );
+                      }
+                    },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFF263346),
                       shape: RoundedRectangleBorder(

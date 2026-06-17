@@ -30,11 +30,12 @@ class NotificationsService {
             .toList();
         final hasMore = data['hasMore'] as bool? ?? false;
         return (items: items, hasMore: hasMore);
+      } else {
+        throw Exception('Error al obtener notificaciones (Status: ${response.statusCode})');
       }
     } catch (e) {
-      // Ignorar error de red
+      throw Exception('Fallo al obtener notificaciones: $e');
     }
-    return (items: <AppNotification>[], hasMore: false);
   }
 
   static Future<void> markAsRead() async {
@@ -42,15 +43,19 @@ class NotificationsService {
     if (userId == null) return;
 
     try {
-      await http
+      final response = await http
           .patch(
             Uri.parse('${AppConfig.apiBaseUrl}/mobile/notifications/read'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'userId': userId}),
           )
           .timeout(const Duration(seconds: 12));
+          
+      if (response.statusCode != 200) {
+        throw Exception('Error al marcar notificaciones como leídas (Status: ${response.statusCode})');
+      }
     } catch (e) {
-      // Ignorar error de red
+      throw Exception('Fallo al marcar notificaciones como leídas: $e');
     }
   }
 
@@ -70,10 +75,11 @@ class NotificationsService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return (data['count'] as num?)?.toInt() ?? 0;
+      } else {
+        throw Exception('Error al obtener conteo de notificaciones (Status: ${response.statusCode})');
       }
     } catch (e) {
-      // Ignorar error de red
+      throw Exception('Fallo al obtener conteo de notificaciones: $e');
     }
-    return 0;
   }
 }

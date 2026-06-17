@@ -479,7 +479,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   String _timeAgo(String? isoDate) {
     if (isoDate == null) return '';
     try {
-      final date = DateTime.parse(isoDate).toLocal();
+      final parsed = DateTime.tryParse(isoDate);
+      if (parsed == null) return '';
+      final date = parsed.toLocal();
       final diff = DateTime.now().difference(date);
       if (diff.inMinutes < 1) return 'Hace un momento';
       if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
@@ -1033,10 +1035,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                           if (req['category']?.toString() != _selectedCategory) return false;
                                         }
                                         if (_selectedModality != null && _selectedModality!.isNotEmpty) {
-                                          final pt = req['priceType']?.toString().toLowerCase() ?? '';
-                                          if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
-                                          if (_selectedModality == 'daily' && !pt.contains('d')) return false;
-                                          if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
+                                          final mod = req['modality']?.toString();
+                                          if (_selectedModality == 'hourly' && mod != 'hourly') return false;
+                                          if (_selectedModality == 'daily' && mod != 'daily') return false;
+                                          if (_selectedModality == 'full' && mod != 'fixed') return false;
                                         }
                                         return true;
                                       }).toList();
@@ -1077,10 +1079,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   if (req['category']?.toString() != _selectedCategory) return false;
                                 }
                                 if (_selectedModality != null && _selectedModality!.isNotEmpty) {
-                                  final pt = req['priceType']?.toString().toLowerCase() ?? '';
-                                  if (_selectedModality == 'hourly' && !pt.contains('hora')) return false;
-                                  if (_selectedModality == 'daily' && !pt.contains('d')) return false;
-                                  if (_selectedModality == 'full' && !pt.contains('fijo')) return false;
+                                  final mod = req['modality']?.toString();
+                                  if (_selectedModality == 'hourly' && mod != 'hourly') return false;
+                                  if (_selectedModality == 'daily' && mod != 'daily') return false;
+                                  if (_selectedModality == 'full' && mod != 'fixed') return false;
                                 }
                                 return true;
                               }).toList();
@@ -1322,7 +1324,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final clientReviews = (client['reviews'] as num?)?.toInt() ?? 0;
     final isVerified = client['isVerified'] == true;
     final createdAt = req['createdAt']?.toString();
-    final isNew = createdAt != null && DateTime.now().difference(DateTime.parse(createdAt).toLocal()).inMinutes < 2;
+    final parsedDate = createdAt != null ? DateTime.tryParse(createdAt)?.toLocal() : null;
+    final isNew = parsedDate != null && DateTime.now().difference(parsedDate).inMinutes < 2;
 
     return Container(
       decoration: BoxDecoration(

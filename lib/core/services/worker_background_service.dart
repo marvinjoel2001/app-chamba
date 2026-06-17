@@ -47,7 +47,7 @@ class WorkerBackgroundService {
 
     await _service.configure(
       androidConfiguration: AndroidConfiguration(
-        onStart: _onStart,
+        onStart: onStartWorkerBackgroundService,
         autoStart: false,
         autoStartOnBoot: true,
         isForegroundMode: true,
@@ -58,7 +58,7 @@ class WorkerBackgroundService {
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false,
-        onForeground: _onStart,
+        onForeground: onStartWorkerBackgroundService,
       ),
     );
   }
@@ -101,78 +101,80 @@ class WorkerBackgroundService {
     }
     _service.invoke('stop');
   }
+}
 
-  @pragma('vm:entry-point')
-  static Future<void> _onStart(ServiceInstance service) async {
-    if (service is AndroidServiceInstance) {
-      service.on('stop').listen((_) {
-        service.stopSelf();
-      });
-    }
-
-    Timer.periodic(const Duration(seconds: 25), (_) async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final enabled = prefs.getBool(_enabledKey) ?? false;
-        if (!enabled) {
-          return;
-        }
-
-        final rawUser = prefs.getString(_workerKey);
-        if (rawUser == null || rawUser.isEmpty) {
-          return;
-        }
-
-        final decoded = jsonDecode(rawUser);
-        if (decoded is! Map<String, dynamic>) {
-          return;
-        }
-
-        final userId = decoded['id']?.toString();
-        final userType = decoded['type']?.toString().toLowerCase();
-        if (userId == null || userId.isEmpty || userType != 'worker') {
-          return;
-        }
-
-        final permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          return;
-        }
-        final locationEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!locationEnabled) {
-          return;
-        }
-
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 10),
-          ),
-        );
-
-        final base = AppConfig.apiBaseUrl;
-        final uri = Uri.parse('$base/mobile/worker/location');
-        await _client.post(
-          uri,
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'workerUserId': userId,
-            'latitude': pos.latitude,
-            'longitude': pos.longitude,
-          }),
-        );
-
-        if (service is AndroidServiceInstance) {
-          await service.setForegroundNotificationInfo(
-            title: _notifTitle,
-            content:
-                'Disponible en segundo plano (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})',
-          );
-        }
-      } catch (_) {
-        // Evita que el timer se detenga por errores intermitentes.
-      }
+@pragma('vm:entry-point')
+Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
+  if (service is AndroidServiceInstance) {
+    service.on('stop').listen((_) {
+      service.stopSelf();
     });
   }
+
+  final client = http.Client();
+
+  Timer.periodic(const Duration(seconds: 25), (_) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('worker_bg_enabled') ?? false;
+      if (!enabled) {
+        return;
+      }
+
+      final rawUser = prefs.getString('session_user');
+      if (rawUser == null || rawUser.isEmpty) {
+        return;
+      }
+
+      final decoded = jsonDecode(rawUser);
+      if (decoded is! Map<String, dynamic>) {
+        return;
+      }
+
+      final userId = decoded['id']?.toString();
+      final userType = decoded['type']?.toString().toLowerCase();
+      if (userId == null || userId.isEmpty || userType != 'worker') {
+        return;
+      }
+
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final locationEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!locationEnabled) {
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      final base = AppConfig.apiBaseUrl;
+      final uri = Uri.parse('$base/mobile/worker/location');
+      await client.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'workerUserId': userId,
+          'latitude': pos.latitude,
+          'longitude': pos.longitude,
+        }),
+      );
+
+      if (service is AndroidServiceInstance) {
+        await service.setForegroundNotificationInfo(
+          title: 'Chamba Worker activo',
+          content:
+              'Disponible en segundo plano (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})',
+        );
+      }
+    } catch (_) {
+      // Evita que el timer se detenga por errores intermitentes.
+    }
+  });
 }

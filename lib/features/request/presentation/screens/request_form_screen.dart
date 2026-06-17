@@ -741,7 +741,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       controller: _descriptionController,
                       minLines: 2,
                       maxLines: null,
-                      readOnly: true,
+                      readOnly: false,
+                      onChanged: (_) => setState(() {}),
                       style: const TextStyle(fontSize: 14, color: Colors.black87),
                       decoration: const InputDecoration(
                         hintText: 'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
@@ -912,6 +913,41 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               Expanded(child: _buildAmountField('Pago por día', _dailyRateController)),
             ],
           ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now().add(const Duration(days: 1)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (date != null) {
+                setState(() => _startDate = date.toIso8601String().split('T')[0]);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today, size: 20, color: AppTheme.colorPrimary),
+                  const SizedBox(width: 12),
+                  Text(
+                    _startDate ?? 'Seleccionar fecha de inicio',
+                    style: TextStyle(
+                      color: _startDate != null ? Colors.black87 : Colors.grey[500],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
         const SizedBox(height: 12),
         Container(
@@ -953,54 +989,72 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[100]!),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.money, color: Colors.green, size: 20),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Efectivo',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87,
+        GestureDetector(
+          onTap: _loadingPaymentMethods || _paymentMethods.isEmpty
+              ? null
+              : () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (_) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _paymentMethods.map((m) => ListTile(
+                          title: Text(m.name),
+                          subtitle: Text(m.description),
+                          onTap: () {
+                            setState(() => _selectedPaymentMethod = m);
+                            Navigator.pop(context);
+                          },
+                        )).toList(),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Pagarás al finalizar el trabajo',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
+                  );
+                },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.payments_outlined,
+                    color: AppTheme.colorPrimary,
+                    size: 20,
+                  ),
                 ),
-              ),
-              Icon(Icons.keyboard_arrow_down, color: Colors.grey[400]),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedPaymentMethod?.name ?? 'Efectivo',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedPaymentMethod?.description ?? 'Pagarás al finalizar el trabajo',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.keyboard_arrow_down, color: Colors.grey[400]),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 24),
