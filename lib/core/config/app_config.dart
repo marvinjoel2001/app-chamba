@@ -30,6 +30,11 @@ class AppConfig {
     defaultValue: '',
   );
 
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static String get socketBaseUrl => _resolveLocalhost(
         const String.fromEnvironment(
           'SOCKET_BASE_URL',

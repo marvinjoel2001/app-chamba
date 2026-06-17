@@ -17,6 +17,7 @@ import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 import 'register_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import 'google_account_type_screen.dart';
 
@@ -126,16 +127,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _continueWithGoogle() async {
     setState(() => _checkingIdentifier = true);
     try {
-      final googleSignIn = GoogleSignIn();
+      final googleSignIn = GoogleSignIn(
+        serverClientId: AppConfig.googleWebClientId.isNotEmpty
+            ? AppConfig.googleWebClientId
+            : null,
+        scopes: ['email', 'profile'],
+      );
+      // Limpia sesión previa para evitar conflictos de cache
+      await googleSignIn.signOut();
       final account = await googleSignIn.signIn();
       if (account == null) {
         setState(() => _checkingIdentifier = false);
         return;
       }
-      
+
       final auth = await account.authentication;
       if (auth.idToken == null) {
-        throw Exception('No se pudo obtener el token de Google');
+        throw Exception(
+          'No se pudo obtener el idToken de Google. '
+          'Verifica que GOOGLE_WEB_CLIENT_ID esté configurado correctamente.',
+        );
       }
 
       final result = await MobileBackendService.instance.loginWithGoogle(idToken: auth.idToken!);
