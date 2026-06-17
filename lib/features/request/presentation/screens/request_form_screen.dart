@@ -1000,7 +1000,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: _paymentMethods.map((m) => ListTile(
                           title: Text(m.name),
-                          subtitle: Text(m.description),
+                          subtitle: Text(m.description ?? ''),
                           onTap: () {
                             setState(() => _selectedPaymentMethod = m);
                             Navigator.pop(context);
