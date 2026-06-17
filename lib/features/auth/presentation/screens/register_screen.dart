@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/app_permissions_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
@@ -73,8 +75,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     RealtimeService.instance.connect(userId: user.id);
 
+    final allPermissionsGranted =
+        await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
+    if (!mounted) return;
+
+    final destination = allPermissionsGranted
+        ? nextScreen
+        : RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
+
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => nextScreen),
+      MaterialPageRoute<void>(builder: (_) => destination),
       (route) => false,
     );
   }
