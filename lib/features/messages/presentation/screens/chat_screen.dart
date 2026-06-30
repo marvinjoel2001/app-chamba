@@ -1113,46 +1113,28 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.arrow_back, color: AppTheme.colorPrimary),
                     ),
-                    ChambaNetworkAvatar(
-                      url: widget.counterpartAvatarUrl,
-                      radius: 24,
-                      fallbackText: widget.counterpartName.trim().isEmpty
-                          ? '?'
-                          : widget.counterpartName.trim().substring(0, 1).toUpperCase(),
-                    ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.counterpartName,
+                            widget.category ?? widget.jobTitle,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
                             ),
                           ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: widget.isArchived ? AppTheme.colorMuted : AppTheme.colorSuccess,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                widget.isArchived ? 'Conversación archivada' : 'Activo ahora',
-                                style: TextStyle(
-                                  color: widget.isArchived ? AppTheme.colorMuted : AppTheme.colorPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            widget.jobTitle,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),

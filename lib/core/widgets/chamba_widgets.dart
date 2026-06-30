@@ -302,15 +302,15 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
   final bool isLightTheme;
 
   static const _clientItems = [
-    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
-    _NavItemData(icon: Icons.person, label: 'Perfil'),
+    _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
+    _NavItemData(icon: Icons.chat_bubble_rounded, label: 'Mensajes'),
+    _NavItemData(icon: Icons.person_rounded, label: 'Perfil'),
   ];
   static const _workerItems = [
-    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.account_balance_wallet, label: 'Billetera'),
-    _NavItemData(icon: Icons.chat_bubble, label: 'Mensajes'),
-    _NavItemData(icon: Icons.person, label: 'Perfil'),
+    _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
+    _NavItemData(icon: Icons.account_balance_wallet_rounded, label: 'Billetera'),
+    _NavItemData(icon: Icons.chat_bubble_rounded, label: 'Mensajes'),
+    _NavItemData(icon: Icons.person_rounded, label: 'Perfil'),
   ];
 
   @override

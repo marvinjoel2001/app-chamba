@@ -709,61 +709,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[200]!),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.colorPrimary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: AppTheme.colorPrimary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    TextField(
-                      controller: _descriptionController,
-                      minLines: 2,
-                      maxLines: null,
-                      readOnly: false,
-                      onChanged: (_) => setState(() {}),
-                      style: const TextStyle(fontSize: 14, color: Colors.black87),
-                      decoration: const InputDecoration(
-                        hintText: 'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        filled: true,
-                        fillColor: Colors.transparent,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_descriptionController.text.length}/120',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
-                    )
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        _DescriptionField(controller: _descriptionController),
         const SizedBox(height: 24),
         
         // Categoría del servicio
@@ -1220,68 +1166,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Widget _buildAmountField(String label, TextEditingController controller) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          Row(
-            children: [
-              const Text('Bs ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return _AmountField(label: label, controller: controller);
   }
 
   Widget _buildNumberField(String label, TextEditingController controller) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                filled: true,
-                fillColor: Colors.transparent,
-              ),
-          ),
-        ],
-      ),
-    );
+    return _NumberField(label: label, controller: controller);
   }
 
   @override
@@ -1643,3 +1532,235 @@ class _PriceTypeOption extends StatelessWidget {
   }
 }
 
+class _AmountField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  const _AmountField({required this.label, required this.controller});
+
+  @override
+  State<_AmountField> createState() => _AmountFieldState();
+}
+
+class _AmountFieldState extends State<_AmountField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFocus = _focusNode.hasFocus;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
+          width: hasFocus ? 1.5 : 1.0,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.label, style: TextStyle(fontSize: 12, color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
+          Row(
+            children: [
+              const Text('Bs ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NumberField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  const _NumberField({required this.label, required this.controller});
+
+  @override
+  State<_NumberField> createState() => _NumberFieldState();
+}
+
+class _NumberFieldState extends State<_NumberField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFocus = _focusNode.hasFocus;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
+          width: hasFocus ? 1.5 : 1.0,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.label, style: TextStyle(fontSize: 12, color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
+          TextField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              filled: true,
+              fillColor: Colors.transparent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DescriptionField extends StatefulWidget {
+  final TextEditingController controller;
+  const _DescriptionField({required this.controller});
+
+  @override
+  State<_DescriptionField> createState() => _DescriptionFieldState();
+}
+
+class _DescriptionFieldState extends State<_DescriptionField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFocus = _focusNode.hasFocus;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(
+          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
+          width: hasFocus ? 1.5 : 1.0,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppTheme.colorPrimary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.edit_outlined,
+              color: AppTheme.colorPrimary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                TextField(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  minLines: 2,
+                  maxLines: null,
+                  readOnly: false,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  decoration: const InputDecoration(
+                    hintText: 'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${widget.controller.text.length}/120',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

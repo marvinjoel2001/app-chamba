@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
@@ -674,34 +676,181 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     // Estado normal: formulario para crear solicitud
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GlassCard(
+        padding: const EdgeInsets.all(16),
         borderRadius: 32,
         child: Column(
           children: [
-            TextField(
-              controller: _promptController,
-              minLines: 4,
-              maxLines: 5,
-              readOnly: _analyzingPrompt,
-              textInputAction: TextInputAction.newline,
-              keyboardType: TextInputType.multiline,
-              decoration: InputDecoration(
-                hintText:
-                    'Aqui escriba lo que buscas. Ejemplo: necesito que alguien me pinte la casa.',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none,
-                    color: _isListening ? Colors.red : AppTheme.colorMuted,
+            Container(
+              padding: const EdgeInsets.only(left: 20, right: 16, top: 16, bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF262744), // Slightly lighter dark purple/blue
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SvgPicture.string(
+                              '''
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2.5L11.75 8.25L17.5 10L11.75 11.75L10 17.5L8.25 11.75L2.5 10L8.25 8.25L10 2.5Z" fill="#9357E8"/>
+                                <path d="M19 13L19.65 15.35L22 16L19.65 16.65L19 19L18.35 16.65L16 16L18.35 15.35L19 13Z" fill="#9357E8"/>
+                              </svg>
+                              ''',
+                              width: 20,
+                              height: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Escribe lo que buscas...',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _promptController,
+                          minLines: 2,
+                          maxLines: 4,
+                          readOnly: _analyzingPrompt,
+                          textInputAction: TextInputAction.newline,
+                          keyboardType: TextInputType.multiline,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            height: 1.4,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            hintText: 'Ejemplo: necesito que alguien\nme pinte la casa.',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 17,
+                              height: 1.4,
+                            ),
+                            border: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onPressed: _listenToSpeech,
-                ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _listenToSpeech,
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF6B42C6),
+                            Color(0xFF4B2996),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFF8152DD).withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            spreadRadius: -2,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _isListening ? Icons.mic : Icons.mic_none,
+                        color: _isListening ? Colors.redAccent : Colors.white,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            ChambaPrimaryButton(
-              label: _analyzingPrompt ? 'Analizando...' : 'Solicitar',
-              onPressed: _analyzingPrompt ? null : _startRequestFlow,
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF9059FF),
+                    Color(0xFF6A35FF),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7A45FF).withValues(alpha: 0.6),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _analyzingPrompt ? null : _startRequestFlow,
+                icon: _analyzingPrompt 
+                  ? const SizedBox(
+                      width: 20, 
+                      height: 20, 
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    )
+                  : const Icon(Icons.send_outlined, color: Colors.white),
+                label: Text(
+                  _analyzingPrompt ? 'Analizando...' : 'Solicitar',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ).copyWith(
+                  elevation: WidgetStateProperty.all(0),
+                ),
+              ),
             ),
           ],
         ),

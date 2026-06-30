@@ -62,6 +62,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   List<String?> _workerAvatars = [];
   List<LatLng> _currentRoutePoints = [];
   bool _isCancelling = false;
+  bool _showImproveOfferBtn = false;
+  Timer? _btnTimer;
+  late final AnimationController _pulseCtrl;
+  final Map<String, List<LatLng>> _routeCache = {};
 
   @override
   void initState() {
@@ -101,6 +105,18 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       const Duration(seconds: 1),
       (_) => _tickCountdown(),
     );
+    
+    _btnTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) {
+        if (mounted) setState(() => _showImproveOfferBtn = !_showImproveOfferBtn);
+      },
+    );
+
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
 
     _routeCtrl = AnimationController(
       vsync: this,
@@ -135,11 +151,17 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.off('job.cancelled', _onJobCancelled);
     _radarCtrl.dispose();
     _routeCtrl.dispose();
+    _pulseCtrl.dispose();
     _ticker?.cancel();
+    _btnTimer?.cancel();
     super.dispose();
   }
 
   Future<List<LatLng>> _fetchRoute(LatLng start, LatLng end) async {
+    final cacheKey = '${start.latitude},${start.longitude}-${end.latitude},${end.longitude}';
+    if (_routeCache.containsKey(cacheKey)) {
+      return _routeCache[cacheKey]!;
+    }
     final token = AppConfig.mapboxAccessToken;
     if (token.isEmpty) return [start, end];
     try {
@@ -152,11 +174,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           final geometry = routes[0]['geometry'];
           final coordinates = geometry['coordinates'] as List<dynamic>?;
           if (coordinates != null) {
-            return coordinates.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
+            final route = coordinates.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
+            _routeCache[cacheKey] = route;
+            return route;
           }
         }
       }
     } catch (_) {}
+    _routeCache[cacheKey] = [start, end];
     return [start, end];
   }
 
@@ -359,9 +384,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               LatLng(baseLat - 0.008, baseLng + 0.003),
             ];
             _workerAvatars = [
-              '',
-              '',
-              '',
+              'https://i.pravatar.cc/150?img=11',
+              'https://i.pravatar.cc/150?img=33',
+              'https://i.pravatar.cc/150?img=60',
             ];
           }
           _offerLifetimeSeconds =
@@ -701,25 +726,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     );
   }
 
-  void _editRequest() {
-    final description = _request?['description']?.toString() ?? '';
-    final title = _request?['title']?.toString();
-    final address = _request?['address']?.toString();
-    
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => RequestFormScreen(
-          initialPrompt: description,
-          modality: _request?['modality']?.toString() ?? 'fixed',
-          initialTitle: title,
-          initialAddress: address,
-          initialLatitude: widget.latitude,
-          initialLongitude: widget.longitude,
-        ),
-      ),
-    ).then((_) => _load());
-  }
-
   void _showRequestMenu() {
     showModalBottomSheet(
       context: context,
@@ -742,14 +748,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.white, size: 20),
-                title: const Text('Editar solicitud', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _editRequest();
-                },
-              ),
+
               ListTile(
                 leading: const Icon(Icons.share, color: Colors.white, size: 20),
                 title: const Text('Compartir solicitud', style: TextStyle(color: Colors.white)),
@@ -797,10 +796,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 ? Container(color: AppTheme.colorBackgroundAccent)
                 : FlutterMap(
                     options: MapOptions(
-                      initialCenter: mapCenter,
+                      initialCenter: LatLng(mapCenter.latitude - 0.005, mapCenter.longitude), // Offset camera south so marker is higher
                       initialZoom: 14,
                       interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.none,
+                        flags: InteractiveFlag.all,
                       ),
                     ),
                     children: [
@@ -812,19 +811,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           'accessToken': AppConfig.mapboxAccessToken,
                         },
                       ),
-                      AnimatedBuilder(
-                        animation: _radarCtrl,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            painter: _RadarWavePainter(
-                              center: mapCenter,
-                              waves: _radarWaves.map((a) => a.value).toList(),
-                              color: const Color(0xFF8A2BE2),
-                            ),
-                            size: Size.infinite,
-                          );
-                        },
-                      ),
+
                       AnimatedBuilder(
                         animation: _routeCtrl,
                         builder: (context, child) {
@@ -839,6 +826,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                             polylines: [
                               Polyline(
                                 points: visiblePoints,
+                                color: const Color(0xFF8A2BE2).withValues(alpha: 0.3),
+                                strokeWidth: 12.0, // Glow
+                              ),
+                              Polyline(
+                                points: visiblePoints,
                                 color: const Color(0xFF8A2BE2),
                                 strokeWidth: 3.0,
                               ),
@@ -848,6 +840,24 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       ),
                       MarkerLayer(
                         markers: [
+                          Marker(
+                            point: mapCenter,
+                            width: 300,
+                            height: 300,
+                            child: AnimatedBuilder(
+                              animation: _radarCtrl,
+                              builder: (context, _) {
+                                return CustomPaint(
+                                  painter: _RadarWavePainter(
+                                    center: mapCenter,
+                                    waves: _radarWaves.map((a) => a.value).toList(),
+                                    color: const Color(0xFF8A2BE2),
+                                  ),
+                                  size: const Size(300, 300),
+                                );
+                              },
+                            ),
+                          ),
                           Marker(
                             point: mapCenter,
                             width: 24,
@@ -1039,7 +1049,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    _buildBudgetCard(),
                                     const SizedBox(height: 16),
                                     if (offers.isEmpty)
                                       const Padding(
@@ -1108,7 +1117,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                               color: Color(0xFF8A2BE2),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.grid_view,
+                            child: const Icon(Icons.handyman_rounded,
                                 color: Colors.white, size: 20),
                           ),
                           const SizedBox(width: 12),
@@ -1152,15 +1161,65 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           ),
                           Row(
                             children: [
-                              TextButton.icon(
-                                onPressed: _editRequest,
-                                icon: const Icon(Icons.edit, size: 14, color: Colors.white),
-                                label: const Text('Editar', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                style: TextButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 500),
+                                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                                child: _showImproveOfferBtn
+                                    ? AnimatedBuilder(
+                                        key: const ValueKey('improveBtn'),
+                                        animation: _pulseCtrl,
+                                        builder: (context, child) {
+                                          final scale = 1.0 + (_pulseCtrl.value * 0.05);
+                                          final shadowAlpha = 0.4 + (_pulseCtrl.value * 0.4);
+                                          return Transform.scale(
+                                            scale: scale,
+                                            child: Tooltip(
+                                              message: 'Mejora la oferta para encontrar más trabajadores',
+                                              preferBelow: false,
+                                              triggerMode: TooltipTriggerMode.tap,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF151D29).withValues(alpha: 0.9),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFF00D26A).withValues(alpha: 0.5)),
+                                              ),
+                                              textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+                                              child: ElevatedButton.icon(
+                                                onPressed: _updatingBudget ? null : _sendImproveOffer,
+                                                icon: const Icon(Icons.monetization_on_outlined, size: 14, color: Colors.white),
+                                                label: Text(
+                                                  _updatingBudget ? '...' : 'Mejorar oferta',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF00D26A),
+                                                  foregroundColor: Colors.white,
+                                                  elevation: 8,
+                                                  shadowColor: const Color(0xFF00D26A).withValues(alpha: shadowAlpha),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
+                                        key: const ValueKey('budgetBadge'),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
+                                        ),
+                                        child: Text(
+                                          'Bs ${_currentBudget.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
                               ),
                               const SizedBox(width: 8),
                               InkWell(
@@ -1207,8 +1266,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           ),
           child: CircleAvatar(
             backgroundColor: Colors.grey[800],
-            backgroundImage: url != null ? NetworkImage(url) : null,
-            child: url == null ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
+            backgroundImage: (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
+            child: (url == null || url.isEmpty) ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
           ),
         ),
         if (isThinking)
