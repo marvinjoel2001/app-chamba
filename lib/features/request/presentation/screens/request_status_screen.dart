@@ -100,6 +100,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.on('offer.client_counter', _onOfferEvent);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
+    _realtime.on('job.reminder', _onJobReminder);
 
     _ticker = Timer.periodic(
       const Duration(seconds: 1),
@@ -149,6 +150,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.off('offer.client_counter', _onOfferEvent);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
+    _realtime.off('job.reminder', _onJobReminder);
     _radarCtrl.dispose();
     _routeCtrl.dispose();
     _pulseCtrl.dispose();
@@ -219,8 +221,35 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     AppFlows.goToRating();
   }
 
-  void _onJobCancelled(dynamic _) {
+  void _onJobCancelled(dynamic payload) {
+    if (payload is Map && payload['reason'] == 'timeout') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tu solicitud se canceló por falta de trabajadores disponibles. Intenta de nuevo.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    }
     AppFlows.goHomeAfterCancellation();
+  }
+
+  void _onJobReminder(dynamic payload) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Nadie ha aceptado aún. Sube tu presupuesto para atraer trabajadores.'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Editar',
+            onPressed: () {
+              setState(() => _showImproveOfferBtn = true);
+            },
+          ),
+        ),
+      );
+    }
   }
 
   void _onOfferEvent(dynamic payload) => _load();
@@ -346,7 +375,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         
         if (lat != null && lng != null) {
           final user = w['user'] as Map<String, dynamic>? ?? {};
-          final avatar = user['profileImage']?.toString();
+          final avatar = w['profilePhotoUrl']?.toString() ?? user['profileImage']?.toString();
           realMarkers.add({
             'location': LatLng(lat, lng),
             'avatar': avatar,
@@ -877,7 +906,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                             ),
                           ),
                           // Fake or real worker avatars
-                          if (_workerLocations.isNotEmpty && offers.isEmpty)
+                          if (_workerLocations.isNotEmpty)
                             ...List.generate(_workerLocations.length, (index) {
                               final isThisWorkerThinking = _isSimulating && _isWorkerThinking && _currentWorkerIndex == index;
                               final avatarUrl = _workerAvatars.length > index ? _workerAvatars[index] : null;
