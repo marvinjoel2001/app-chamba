@@ -41,6 +41,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   StreamSubscription<Position>? _locationStreamSubscription;
   bool _available = true; // se actualiza desde la DB en _initLocation
   bool _togglingAvailability = false;
+  bool _isMapInitialized = false;
 
   // El cliente hizo una contraoferta al worker
   bool _clientCountered = false;
@@ -228,9 +229,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         final loc = LatLng(pos.latitude, pos.longitude);
         setState(() => _workerLocation = loc);
 
-        try {
-          _mapController.move(loc, 14);
-        } catch (_) {}
+        if (!_isMapInitialized) {
+          _isMapInitialized = true;
+          try {
+            _mapController.move(loc, 14);
+          } catch (_) {}
+        }
 
         final user = SessionStore.currentUser;
         if (user != null) {
@@ -1461,7 +1465,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      req['title']?.toString() ?? 'Sin título',
+                      req['category']?.toString() ?? req['title']?.toString() ?? 'Sin categoría',
                       style: const TextStyle(
                         color: AppTheme.colorText,
                         fontSize: 18,
@@ -1486,17 +1490,27 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    req['priceType']?.toString() ?? 'Presupuesto',
-                    style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
-                  ),
-                  Text(
-                    'Bs. $currentBudget',
+                    req['modality'] == 'hourly' && req['hourlyRate'] != null
+                        ? 'Bs. ${req['hourlyRate']}/h'
+                        : req['modality'] == 'daily' && req['dailyRate'] != null
+                            ? 'Bs. ${req['dailyRate']}/día'
+                            : 'Bs. $currentBudget',
                     style: const TextStyle(
                       color: AppTheme.colorPrimary,
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (req['modality'] != 'fixed' && req['modality'] != null)
+                    Text(
+                      'Total: Bs. $currentBudget',
+                      style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11),
+                    )
+                  else
+                    Text(
+                      req['priceType']?.toString() ?? 'Presupuesto',
+                      style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                    ),
                 ],
               ),
             ],
@@ -1978,20 +1992,35 @@ class _JobDetailsSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          priceType,
-                          style: const TextStyle(
-                            color: AppTheme.colorMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          'Bs $budget',
+                          requestData['modality'] == 'hourly' && requestData['hourlyRate'] != null
+                              ? 'Bs. ${requestData['hourlyRate']} por hora'
+                              : requestData['modality'] == 'daily' && requestData['dailyRate'] != null
+                                  ? 'Bs. ${requestData['dailyRate']} por día'
+                                  : 'Bs. $budget',
                           style: const TextStyle(
                             color: AppTheme.colorHighlight,
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if (requestData['modality'] == 'hourly' && requestData['estimatedHours'] != null)
+                          Text(
+                            'Total: Bs. $budget (${requestData['estimatedHours']} hrs)',
+                            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                          )
+                        else if (requestData['modality'] == 'daily' && requestData['days'] != null)
+                          Text(
+                            'Total: Bs. $budget (${requestData['days']} días)',
+                            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                          )
+                        else
+                          Text(
+                            priceType,
+                            style: const TextStyle(
+                              color: AppTheme.colorMuted,
+                              fontSize: 12,
+                            ),
+                          ),
                       ],
                     ),
                 ],
