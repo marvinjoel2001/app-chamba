@@ -385,11 +385,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
     // Foto del trabajo por defecto
     const AssetImage jobAvatar = AssetImage('assets/images/chat/default_job.png');
 
-    final bool hasUnread = thread.hasUnreadMessages;
-    
-    // Contamos el número de mensajes no leídos (simulado si no está en el modelo, usamos 1 para el mockup)
-    // Asumimos que si hasUnread es true, mostramos un badge
-    final int unreadCount = hasUnread ? 1 : 0; // Idealmente vendría de thread.unreadCount
+    // Conteo real de mensajes no leídos que envía el backend.
+    final int unreadCount = thread.unreadCount;
+    final bool hasUnread = unreadCount > 0;
+    final String unreadLabel = unreadCount > 99 ? '99+' : '$unreadCount';
 
     final highlightBg = const Color(0xFFF8F7FA); // Light purple/grey on hover/unread
     final textC = const Color(0xFF090D16); // Dark text
@@ -513,7 +512,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            '$unreadCount', // O usar 1 si no hay count exacto
+                            unreadLabel,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -535,7 +534,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   void _openChat(ChatThread thread) {
     SessionStore.activeThreadId = thread.id;
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
           threadId: thread.id,
@@ -545,11 +545,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
           agreedPrice: thread.agreedPrice,
           counterpartName: thread.counterpartName,
           counterpartAvatarUrl: thread.counterpartProfilePhotoUrl,
+          counterpartPhone: thread.counterpartPhone,
           category: thread.category,
           workerId: thread.workerId,
           isArchived: thread.isArchived,
         ),
       ),
-    );
+    )
+        .then((_) {
+      // Al volver del chat, refresca para reflejar los mensajes ya leídos.
+      if (mounted) _load(silent: true);
+    });
   }
 }

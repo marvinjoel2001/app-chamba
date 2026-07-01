@@ -70,8 +70,10 @@
 	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos tu cámara para las videollamadas dentro de la aplicación.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Necesitamos tu micrófono para que puedas dictar lo que buscas por voz.</string>
+	<string>Necesitamos tu micrófono para que puedas dictar lo que buscas por voz y realizar llamadas en la app.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Necesitamos acceso al reconocimiento de voz para transcribir tu dictado.</string>
 	<key>UIBackgroundModes</key>

@@ -33,17 +33,46 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
 
   double get _base => widget.originalBudget ?? 100;
 
-  String _priceTypeSuffix() {
-    final raw = widget.requestData?['priceType']?.toString() ??
-        widget.requestData?['price_type']?.toString() ??
-        '';
-    if (raw.contains('hora')) return '/hora';
-    if (raw.contains('full') || raw.contains('fijo')) return ' (precio fijo)';
-    return '/día';
+  /// Devuelve la modalidad normalizada: 'hourly' | 'daily' | 'fixed'.
+  String _modality() {
+    final raw = (widget.requestData?['modality']?.toString() ??
+            widget.requestData?['priceType']?.toString() ??
+            widget.requestData?['price_type']?.toString() ??
+            '')
+        .toLowerCase();
+    if (raw.contains('hourly') || raw.contains('hora')) return 'hourly';
+    if (raw.contains('daily') || raw.contains('día') || raw.contains('dia')) {
+      return 'daily';
+    }
+    return 'fixed';
   }
 
-  String _priceLabel() =>
-      'Oferta original: Bs ${_base.toInt()}${_priceTypeSuffix()}';
+  /// Detalle bajo el monto: aclara que la negociación es sobre el TOTAL del
+  /// trabajo y muestra el desglose (horas/días × tarifa) cuando está disponible.
+  String? _totalBreakdown() {
+    final data = widget.requestData;
+    if (data == null) return null;
+    switch (_modality()) {
+      case 'hourly':
+        final hours = (data['estimatedHours'] as num?)?.toInt();
+        final rate = (data['hourlyRate'] as num?)?.toInt();
+        if (hours != null && hours > 0 && rate != null && rate > 0) {
+          return '$hours h × Bs $rate/h';
+        }
+        return 'Precio total por las horas trabajadas';
+      case 'daily':
+        final days = (data['days'] as num?)?.toInt();
+        final rate = (data['dailyRate'] as num?)?.toInt();
+        if (days != null && days > 0 && rate != null && rate > 0) {
+          return '$days día(s) × Bs $rate/día';
+        }
+        return 'Precio total por la jornada';
+      default:
+        return 'Precio fijo por el trabajo completo';
+    }
+  }
+
+  String _priceLabel() => 'Oferta original: Bs ${_base.toInt()}';
 
   @override
   void initState() {
@@ -227,11 +256,24 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 8),
+                // Aclara que la negociación es sobre el total del trabajo.
+                if (_totalBreakdown() != null)
+                  Center(
+                    child: Text(
+                      _totalBreakdown()!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
 
                 // ── Precio propuesto ─────────────────────────────────────
                 Text(
-                  'Tu precio propuesto',
+                  'Tu precio total propuesto',
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
@@ -285,7 +327,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   )
                 else
                   Text(
-                    'Bs ${_selectedAmount.toInt()}${_priceTypeSuffix()}',
+                    'Bs ${_selectedAmount.toInt()}',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                           fontWeight: FontWeight.w800,

@@ -17,11 +17,13 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
 import '../../domain/usecases/messages_usecases.dart';
 import '../state/messages_dependencies.dart';
+import 'call_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -32,6 +34,7 @@ class ChatScreen extends StatefulWidget {
     this.agreedPrice = 0,
     this.counterpartName = '',
     this.counterpartAvatarUrl,
+    this.counterpartPhone,
     this.category,
     this.workerId,
     this.isArchived = false,
@@ -47,6 +50,7 @@ class ChatScreen extends StatefulWidget {
   final double agreedPrice;
   final String counterpartName;
   final String? counterpartAvatarUrl;
+  final String? counterpartPhone;
   final String? category;
   final String? workerId;
   final bool isArchived;
@@ -210,6 +214,11 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages = [..._messages, newMessage];
       });
+
+      // Mensaje entrante del otro usuario con el chat abierto: se lee al instante.
+      if (senderId != SessionStore.currentUser?.id) {
+        _markThreadReadOnServer();
+      }
 
       if (_isNearBottom) {
         _scrollToBottom();
@@ -936,6 +945,22 @@ class _ChatScreenState extends State<ChatScreen> {
     _isNearBottom = (maxScroll - currentScroll) < 100;
   }
 
+  /// Marca la conversación como leída en el backend para que el badge de no
+  /// leídos deje de contar estos mensajes. Es "fire and forget": un fallo de
+  /// red no debe interrumpir la lectura del chat.
+  Future<void> _markThreadReadOnServer() async {
+    final userId = SessionStore.currentUser?.id;
+    if (userId == null || widget.threadId.isEmpty) return;
+    try {
+      await MobileBackendService.instance.markThreadRead(
+        threadId: widget.threadId,
+        userId: userId,
+      );
+    } catch (_) {
+      // Silencioso: se reintentará en la próxima apertura/lectura.
+    }
+  }
+
   void _markVisibleMessagesAsRead() {
     // Implement read tracking based on viewport visibility
     // For now, mark last few messages as read when near bottom
@@ -990,6 +1015,8 @@ class _ChatScreenState extends State<ChatScreen> {
         if (isFirstLoad) {
           _jumpToBottom();
         }
+        // Abrir/refrescar el chat cuenta como leer la conversación.
+        _markThreadReadOnServer();
       },
       onFailure: (failure) {
         setState(() {
@@ -1140,7 +1167,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () {}, // Action for phone call
+                      onPressed: () {
+                        final user = SessionStore.currentUser;
+                        if (user == null) return;
+                        
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => CallScreen(
+                              callId: widget.threadId,
+                              currentUserId: user.id,
+                              currentUserName: user.fullName,
+                            ),
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.phone_outlined, color: AppTheme.colorPrimary),
                     ),
                   ],
@@ -1330,6 +1370,23 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildSystemMessage(ChatMessage message) {
+    // El badge refleja el estado real del trabajo (no un valor fijo).
+    final String statusLabel;
+    final Color statusColor;
+    switch (widget.jobStatus) {
+      case ChatThreadStatus.completed:
+        statusLabel = 'Completado';
+        statusColor = AppTheme.colorSuccess;
+        break;
+      case ChatThreadStatus.cancelled:
+        statusLabel = 'Cancelado';
+        statusColor = Colors.redAccent;
+        break;
+      case ChatThreadStatus.active:
+        statusLabel = 'Activo';
+        statusColor = AppTheme.colorPrimary;
+        break;
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1362,17 +1419,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Mock badge as requested in screenshot (Cancelado/Activo)
+                  // Badge de estado real del trabajo.
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'Cancelado', // Static for mockup match, in real life derive from status
+                    child: Text(
+                      statusLabel,
                       style: TextStyle(
-                        color: Colors.redAccent,
+                        color: statusColor,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),

@@ -35,6 +35,9 @@ class AppConfig {
     defaultValue: '',
   );
 
+  static const int zegoAppId = 1801910551;
+  static const String zegoAppSign = '865754c05aed91e19bf9a76a476a18e5507241310c39f1db636219d32a46b689';
+
   static String get socketBaseUrl => _resolveLocalhost(
         const String.fromEnvironment(
           'SOCKET_BASE_URL',

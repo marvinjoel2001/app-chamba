@@ -21,6 +21,7 @@ class ChatThread {
     this.counterpartFirstName,
     this.counterpartLastName,
     this.counterpartProfilePhotoUrl,
+    this.counterpartPhone,
     this.category,
     this.workerId,
     this.clientId,
@@ -28,6 +29,7 @@ class ChatThread {
     this.lastMessageAt,
     this.lastMessage,
     this.hasUnreadMessages = false,
+    this.unreadCount = 0,
     this.type = ChatThreadType.active,
   });
 
@@ -41,6 +43,7 @@ class ChatThread {
   final String? counterpartFirstName;
   final String? counterpartLastName;
   final String? counterpartProfilePhotoUrl;
+  final String? counterpartPhone;
   final String? category;
   final String? workerId;
   final String? clientId;
@@ -48,6 +51,7 @@ class ChatThread {
   final DateTime? lastMessageAt;
   final String? lastMessage;
   final bool hasUnreadMessages;
+  final int unreadCount;
   final ChatThreadType type;
 
   bool get isActive => jobStatus == ChatThreadStatus.active;

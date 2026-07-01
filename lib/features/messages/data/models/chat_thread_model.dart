@@ -12,6 +12,7 @@ class ChatThreadModel extends ChatThread {
     super.counterpartFirstName,
     super.counterpartLastName,
     super.counterpartProfilePhotoUrl,
+    super.counterpartPhone,
     super.category,
     super.workerId,
     super.clientId,
@@ -19,6 +20,7 @@ class ChatThreadModel extends ChatThread {
     super.lastMessageAt,
     super.lastMessage,
     super.hasUnreadMessages,
+    super.unreadCount,
     super.type,
   });
 
@@ -44,13 +46,16 @@ class ChatThreadModel extends ChatThread {
       counterpartFirstName: counterpart['firstName']?.toString(),
       counterpartLastName: counterpart['lastName']?.toString(),
       counterpartProfilePhotoUrl: counterpart['profilePhotoUrl']?.toString(),
+      counterpartPhone: counterpart['phone']?.toString(),
       category: request['category']?.toString(),
       workerId: request['workerId']?.toString() ?? json['workerId']?.toString(),
       clientId: request['clientId']?.toString() ?? json['clientId']?.toString(),
       createdAt: _parseDate(json['createdAt']?.toString()),
       lastMessageAt: _parseDate(json['lastMessageAt']?.toString()),
       lastMessage: json['lastMessage']?.toString(),
-      hasUnreadMessages: json['hasUnreadMessages'] as bool? ?? false,
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      hasUnreadMessages: json['hasUnreadMessages'] as bool? ??
+          (((json['unreadCount'] as num?)?.toInt() ?? 0) > 0),
       type: _parseType(
           json['type']?.toString() ?? json['archived']),
     );
@@ -74,12 +79,14 @@ class ChatThreadModel extends ChatThread {
         'firstName': counterpartFirstName,
         'lastName': counterpartLastName,
         'profilePhotoUrl': counterpartProfilePhotoUrl,
+        'phone': counterpartPhone,
       },
       'agreedPrice': agreedPrice,
       'createdAt': createdAt?.toUtc().toIso8601String(),
       'lastMessageAt': lastMessageAt?.toUtc().toIso8601String(),
       'lastMessage': lastMessage,
       'hasUnreadMessages': hasUnreadMessages,
+      'unreadCount': unreadCount,
       'type': type == ChatThreadType.archived ? 'archived' : 'active',
       'archived': isArchived,
     };

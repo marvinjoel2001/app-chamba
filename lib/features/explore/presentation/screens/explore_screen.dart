@@ -556,8 +556,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     // Solicitud buscando/negociando → banner morado → RequestStatusScreen
     if (activeStatus == 'searching' || activeStatus == 'negotiating') {
+      final title = _activeRequest?['title']?.toString() ?? 'Ver solicitud';
+      final address = _activeRequest?['address']?.toString() ?? 'Ubicación no disponible';
+      final pendingOffersCount = (_activeRequest?['pendingOffersCount'] as num?)?.toInt() ?? 0;
+      final hasOffers = pendingOffersCount > 0;
+
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: GestureDetector(
           onTap: () {
             SessionStore.activeRequestId = _activeRequest?['id']?.toString();
@@ -571,101 +576,138 @@ class _ExploreScreenState extends State<ExploreScreen> {
             );
           },
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1030),
+              color: const Color(0xFF140C27).withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: AppTheme.colorPrimary.withValues(alpha: 0.5),
+                color: const Color(0xFF6A35FF).withValues(alpha: 0.3),
+                width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.colorPrimary.withValues(alpha: 0.15),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+                  color: const Color(0xFF6A35FF).withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  spreadRadius: -5,
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorPrimary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.radar,
-                    color: AppTheme.colorPrimary,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                // Top Section (Badge + Title + Address vs Icon)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'SOLICITUD EN CURSO',
-                            style: TextStyle(
-                              color: AppTheme.colorPrimaryLight,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
+                          // Animated Badge EN CURSO
+                          const PulseBadge(),
+                          const SizedBox(height: 16),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              height: 1.2,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 8),
-                          // Badge de ofertas recibidas
-                          if (_activeRequest?['pendingOffersCount'] != null &&
-                              (_activeRequest!['pendingOffersCount'] as num) >
-                                  0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.colorHighlight,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${_activeRequest!['pendingOffersCount']} oferta${(_activeRequest!['pendingOffersCount'] as num) != 1 ? 's' : ''}',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined, color: AppTheme.colorMuted, size: 16),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  address,
+                                  style: const TextStyle(color: AppTheme.colorMuted, fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
+                            ],
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _activeRequest?['title']?.toString() ?? 'Ver solicitud',
-                        style: const TextStyle(
-                          color: AppTheme.colorText,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(width: 16),
+                    // Circular Glowing Icon
+                    Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.transparent,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6A35FF).withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          )
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Buscando trabajadores cerca de ti...',
-                        style: TextStyle(
-                          color: AppTheme.colorMuted,
-                          fontSize: 12,
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/icon/list.png',
+                          width: 105,
+                          height: 105,
+                          fit: BoxFit.contain,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppTheme.colorPrimaryLight,
-                  size: 24,
+                const SizedBox(height: 20),
+                // Divider line (simulating dashed visually with low opacity)
+                Divider(color: Colors.white.withValues(alpha: 0.08), height: 1, thickness: 1),
+                const SizedBox(height: 16),
+                // Bottom section
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                      ),
+                      child: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFFB388FF), size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            hasOffers ? '¡Tienes nuevas ofertas!' : 'Buscando trabajadores cerca de ti...',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            hasOffers 
+                              ? 'Revisa los $pendingOffersCount trabajadores interesados'
+                              : 'Te notificaremos cuando recibas nuevas ofertas',
+                            style: const TextStyle(
+                              color: AppTheme.colorMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1251,6 +1293,94 @@ class _MapControl extends StatelessWidget {
               : const Color.fromARGB(255, 255, 255, 255),
         ),
       ),
+    );
+  }
+}
+
+class PulseBadge extends StatefulWidget {
+  const PulseBadge({super.key});
+
+  @override
+  State<PulseBadge> createState() => _PulseBadgeState();
+}
+
+class _PulseBadgeState extends State<PulseBadge> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(begin: 0.1, end: 1.0).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF6A35FF).withValues(alpha: 0.15 + (_animation.value * 0.25)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFF6A35FF).withValues(alpha: 0.3 + (_animation.value * 0.4)),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6A35FF).withValues(alpha: _animation.value * 0.4),
+                blurRadius: 4 + (_animation.value * 12),
+                spreadRadius: _animation.value * 2,
+              )
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white,
+                      blurRadius: 2 + (_animation.value * 6),
+                      spreadRadius: _animation.value * 1,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'EN CURSO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

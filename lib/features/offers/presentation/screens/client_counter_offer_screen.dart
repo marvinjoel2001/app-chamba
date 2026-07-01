@@ -39,7 +39,7 @@ class _ClientCounterOfferScreenState extends State<ClientCounterOfferScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedAmount = (_base + 5).floorToDouble();
+    _selectedAmount = _pct(5);
   }
 
   @override
@@ -49,9 +49,14 @@ class _ClientCounterOfferScreenState extends State<ClientCounterOfferScreen> {
     super.dispose();
   }
 
-  double _step(int n) {
-    final v = _base + n;
-    return v.floorToDouble();
+  /// Presets porcentuales sobre la oferta actual (igual que el trabajador):
+  /// +5%, +10%, +20%. Se redondea hacia abajo para trabajar con enteros.
+  double _pct(double pct) {
+    final v = _base * (1 + pct / 100);
+    final floored = v.floorToDouble();
+    // La contraoferta del cliente debe ser estrictamente mayor a la actual;
+    // en presupuestos pequeños el redondeo podría igualar la base.
+    return floored > _base ? floored : _base + 1;
   }
 
   void _selectPreset(double amount) {
@@ -128,9 +133,9 @@ class _ClientCounterOfferScreenState extends State<ClientCounterOfferScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s5 = _step(5);
-    final s10 = _step(10);
-    final s20 = _step(20);
+    final s5 = _pct(5);
+    final s10 = _pct(10);
+    final s20 = _pct(20);
     final originalInt = widget.originalBudget.toInt();
     final workerOfferInt = widget.workerOffer.toInt();
 

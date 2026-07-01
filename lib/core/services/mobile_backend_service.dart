@@ -306,6 +306,16 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> markThreadRead({
+    required String threadId,
+    required String userId,
+  }) {
+    return _api.post(
+      '/mobile/messages/$threadId/read',
+      body: {'userId': userId},
+    );
+  }
+
   Future<Map<String, dynamic>> incomingRequest({required String workerUserId}) {
     return _api.get(
       '/mobile/incoming-request',
