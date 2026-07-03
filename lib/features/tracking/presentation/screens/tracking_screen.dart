@@ -312,8 +312,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       body: Stack(
         children: [
           // ── MAPA ──────────────────────────────────────────────────────
+          // Ocupa toda la pantalla; el bottom sheet arrastrable lo cubre
+          // parcialmente según cuánto lo suba el usuario.
           Positioned.fill(
-            bottom: 320,
             child: AppConfig.mapboxAccessToken.trim().isEmpty
                 ? Container(
                     color: AppTheme.colorBackgroundAccent,
@@ -537,18 +538,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ),
           ),
 
-          // ── BOTTOM CARD ───────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
+          // ── BOTTOM SHEET ARRASTRABLE ──────────────────────────────────
+          DraggableScrollableSheet(
+            initialChildSize: 0.45,
+            minChildSize: 0.18,
+            maxChildSize: 0.85,
+            builder: (context, scrollController) => Container(
               decoration: const BoxDecoration(
                 color: Color(0xFF0D1728),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: _loading
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
                       ? Text(
@@ -717,27 +720,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             // Botones
                             Row(
                               children: [
-                                // Confirmar llegada (solo si el worker llegó y no se confirmó aún)
+                                // Confirmar llegada: botón real solo cuando se
+                                // puede tocar; mientras tanto, un indicador de
+                                // estado (un botón deshabilitado parece roto).
                                 Expanded(
                                   flex: 3,
-                                  child: ChambaPrimaryButton(
-                                    label: clientConfirmed
-                                        ? 'Llegada confirmada ✓'
-                                        : workerArrived
-                                            ? 'CONFIRMAR LLEGADA'
-                                            : 'Esperando al trabajador...',
-                                    icon: clientConfirmed
-                                        ? Icons.check_circle
-                                        : workerArrived
-                                            ? Icons.where_to_vote
-                                            : Icons.hourglass_top,
-                                    isYellow: workerArrived && !clientConfirmed,
-                                    onPressed: workerArrived && !clientConfirmed
-                                        ? (_confirmingArrival
-                                            ? null
-                                            : _confirmArrival)
-                                        : null,
-                                  ),
+                                  child: workerArrived && !clientConfirmed
+                                      ? ChambaPrimaryButton(
+                                          label: 'CONFIRMAR LLEGADA',
+                                          icon: Icons.where_to_vote,
+                                          isYellow: true,
+                                          onPressed: _confirmingArrival
+                                              ? null
+                                              : _confirmArrival,
+                                        )
+                                      : _ArrivalStatusBanner(
+                                          confirmed: clientConfirmed,
+                                        ),
                                 ),
                                 const SizedBox(width: 10),
                                 // Chat
@@ -772,6 +771,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                               counterpartName:
                                                   '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
                                                       .trim(),
+                                              counterpartId:
+                                                  worker?['id']?.toString(),
                                               counterpartAvatarUrl:
                                                   worker?['profilePhotoUrl']
                                                       as String?,
@@ -844,6 +845,55 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             ),
                           ],
                         ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estado de la llegada del trabajador: "en camino" o "confirmada".
+/// Informativo, no interactivo — por eso no es un botón.
+class _ArrivalStatusBanner extends StatelessWidget {
+  const _ArrivalStatusBanner({required this.confirmed});
+
+  final bool confirmed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = confirmed ? AppTheme.colorSuccess : AppTheme.colorMuted;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: confirmed
+            ? AppTheme.colorSuccessSoft
+            : AppTheme.colorSurfaceSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            confirmed ? Icons.check_circle : Icons.hourglass_top,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              confirmed
+                  ? 'Llegada confirmada'
+                  : 'El trabajador está en camino…',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

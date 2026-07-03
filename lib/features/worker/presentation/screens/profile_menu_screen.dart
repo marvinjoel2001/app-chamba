@@ -313,7 +313,14 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
     return Scaffold(
       body: ChambaBackground(
         child: SafeArea(
-          child: ListView(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadUnreadSupportCount();
+              // Refresca los datos de sesión mostrados (foto, verificación).
+              if (mounted) setState(() {});
+            },
+            child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               Text(
@@ -569,6 +576,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
                 onTap: _logout,
               ),
             ],
+            ),
           ),
         ),
       ),

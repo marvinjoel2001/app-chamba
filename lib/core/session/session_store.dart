@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/call_service.dart';
+
 class SessionUser {
   const SessionUser({
     required this.id,
@@ -143,6 +145,8 @@ class SessionStore {
     currentUser = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
+    // Deja al usuario listo para recibir llamadas (idempotente por usuario).
+    await CallService.init();
   }
 
   static Future<void> persistCurrentUser() async {
@@ -156,6 +160,7 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
+    await CallService.uninit();
     currentUser = null;
     activeRequestId = null;
     activeThreadId = null;

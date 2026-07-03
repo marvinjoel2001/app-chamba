@@ -555,6 +555,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
           jobStatus: thread.jobStatus,
           agreedPrice: thread.agreedPrice,
           counterpartName: thread.counterpartName,
+          counterpartId: SessionStore.currentUser?.type == 'worker'
+              ? thread.clientId
+              : thread.workerId,
           counterpartAvatarUrl: thread.counterpartProfilePhotoUrl,
           counterpartPhone: thread.counterpartPhone,
           category: thread.category,

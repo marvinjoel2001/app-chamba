@@ -19,11 +19,13 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
+import 'package:zego_uikit/zego_uikit.dart';
+import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
+
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
 import '../../domain/usecases/messages_usecases.dart';
 import '../state/messages_dependencies.dart';
-import 'call_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -33,6 +35,7 @@ class ChatScreen extends StatefulWidget {
     this.jobStatus = ChatThreadStatus.active,
     this.agreedPrice = 0,
     this.counterpartName = '',
+    this.counterpartId,
     this.counterpartAvatarUrl,
     this.counterpartPhone,
     this.category,
@@ -49,6 +52,10 @@ class ChatScreen extends StatefulWidget {
   final ChatThreadStatus jobStatus;
   final double agreedPrice;
   final String counterpartName;
+
+  /// Id de usuario del interlocutor; necesario para llamarlo. Si no llega,
+  /// se deduce del primer mensaje ajeno del hilo.
+  final String? counterpartId;
   final String? counterpartAvatarUrl;
   final String? counterpartPhone;
   final String? category;
@@ -93,6 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecording = false;
   String? _error;
   List<ChatMessage> _messages = const [];
+  String? _counterpartId;
 
   // Audio recording & playback
   final AudioRecorder _audioRecorder = AudioRecorder();
@@ -115,6 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _counterpartId = widget.counterpartId;
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
     _realtime.joinThread(widget.threadId);
@@ -1011,6 +1020,17 @@ class _ChatScreenState extends State<ChatScreen> {
           _shouldRedirectToLogin = false;
           _error = null;
           _loading = false;
+          // Deducir el interlocutor si no llegó por parámetro (p. ej. al
+          // abrir el chat desde una notificación).
+          final myId = SessionStore.currentUser?.id;
+          if (_counterpartId == null && myId != null) {
+            for (final message in messages) {
+              if (!message.isSystem && message.senderUserId != myId) {
+                _counterpartId = message.senderUserId;
+                break;
+              }
+            }
+          }
         });
         if (isFirstLoad) {
           _jumpToBottom();
@@ -1166,23 +1186,41 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () {
-                        final user = SessionStore.currentUser;
-                        if (user == null) return;
-                        
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => CallScreen(
-                              callId: widget.threadId,
-                              currentUserId: user.id,
-                              currentUserName: user.fullName,
-                            ),
+                    // Botón de llamada: envía una invitación real (le suena
+                    // al otro usuario) en vez de solo entrar a la sala.
+                    if (_counterpartId != null)
+                      ZegoSendCallInvitationButton(
+                        isVideoCall: false,
+                        invitees: [
+                          ZegoUIKitUser(
+                            id: _counterpartId!,
+                            name: widget.counterpartName.isEmpty
+                                ? 'Usuario'
+                                : widget.counterpartName,
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.phone_outlined, color: AppTheme.colorPrimary),
-                    ),
+                        ],
+                        resourceID: 'chamba_call',
+                        buttonSize: const Size(48, 48),
+                        iconSize: const Size(24, 24),
+                        icon: ButtonIcon(
+                          icon: const Icon(
+                            Icons.phone_outlined,
+                            color: AppTheme.colorPrimary,
+                          ),
+                          backgroundColor: Colors.transparent,
+                        ),
+                        onPressed: (String code, String message, List<String> errorInvitees) {
+                          if (code.isNotEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'No se pudo iniciar la llamada ($message)',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -1286,8 +1324,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
                         ? Center(child: Text(_error!))
-                        : ListView.builder(
+                        : RefreshIndicator(
+                            onRefresh: _load,
+                            child: ListView.builder(
                             controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
@@ -1310,6 +1351,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                               return Column(children: widgets);
                             },
+                          ),
                           ),
               ),
 

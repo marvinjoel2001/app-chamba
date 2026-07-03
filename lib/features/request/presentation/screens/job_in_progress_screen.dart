@@ -437,6 +437,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           builder: (_) => ChatScreen(
             threadId: threadId!,
             counterpartName: clientName.isEmpty ? 'Cliente' : clientName,
+            counterpartId: client?['id']?.toString(),
             counterpartAvatarUrl: client?['profilePhotoUrl'] as String?,
           ),
         ),
@@ -1052,32 +1053,36 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                             const SizedBox(height: 16),
                             Row(
                               children: [
+                                // Botón real solo cuando hay acción posible;
+                                // los estados de espera se muestran como
+                                // indicadores (un botón deshabilitado parece
+                                // que la app está fallando).
                                 Expanded(
                                   flex: 3,
-                                  child: ChambaPrimaryButton(
-                                    label: clientConfirmed
-                                        ? 'TRABAJO TERMINADO'
-                                        : workerArrived
-                                            ? 'Esperando cliente...'
-                                            : !_isWithinArrivalZone
-                                                ? 'Acércate al destino'
-                                                : 'LLEGUÉ AL SITIO',
-                                    icon: clientConfirmed
-                                        ? Icons.check_circle
-                                        : workerArrived
-                                            ? Icons.hourglass_top
-                                            : !_isWithinArrivalZone
-                                                ? Icons.location_disabled
-                                                : Icons.location_on,
-                                    isYellow: clientConfirmed,
-                                    onPressed: workerArrived && !clientConfirmed
-                                        ? null
-                                        : clientConfirmed
-                                            ? _completeJob
-                                            : !_isWithinArrivalZone
-                                                ? null // Deshabilitado fuera de zona
-                                                : _markArrived,
-                                  ),
+                                  child: clientConfirmed
+                                      ? ChambaPrimaryButton(
+                                          label: 'TRABAJO TERMINADO',
+                                          icon: Icons.check_circle,
+                                          isYellow: true,
+                                          onPressed: _completeJob,
+                                        )
+                                      : workerArrived
+                                          ? const _JobStatusBanner(
+                                              icon: Icons.hourglass_top,
+                                              text:
+                                                  'Esperando confirmación del cliente…',
+                                            )
+                                          : _isWithinArrivalZone
+                                              ? ChambaPrimaryButton(
+                                                  label: 'LLEGUÉ AL SITIO',
+                                                  icon: Icons.location_on,
+                                                  onPressed: _markArrived,
+                                                )
+                                              : const _JobStatusBanner(
+                                                  icon: Icons.location_disabled,
+                                                  text:
+                                                      'Acércate al destino para marcar tu llegada',
+                                                ),
                                 ),
                                 const SizedBox(width: 10),
                                 // Chat directo con el cliente + badge de no leídos
@@ -1155,6 +1160,48 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estado del trabajo cuando no hay acción disponible para el worker.
+/// Informativo, no interactivo — por eso no es un botón.
+class _JobStatusBanner extends StatelessWidget {
+  const _JobStatusBanner({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.colorSurfaceSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.colorMuted.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppTheme.colorMuted, size: 20),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppTheme.colorMuted,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

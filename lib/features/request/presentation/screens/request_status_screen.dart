@@ -612,6 +612,21 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   Future<void> _editOfferAmount() async {
+    // La mejora de oferta SIEMPRE trabaja sobre el monto TOTAL del trabajo.
+    // En modalidades por hora/día se muestra el desglose y la tarifa
+    // equivalente para que el cliente sepa exactamente qué está mejorando.
+    final modality = _request?['modality']?.toString() ?? 'fixed';
+    final units = modality == 'hourly'
+        ? (double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0)
+        : modality == 'daily'
+            ? (double.tryParse(_request?['days']?.toString() ?? '') ?? 0)
+            : 0.0;
+    final unitLabel = modality == 'hourly' ? 'hora' : 'día';
+    final unitsLabel = modality == 'hourly' ? 'horas' : 'días';
+
+    String formatRate(double rate) =>
+        rate % 1 == 0 ? rate.toStringAsFixed(0) : rate.toStringAsFixed(2);
+
     final controller = TextEditingController(
       text: _draftBudget.toInt().toString(),
     );
@@ -619,11 +634,75 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Editar oferta'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(prefixText: 'Bs '),
+          title: const Text('Mejorar oferta'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final parsed = double.tryParse(controller.text.trim());
+              final newRate =
+                  (parsed != null && parsed > 0 && units > 0) ? parsed / units : null;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (units > 0)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.colorSurfaceSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Oferta actual:\n'
+                        'Bs ${formatRate(_currentBudget / units)} por $unitLabel × '
+                        '${units.toStringAsFixed(0)} $unitsLabel '
+                        '= Bs ${_currentBudget.toStringAsFixed(0)} en total',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.colorMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Text(
+                        'Oferta actual: Bs ${_currentBudget.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.colorMuted,
+                        ),
+                      ),
+                    ),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      prefixText: 'Bs ',
+                      labelText: units > 0
+                          ? 'Nuevo monto TOTAL del trabajo'
+                          : 'Nueva oferta',
+                    ),
+                  ),
+                  if (newRate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        '= Bs ${formatRate(newRate)} por $unitLabel',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.colorSuccess,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           actions: [
             TextButton(
@@ -1019,8 +1098,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         Expanded(
                           child: _loading && offers.isEmpty
                               ? const Center(child: CircularProgressIndicator())
-                              : ListView(
+                              : RefreshIndicator(
+                                  onRefresh: _load,
+                                  child: ListView(
                                   controller: scrollController,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   padding: const EdgeInsets.symmetric(horizontal: 16),
                                   children: [
                                     Row(
@@ -1112,6 +1195,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     ),
                                     const SizedBox(height: 24),
                                   ],
+                                ),
                                 ),
                         ),
                       ],
@@ -1241,7 +1325,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                           border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
                                         ),
                                         child: Text(
-                                          'Bs ${_currentBudget.toStringAsFixed(0)}',
+                                          _budgetBadgeText(),
+                                          textAlign: TextAlign.center,
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
@@ -1325,104 +1410,23 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     );
   }
 
-  Widget _buildBudgetCard() {
-    final displayBudget = _draftBudget;
+  /// Texto del presupuesto para el badge de la tarjeta flotante. En
+  /// modalidades por hora/día se muestra el desglose para que el cliente
+  /// sepa que el monto es el total del trabajo.
+  String _budgetBadgeText() {
+    final total = 'Bs ${_currentBudget.toStringAsFixed(0)}';
     final modality = _request?['modality']?.toString() ?? 'fixed';
-    final estimatedHours = _request?['estimatedHours']?.toString() ?? '0';
-    final hourlyRate = _request?['hourlyRate']?.toString() ?? '0';
-    final days = _request?['days']?.toString() ?? '0';
-    final dailyRate = _request?['dailyRate']?.toString() ?? '0';
-
-    String title = 'Tu presupuesto';
-    String subtitle = 'Bs ${displayBudget.toStringAsFixed(0)}';
-
-    if (modality == 'hourly') {
-      title = 'Pago por hora ($estimatedHours hrs)';
-      subtitle = 'Bs $hourlyRate / hr (Total: Bs ${displayBudget.toStringAsFixed(0)})';
-    } else if (modality == 'daily') {
-      title = 'Pago por día ($days días)';
-      subtitle = 'Bs $dailyRate / día (Total: Bs ${displayBudget.toStringAsFixed(0)})';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2436),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              color: Color(0xFF8A2BE2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.account_balance_wallet,
-                color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: _updatingBudget ? null : _sendImproveOffer,
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.monetization_on_outlined, size: 18, color: Colors.white),
-                Positioned(
-                  right: -4,
-                  top: -2,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF00D26A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.add, size: 10, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            label: Text(
-              _updatingBudget ? '...' : 'Mejorar Oferta',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D26A),
-              foregroundColor: Colors.white,
-              elevation: 4,
-              shadowColor: const Color(0xFF00D26A).withValues(alpha: 0.4),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
+    final units = modality == 'hourly'
+        ? (double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0)
+        : modality == 'daily'
+            ? (double.tryParse(_request?['days']?.toString() ?? '') ?? 0)
+            : 0.0;
+    if (units <= 0) return total;
+    final unitLabel = modality == 'hourly' ? 'h' : 'd';
+    final rate = _currentBudget / units;
+    final rateText =
+        rate % 1 == 0 ? rate.toStringAsFixed(0) : rate.toStringAsFixed(2);
+    return '$total\n${units.toStringAsFixed(0)}$unitLabel × Bs $rateText';
   }
 
   Widget _buildOfferItem(dynamic offerData) {
