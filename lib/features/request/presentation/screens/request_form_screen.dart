@@ -55,6 +55,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final _daysController = TextEditingController(text: '1');
   final _dailyRateController = TextEditingController(text: '100');
   String? _startDate;
+  TimeOfDay? _startTime;
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hh = time.hour.toString().padLeft(2, '0');
+    final mm = time.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  /// Fecha de inicio a enviar al backend: 'YYYY-MM-DD' o, si el cliente
+  /// eligió hora, 'YYYY-MM-DDTHH:mm:00'.
+  String? get _startDateForBackend {
+    if (_startDate == null) return null;
+    if (_startTime == null) return _startDate;
+    return '${_startDate}T${_formatTimeOfDay(_startTime!)}:00';
+  }
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PendingImage> _pendingImages = [];
   late final List<Map<String, dynamic>> _suggestedCategories;
@@ -594,7 +609,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         hourlyRate: hourlyRate,
         days: days,
         dailyRate: dailyRate,
-        startDate: _startDate,
+        startDate: _startDateForBackend,
       ))
           .fold(
             onSuccess: (value) => value,
@@ -860,39 +875,100 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now().add(const Duration(days: 1)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (date != null) {
-                setState(() => _startDate = date.toIso8601String().split('T')[0]);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 20, color: AppTheme.colorPrimary),
-                  const SizedBox(width: 12),
-                  Text(
-                    _startDate ?? 'Seleccionar fecha de inicio',
-                    style: TextStyle(
-                      color: _startDate != null ? Colors.black87 : Colors.grey[500],
-                      fontSize: 14,
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      setState(() =>
+                          _startDate = date.toIso8601String().split('T')[0]);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today,
+                            size: 20, color: AppTheme.colorPrimary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _startDate ?? 'Fecha de inicio',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _startDate != null
+                                  ? Colors.black87
+                                  : Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: GestureDetector(
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime:
+                          _startTime ?? const TimeOfDay(hour: 8, minute: 0),
+                    );
+                    if (time != null) {
+                      setState(() => _startTime = time);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time,
+                            size: 20, color: AppTheme.colorPrimary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _startTime != null
+                                ? _formatTimeOfDay(_startTime!)
+                                : 'Hora',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _startTime != null
+                                  ? Colors.black87
+                                  : Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
         const SizedBox(height: 12),

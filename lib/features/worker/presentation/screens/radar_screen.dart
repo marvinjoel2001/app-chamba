@@ -299,7 +299,10 @@ class _RadarScreenState extends State<RadarScreen> {
     return Scaffold(
       body: ChambaBackground(
         child: SafeArea(
-          child: ListView(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               Row(
@@ -502,6 +505,7 @@ class _RadarScreenState extends State<RadarScreen> {
                 ],
               ),
             ],
+            ),
           ),
         ),
       ),

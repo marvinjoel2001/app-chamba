@@ -217,18 +217,28 @@ class _MessagesScreenState extends State<MessagesScreen> {
       );
     }
     if (threads.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'No tienes conversaciones aun.',
-            style: TextStyle(
-                color: isLight ? Colors.grey[600] : AppTheme.colorMuted),
-          ),
+      return RefreshIndicator(
+        onRefresh: () => _load(silent: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(48),
+              child: Center(
+                child: Text(
+                  'No tienes conversaciones aun.',
+                  style: TextStyle(
+                      color: isLight ? Colors.grey[600] : AppTheme.colorMuted),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: () => _load(silent: true),
+      child: ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       children: [
         _buildNotificationsItem(isLight),
@@ -262,6 +272,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 

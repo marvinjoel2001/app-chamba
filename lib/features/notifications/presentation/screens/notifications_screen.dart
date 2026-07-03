@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/push/notification_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../data/notifications_service.dart';
 import '../../domain/models/app_notification.dart';
-import '../../../messages/presentation/screens/messages_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -194,17 +194,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             : AppTheme.colorPrimary.withOpacity(0.1),
                         child: ListTile(
                           onTap: () {
-                            if (item.data != null && item.data!['deep_link'] != null) {
-                              final deepLink = item.data!['deep_link'] as String;
-                              if (deepLink.startsWith('/chat') || deepLink.startsWith('/support')) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const MessagesScreen()),
-                                );
-                              } else {
-                                // Default fallback para otros deep links: volver al home
-                                Navigator.of(context).popUntil((r) => r.isFirst);
-                              }
-                            }
+                            NotificationRouter.openFromData({
+                              'type': item.type,
+                              ...?item.data,
+                            });
                           },
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 8),

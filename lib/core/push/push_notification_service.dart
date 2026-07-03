@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -11,7 +12,7 @@ import '../services/mobile_backend_service.dart';
 import '../../firebase_options.dart';
 import '../session/session_store.dart';
 import '../../app.dart';
-import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import 'notification_router.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -109,7 +110,37 @@ class PushNotificationService {
       android: androidSettings,
       iOS: iosSettings,
     );
-    await _localNotifications.initialize(initSettings);
+    // Manejar tap en notificaciones locales (foreground y llamada)
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload == null || payload.isEmpty) return;
+        try {
+          final decoded = jsonDecode(payload);
+          if (decoded is Map) {
+            _handleNotificationTap(Map<String, dynamic>.from(decoded));
+          }
+        } catch (_) {
+          // payload no parseable: ignorar
+        }
+      },
+    );
+
+    // Tap en una notificación local con la app cerrada (cold start)
+    final launchDetails =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    final launchPayload = launchDetails?.notificationResponse?.payload;
+    if (launchDetails?.didNotificationLaunchApp == true &&
+        launchPayload != null &&
+        launchPayload.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(launchPayload);
+        if (decoded is Map) {
+          _scheduleColdStartNavigation(Map<String, dynamic>.from(decoded));
+        }
+      } catch (_) {}
+    }
 
     // Mostrar notificación local cuando llega mensaje en foreground
     FirebaseMessaging.onMessage.listen((message) {
@@ -127,6 +158,12 @@ class PushNotificationService {
       _handleNotificationTap(message.data);
     });
 
+    // Tap en un push FCM con la app cerrada (cold start)
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      _scheduleColdStartNavigation(initialMessage.data);
+    }
+
     final token = await messaging.getToken();
     await _syncTokenWithBackend(token);
 
@@ -136,13 +173,27 @@ class PushNotificationService {
   }
 
   static void _handleNotificationTap(Map<String, dynamic> data) {
-    final context = ChambaApp.navigatorKey.currentContext;
-    if (context == null) return;
+    // Navegar directo a la pantalla asociada (chat, solicitud, soporte...)
+    NotificationRouter.openFromData(data);
+  }
 
-    // Navegar al Centro de Notificaciones al tocar (estilo TikTok)
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-    );
+  /// En cold start el navigator todavía no existe cuando llega el tap;
+  /// reintenta hasta que la app termine de montar el árbol.
+  static void _scheduleColdStartNavigation(
+    Map<String, dynamic> data, [
+    int attempt = 0,
+  ]) {
+    if (attempt > 20) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = ChambaApp.navigatorKey.currentState;
+      if (navigator == null || !SessionStore.isLoggedIn) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _scheduleColdStartNavigation(data, attempt + 1);
+        });
+        return;
+      }
+      _handleNotificationTap(data);
+    });
   }
 
   Future<void> syncTokenForCurrentUser() async {
@@ -206,7 +257,7 @@ class PushNotificationService {
           presentSound: true,
         ),
       ),
-      payload: message.data.toString(),
+      payload: jsonEncode(message.data),
     );
   }
 
@@ -245,7 +296,7 @@ class PushNotificationService {
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),
-      payload: data.toString(),
+      payload: jsonEncode(data),
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/start_date_label.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
@@ -1482,6 +1483,36 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         fontSize: 14,
                       ),
                     ),
+                    if (startDateLabel(req['startDate']) != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.colorPrimary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.event,
+                                size: 13, color: AppTheme.colorPrimary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                startDateLabel(req['startDate'])!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppTheme.colorPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2026,6 +2057,37 @@ class _JobDetailsSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+
+              // Cuándo empieza el trabajo (modalidad por día / programados)
+              if (startDateLabel(requestData['startDate']) != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event,
+                          size: 18, color: AppTheme.colorPrimaryLight),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          startDateLabel(requestData['startDate'])!,
+                          style: const TextStyle(
+                            color: AppTheme.colorPrimaryLight,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Descripción
               if (description.isNotEmpty) ...[

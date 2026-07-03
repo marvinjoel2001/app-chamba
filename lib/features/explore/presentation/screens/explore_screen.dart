@@ -34,6 +34,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _promptController = TextEditingController();
   final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
+  bool _refreshing = false;
   bool _analyzingPrompt = false;
   String? _error;
   String? _locationBlockMessage;
@@ -92,6 +93,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (mounted) {
       setState(() => _activeRequest = null);
       _load();
+    }
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await _load();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
     }
   }
 
@@ -1228,6 +1239,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               bottom: _isClient ? 280 : 330,
               child: Column(
                 children: [
+                  _MapControl(
+                    icon: _refreshing ? Icons.hourglass_top : Icons.refresh,
+                    onTap: _refreshing ? null : _refresh,
+                  ),
+                  const SizedBox(height: 12),
                   _MapControl(icon: Icons.add, onTap: _zoomIn),
                   const SizedBox(height: 12),
                   _MapControl(icon: Icons.remove, onTap: _zoomOut),
