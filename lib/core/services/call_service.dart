@@ -37,6 +37,21 @@ class CallService {
           return ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall()
             ..turnOnCameraWhenJoining = false;
         },
+        // Notificación de llamada entrante con la app en segundo plano o
+        // cerrada (requiere el certificado FCM y el resourceID 'chamba_call'
+        // configurados en la consola de Zego).
+        notificationConfig: ZegoCallInvitationNotificationConfig(
+          androidNotificationConfig: ZegoCallAndroidNotificationConfig(
+            showOnLockedScreen: true,
+            showOnFullScreen: true,
+            callChannel: ZegoCallAndroidNotificationChannelConfig(
+              channelID: 'chamba_voice_call',
+              channelName: 'Llamadas de voz',
+              sound: 'chamba_ringtone',
+              vibrate: true,
+            ),
+          ),
+        ),
       );
       _initialized = true;
       _initializedUserId = user.id;

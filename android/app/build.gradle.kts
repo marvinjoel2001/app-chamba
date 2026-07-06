@@ -29,9 +29,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
+        // No usar ndk.abiFilters aquí: entra en conflicto con
+        // `flutter build apk --split-per-abi`, que ya genera un APK por
+        // arquitectura.
     }
 
     buildTypes {

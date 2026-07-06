@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
+import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 
 import 'app.dart';
 import 'core/push/push_notification_service.dart';
@@ -20,6 +21,15 @@ Future<void> main() async {
   // desde cualquier parte de la app.
   ZegoUIKitPrebuiltCallInvitationService().setNavigatorKey(
     ChambaApp.navigatorKey,
+  );
+
+  // Permite que la llamada entrante suene y se muestre aunque la app esté
+  // en segundo plano o cerrada (push offline vía ZPNs + FCM).
+  unawaited(
+    ZegoUIKitPrebuiltCallInvitationService()
+        .useSystemCallingUI([ZegoUIKitSignalingPlugin()]).catchError((e) {
+      debugPrint('Error configurando UI de llamadas del sistema: $e');
+    }),
   );
 
   try {
