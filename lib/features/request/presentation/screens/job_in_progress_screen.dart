@@ -39,6 +39,11 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   Timer? _locationTimer;
   LatLng? _deviceLocation; // ubicación real del GPS
 
+  /// Auto-centrar el mapa en el worker. Se desactiva apenas el usuario
+  /// arrastra o hace zoom (el gesto del usuario manda) y se reactiva con
+  /// el botón de "mi ubicación".
+  bool _followWorker = true;
+
   List<LatLng> _routePoints = [];
   LatLng? _lastRouteFetchPos;
 
@@ -94,10 +99,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
       if (mounted) {
         setState(() => _deviceLocation = loc);
-        // Mover el mapa a la nueva posición del worker
-        try {
-          _mapController.move(loc, _mapController.camera.zoom);
-        } catch (_) {}
+        // Solo seguir al worker si el usuario no está explorando el mapa;
+        // se conserva el zoom actual en todo caso.
+        if (_followWorker) {
+          try {
+            _mapController.move(loc, _mapController.camera.zoom);
+          } catch (_) {}
+        }
       }
 
       // Sincronizar con el backend
@@ -587,6 +595,33 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final workElapsedSeconds =
         (_tracking?['workElapsedSeconds'] as num?)?.toInt();
 
+    // Desglose de la modalidad bajo el monto (mismo criterio que la
+    // pantalla del cliente): el total manda, el detalle aclara.
+    final modality = _tracking?['modality']?.toString() ?? 'fixed';
+    final estimatedHours =
+        (_tracking?['estimatedHours'] as num?)?.toDouble() ?? 0;
+    final days = (_tracking?['days'] as num?)?.toDouble() ?? 0;
+    final totalAmount = (amount as num?)?.toDouble();
+    String? modalityLabel;
+    if (totalAmount != null) {
+      String rateOf(double units) {
+        final rate = totalAmount / units;
+        return rate % 1 == 0
+            ? rate.toStringAsFixed(0)
+            : rate.toStringAsFixed(2);
+      }
+
+      if (modality == 'hourly' && estimatedHours > 0) {
+        modalityLabel =
+            'Por hora · ${estimatedHours.toStringAsFixed(0)}h × Bs ${rateOf(estimatedHours)}';
+      } else if (modality == 'daily' && days > 0) {
+        modalityLabel =
+            'Por día · ${days.toStringAsFixed(0)} días × Bs ${rateOf(days)}';
+      } else {
+        modalityLabel = 'Precio fijo';
+      }
+    }
+
     final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
     final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
     final destLat =
@@ -634,6 +669,19 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: destPos != null ? 13 : 15,
+                      onMapEvent: (event) {
+                        // Cualquier gesto del usuario (arrastrar, pellizcar,
+                        // doble tap) apaga el auto-centrado; los movimientos
+                        // programáticos (mapController/fitCamera) no.
+                        final isUserGesture = event.source !=
+                                MapEventSource.mapController &&
+                            event.source != MapEventSource.fitCamera &&
+                            event.source !=
+                                MapEventSource.nonRotatedSizeChange;
+                        if (isUserGesture && _followWorker) {
+                          setState(() => _followWorker = false);
+                        }
+                      },
                     ),
                     children: [
                       TileLayer(
@@ -832,8 +880,11 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                 const SizedBox(height: 8),
                 _MapBtn(
                   icon: Icons.my_location,
-                  highlighted: true,
+                  // Iluminado solo cuando el mapa sigue al worker, para que
+                  // se note el estado del seguimiento.
+                  highlighted: _followWorker,
                   onTap: () {
+                    setState(() => _followWorker = true);
                     final center = _deviceLocation ?? mapCenter;
                     _mapController.move(center, 15);
                   },
@@ -842,6 +893,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                 _MapBtn(
                   icon: Icons.route,
                   onTap: () {
+                    // Ver la ruta completa es explorar: pausar el
+                    // auto-centrado para que no se pierda el encuadre.
+                    setState(() => _followWorker = false);
                     if (destPos != null) {
                       _mapController.fitCamera(
                         CameraFit.bounds(
@@ -937,13 +991,27 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                   ),
                                 ),
                                 const Spacer(),
-                                Text(
-                                  amount != null ? 'Bs $amount' : '',
-                                  style: const TextStyle(
-                                    color: AppTheme.colorText,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      amount != null ? 'Bs $amount' : '',
+                                      style: const TextStyle(
+                                        color: AppTheme.colorText,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    if (modalityLabel != null)
+                                      Text(
+                                        modalityLabel,
+                                        style: const TextStyle(
+                                          color: AppTheme.colorMuted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),

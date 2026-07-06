@@ -46,8 +46,32 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
     _realtime.on('chat.message', _onChatMessage);
+    _realtime.on('worker.location.updated', _onWorkerLocation);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _load();
+  }
+
+  /// Posición del worker en vivo (el worker la emite cada ~5 s). Solo mueve
+  /// el marcador: nunca toca la cámara, así el zoom/encuadre del usuario
+  /// se respeta siempre.
+  void _onWorkerLocation(dynamic data) {
+    final msg =
+        data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+    final trackedWorkerId = _tracking?['worker']?['id']?.toString();
+    if (trackedWorkerId == null ||
+        msg['workerId']?.toString() != trackedWorkerId) {
+      return;
+    }
+    final lat = (msg['latitude'] as num?)?.toDouble();
+    final lng = (msg['longitude'] as num?)?.toDouble();
+    if (lat == null || lng == null || !mounted) return;
+    setState(() {
+      final worker = _tracking?['worker'];
+      if (worker is Map) {
+        worker['latitude'] = lat;
+        worker['longitude'] = lng;
+      }
+    });
   }
 
   void _onChatMessage(dynamic data) {
@@ -65,6 +89,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
     _realtime.off('chat.message', _onChatMessage);
+    _realtime.off('worker.location.updated', _onWorkerLocation);
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -282,6 +307,33 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final address = _tracking?['address']?.toString() ?? '';
     final title = _tracking?['title']?.toString() ?? 'Servicio en curso';
     final amount = _tracking?['agreedAmount'];
+
+    // Desglose de la modalidad bajo el monto: el total siempre manda y el
+    // detalle (horas/días × tarifa) evita dudas sobre qué se está pagando.
+    final modality = _tracking?['modality']?.toString() ?? 'fixed';
+    final estimatedHours =
+        (_tracking?['estimatedHours'] as num?)?.toDouble() ?? 0;
+    final days = (_tracking?['days'] as num?)?.toDouble() ?? 0;
+    final totalAmount = (amount as num?)?.toDouble();
+    String? modalityLabel;
+    if (totalAmount != null) {
+      String rateOf(double units) {
+        final rate = totalAmount / units;
+        return rate % 1 == 0
+            ? rate.toStringAsFixed(0)
+            : rate.toStringAsFixed(2);
+      }
+
+      if (modality == 'hourly' && estimatedHours > 0) {
+        modalityLabel =
+            'Por hora · ${estimatedHours.toStringAsFixed(0)}h × Bs ${rateOf(estimatedHours)}';
+      } else if (modality == 'daily' && days > 0) {
+        modalityLabel =
+            'Por día · ${days.toStringAsFixed(0)} días × Bs ${rateOf(days)}';
+      } else {
+        modalityLabel = 'Precio fijo';
+      }
+    }
 
     final workerLat = (worker?['latitude'] as num?)?.toDouble();
     final workerLng = (worker?['longitude'] as num?)?.toDouble();
@@ -601,13 +653,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   ),
                                 ),
                                 const Spacer(),
-                                Text(
-                                  amount != null ? 'Bs $amount' : '',
-                                  style: const TextStyle(
-                                    color: AppTheme.colorText,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      amount != null ? 'Bs $amount' : '',
+                                      style: const TextStyle(
+                                        color: AppTheme.colorText,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    if (modalityLabel != null)
+                                      Text(
+                                        modalityLabel,
+                                        style: const TextStyle(
+                                          color: AppTheme.colorMuted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
