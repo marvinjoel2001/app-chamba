@@ -1476,6 +1476,32 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     const Icon(Icons.verified, color: Color(0xFF8A2BE2), size: 16),
                   ],
                 ),
+                if (offer['agencyName'] != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8A2BE2).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF8A2BE2).withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.business_center, color: Color(0xFF8A2BE2), size: 10),
+                        const SizedBox(width: 4),
+                        Text(
+                          offer['agencyName'].toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF8A2BE2),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 2),
                 Row(
                   children: [

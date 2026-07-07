@@ -1209,17 +1209,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   Widget _buildEmptyContent(double bottomPadding) {
+    final isAgency = SessionStore.currentUser?.isAgencyWorker == true;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.search_off, color: AppTheme.colorMuted, size: 48),
+          Icon(
+            isAgency ? Icons.business_center : Icons.search_off,
+            color: AppTheme.colorMuted,
+            size: 48,
+          ),
           const SizedBox(height: 12),
-          const Text(
-            'No hay solicitudes cercanas',
+          Text(
+            isAgency ? 'Sin trabajos asignados' : 'No hay solicitudes cercanas',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppTheme.colorText,
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -1227,9 +1232,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            _available
-                ? 'Estás disponible. Las solicitudes aparecerán aquí.'
-                : 'Estás ocupado. Activa disponibilidad para recibir trabajos.',
+            isAgency
+                ? 'Espera a que tu agencia te asigne trabajos directamente.'
+                : _available
+                    ? 'Estás disponible. Las solicitudes aparecerán aquí.'
+                    : 'Estás ocupado. Activa disponibilidad para recibir trabajos.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
           ),
