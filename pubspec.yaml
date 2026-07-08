@@ -105,6 +105,8 @@ flutter:
     - assets/images/backgrounds/
     - assets/images/chat/
     - assets/legal/
+    - assets/sounds/mic_start.wav
+    - assets/sounds/mic_stop.wav
 
   # To add assets to your application, add an assets section, like this:
   # assets:

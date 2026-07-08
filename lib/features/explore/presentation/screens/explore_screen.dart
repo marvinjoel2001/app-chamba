@@ -1,6 +1,8 @@
 import 'dart:ui';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -29,7 +31,8 @@ class ExploreScreen extends StatefulWidget {
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> {
+class _ExploreScreenState extends State<ExploreScreen>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final TextEditingController _promptController = TextEditingController();
   final RealtimeService _realtime = RealtimeService.instance;
@@ -41,6 +44,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _canOpenLocationSettings = false;
   bool _isListening = false;
   late stt.SpeechToText _speechToText;
+  // Feedback del micrófono (tipo WhatsApp): pulso animado, vibración y beeps.
+  late AnimationController _micPulseController;
+  final AudioPlayer _micSoundPlayer = AudioPlayer();
+  double _micSoundLevel = 0;
   List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
@@ -61,6 +68,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     _speechToText = stt.SpeechToText();
+    _micPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _micSoundPlayer.setPlayerMode(PlayerMode.lowLatency);
     // Escuchar eventos de trabajo completado/cancelado para limpiar el banner
     _realtime.on('job.completed', _onJobFinished);
     _realtime.on('job.cancelled', _onJobFinished);
@@ -74,6 +86,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _realtime.off('job.cancelled', _onJobFinished);
     _realtime.off('offer.new', _onNewOffer);
     _promptController.dispose();
+    _micPulseController.dispose();
+    _micSoundPlayer.dispose();
     super.dispose();
   }
 
@@ -790,7 +804,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             isDense: true,
                             filled: false,
                             fillColor: Colors.transparent,
-                            hintText: 'Ejemplo: necesito que alguien\nme pinte la casa.',
+                            hintText: _isListening
+                                ? 'Te estamos escuchando…\nhabla con confianza.'
+                                : 'Ejemplo: necesito que alguien\nme pinte la casa.',
                             hintStyle: TextStyle(
                               color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 17,
@@ -808,41 +824,93 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: _listenToSpeech,
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF6B42C6),
-                            Color(0xFF4B2996),
-                          ],
-                        ),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                          BoxShadow(
-                            color: const Color(0xFF8152DD).withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            spreadRadius: -2,
-                            offset: const Offset(0, -2),
+                    child: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Anillos que se expanden mientras la app escucha.
+                          if (_isListening)
+                            AnimatedBuilder(
+                              animation: _micPulseController,
+                              builder: (context, _) {
+                                final t = _micPulseController.value;
+                                final t2 = (t + 0.5) % 1.0;
+                                Widget ring(double progress) => Container(
+                                      width: 52 + progress * 34,
+                                      height: 52 + progress * 34,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.redAccent.withValues(
+                                            alpha: (1 - progress) * 0.55,
+                                          ),
+                                          width: 2,
+                                        ),
+                                      ),
+                                    );
+                                return Stack(
+                                  alignment: Alignment.center,
+                                  children: [ring(t), ring(t2)],
+                                );
+                              },
+                            ),
+                          // Botón del micrófono; late al ritmo de la voz.
+                          AnimatedScale(
+                            scale: _isListening
+                                ? 1.0 + _micSoundLevel * 0.18
+                                : 1.0,
+                            duration: const Duration(milliseconds: 120),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: _isListening
+                                      ? const [
+                                          Color(0xFFE53950),
+                                          Color(0xFFB01836),
+                                        ]
+                                      : const [
+                                          Color(0xFF6B42C6),
+                                          Color(0xFF4B2996),
+                                        ],
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                  BoxShadow(
+                                    color: (_isListening
+                                            ? Colors.redAccent
+                                            : const Color(0xFF8152DD))
+                                        .withValues(alpha: 0.4),
+                                    blurRadius: 12,
+                                    spreadRadius: -2,
+                                    offset: const Offset(0, -2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                _isListening ? Icons.mic : Icons.mic_none,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
                           ),
                         ],
-                      ),
-                      child: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none,
-                        color: _isListening ? Colors.redAccent : Colors.white,
-                        size: 26,
                       ),
                     ),
                   ),
@@ -911,25 +979,62 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  /// Feedback al empezar a escuchar: vibración + beep ascendente (tipo WhatsApp).
+  void _playMicStartFeedback() {
+    HapticFeedback.mediumImpact();
+    _micSoundPlayer.play(AssetSource('sounds/mic_start.wav'), volume: 0.6);
+  }
+
+  /// Feedback al dejar de escuchar: vibración suave + beep descendente.
+  void _playMicStopFeedback() {
+    HapticFeedback.lightImpact();
+    _micSoundPlayer.play(AssetSource('sounds/mic_stop.wav'), volume: 0.5);
+  }
+
+  void _setListening(bool listening) {
+    if (!mounted) return;
+    if (listening == _isListening) return;
+    setState(() {
+      _isListening = listening;
+      if (!listening) _micSoundLevel = 0;
+    });
+    if (listening) {
+      _micPulseController.repeat();
+    } else {
+      _micPulseController.stop();
+      _micPulseController.reset();
+      _playMicStopFeedback();
+    }
+  }
+
   void _listenToSpeech() async {
     if (!_isListening) {
       bool available = await _speechToText.initialize(
         onStatus: (val) {
           if (val == 'done' || val == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
+            _setListening(false);
           }
         },
         onError: (val) {
-          if (mounted) setState(() => _isListening = false);
+          _setListening(false);
         },
       );
       if (available) {
-        setState(() => _isListening = true);
+        _playMicStartFeedback();
+        _setListening(true);
         _speechToText.listen(
           onResult: (val) {
             if (mounted) {
               setState(() {
                 _promptController.text = val.recognizedWords;
+              });
+            }
+          },
+          onSoundLevelChange: (level) {
+            // En Android el nivel llega aprox. entre -2 y 10 dB.
+            if (mounted && _isListening) {
+              setState(() {
+                _micSoundLevel = ((level + 2) / 12).clamp(0.0, 1.0);
               });
             }
           },
@@ -942,7 +1047,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         );
       }
     } else {
-      setState(() => _isListening = false);
+      _setListening(false);
       _speechToText.stop();
     }
   }
