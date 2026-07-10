@@ -16,6 +16,18 @@
 # Flutter Local Notifications
 -keep class com.dexterous.** { *; }
 
+# Zego (llamadas y push ZPNs) + Gson
+# R8 en modo full borra las firmas genéricas de las subclases de TypeToken,
+# lo que crashea ZPNsFCMReceiver al llegar una notificación en release:
+# "TypeToken must be created with a type argument"
+-keep class im.zego.** { *; }
+-dontwarn im.zego.**
+-keep class **.zego.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-keep public class * implements java.lang.reflect.Type
+
 # Geolocator
 -keep class com.baseflow.geolocator.** { *; }
 
