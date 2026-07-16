@@ -7,8 +7,9 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../auth/presentation/state/auth_dependencies.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -21,7 +22,7 @@ import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 
-class ProfileMenuScreen extends StatefulWidget {
+class ProfileMenuScreen extends ConsumerStatefulWidget {
   const ProfileMenuScreen({
     this.uploadWorkerProfilePhotoUseCase,
     this.deleteWorkerProfilePhotoUseCase,
@@ -32,10 +33,10 @@ class ProfileMenuScreen extends StatefulWidget {
   final DeleteWorkerProfilePhotoUseCase? deleteWorkerProfilePhotoUseCase;
 
   @override
-  State<ProfileMenuScreen> createState() => _ProfileMenuScreenState();
+  ConsumerState<ProfileMenuScreen> createState() => _ProfileMenuScreenState();
 }
 
-class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
+class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
   UploadWorkerProfilePhotoUseCase get _uploadWorkerProfilePhotoUseCase =>
       widget.uploadWorkerProfilePhotoUseCase ??
       WorkerDependencies.uploadWorkerProfilePhoto;
@@ -292,8 +293,7 @@ class _ProfileMenuScreenState extends State<ProfileMenuScreen> {
       return;
     }
 
-    final result = await AuthDependencies.logout();
-    result.fold(onSuccess: (_) {}, onFailure: (_) {});
+    await ref.read(authControllerProvider.notifier).logout();
 
     if (!mounted) {
       return;
