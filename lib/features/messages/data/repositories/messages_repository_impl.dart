@@ -81,4 +81,17 @@ class MessagesRepositoryImpl implements MessagesRepository {
       return Error(mapToFailure(error));
     }
   }
+
+  @override
+  Future<Result<void>> deleteThread({
+    required String threadId,
+    required String userId,
+  }) async {
+    try {
+      await _remote.deleteThread(threadId: threadId, userId: userId);
+      return const Success(null);
+    } catch (error) {
+      return Error(mapToFailure(error));
+    }
+  }
 }

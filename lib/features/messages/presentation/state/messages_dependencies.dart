@@ -15,4 +15,5 @@ class MessagesDependencies {
   static final getThreadMessages = GetThreadMessagesUseCase(_repository);
   static final sendMessage = SendMessageUseCase(_repository);
   static final archiveThread = ArchiveThreadUseCase(_repository);
+  static final deleteThread = DeleteThreadUseCase(_repository);
 }

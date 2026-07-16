@@ -12,6 +12,10 @@ abstract class MessagesRemoteDataSource {
     required String threadId,
     required String userId,
   });
+  Future<Map<String, dynamic>> deleteThread({
+    required String threadId,
+    required String userId,
+  });
 }
 
 class MessagesRemoteDataSourceImpl implements MessagesRemoteDataSource {
@@ -48,5 +52,13 @@ class MessagesRemoteDataSourceImpl implements MessagesRemoteDataSource {
     required String userId,
   }) {
     return _backendService.archiveThread(threadId: threadId, userId: userId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> deleteThread({
+    required String threadId,
+    required String userId,
+  }) {
+    return _backendService.deleteThread(threadId: threadId, userId: userId);
   }
 }

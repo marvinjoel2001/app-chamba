@@ -56,3 +56,16 @@ class ArchiveThreadUseCase {
     return _repository.archiveThread(threadId: threadId, userId: userId);
   }
 }
+
+class DeleteThreadUseCase {
+  DeleteThreadUseCase(this._repository);
+
+  final MessagesRepository _repository;
+
+  Future<Result<void>> call({
+    required String threadId,
+    required String userId,
+  }) {
+    return _repository.deleteThread(threadId: threadId, userId: userId);
+  }
+}

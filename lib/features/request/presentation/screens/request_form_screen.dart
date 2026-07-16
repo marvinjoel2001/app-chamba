@@ -76,7 +76,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   bool _loading = false;
   bool _checkingLocation = true;
   String? _locationBlockMessage;
-  bool _canOpenLocationSettings = false;
+  String? _locationBlockType;
   double? _latitude;
   double? _longitude;
   String? _resolvedAddress;
@@ -147,7 +147,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     setState(() {
       _checkingLocation = true;
       _locationBlockMessage = null;
-      _canOpenLocationSettings = false;
+      _locationBlockType = null;
     });
 
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
@@ -178,7 +178,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         setState(() {
           _locationBlockMessage =
               'Activa la ubicacion del telefono para crear una solicitud.';
-          _canOpenLocationSettings = true;
+          _locationBlockType = 'disabled';
           _checkingLocation = false;
         });
         return;
@@ -192,6 +192,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           if (!mounted) return;
           setState(() {
             _locationBlockMessage = 'Debes activar el GPS para dar permisos.';
+            _locationBlockType = 'denied';
             _checkingLocation = false;
           });
           return;
@@ -207,8 +208,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _locationBlockMessage = permission == LocationPermission.deniedForever
               ? 'El permiso de ubicacion esta bloqueado. Habilitalo en ajustes.'
               : 'Debes permitir ubicacion para continuar.';
-          _canOpenLocationSettings =
-              permission == LocationPermission.deniedForever;
+          _locationBlockType =
+              permission == LocationPermission.deniedForever ? 'deniedForever' : 'denied';
           _checkingLocation = false;
         });
         return;
@@ -685,24 +686,38 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 ),
                 const SizedBox(height: 14),
                 ElevatedButton(
-                  onPressed: _initializeLocation,
+                  onPressed: () async {
+                    if (_locationBlockType == 'disabled') {
+                      final isEnabled = await Geolocator.isLocationServiceEnabled();
+                      if (isEnabled) {
+                        _initializeLocation();
+                      } else {
+                        await Geolocator.openLocationSettings();
+                      }
+                    } else if (_locationBlockType == 'deniedForever') {
+                      final perm = await Geolocator.checkPermission();
+                      if (perm == LocationPermission.always || perm == LocationPermission.whileInUse) {
+                        _initializeLocation();
+                      } else {
+                        await Geolocator.openAppSettings();
+                      }
+                    } else {
+                      _initializeLocation();
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.colorPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Permitir ubicacion', style: TextStyle(color: Colors.white)),
+                  child: Text(
+                    _locationBlockType == 'disabled'
+                        ? 'Activar ubicacion'
+                        : _locationBlockType == 'deniedForever'
+                            ? 'Abrir Ajustes'
+                            : 'Permitir ubicacion',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
-                if (_canOpenLocationSettings) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: Geolocator.openAppSettings,
-                    child: const Text('Abrir ajustes'),
-                  ),
-                  TextButton(
-                    onPressed: Geolocator.openLocationSettings,
-                    child: const Text('Activar servicios de ubicacion'),
-                  ),
-                ],
               ],
             ),
           ),

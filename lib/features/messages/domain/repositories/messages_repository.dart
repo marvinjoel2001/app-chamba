@@ -19,4 +19,8 @@ abstract class MessagesRepository {
     required String threadId,
     required String userId,
   });
+  Future<Result<void>> deleteThread({
+    required String threadId,
+    required String userId,
+  });
 }

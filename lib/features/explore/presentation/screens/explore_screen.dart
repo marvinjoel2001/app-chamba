@@ -41,7 +41,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _analyzingPrompt = false;
   String? _error;
   String? _locationBlockMessage;
-  bool _canOpenLocationSettings = false;
+  String? _locationBlockType;
   bool _isListening = false;
   late stt.SpeechToText _speechToText;
   // Feedback del micrófono (tipo WhatsApp): pulso animado, vibración y beeps.
@@ -137,13 +137,13 @@ class _ExploreScreenState extends State<ExploreScreen>
         _loading = true;
         _error = null;
         _locationBlockMessage = null;
-        _canOpenLocationSettings = false;
+        _locationBlockType = null;
       });
     } else {
       setState(() {
         _error = null;
         _locationBlockMessage = null;
-        _canOpenLocationSettings = false;
+        _locationBlockType = null;
       });
     }
 
@@ -215,7 +215,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (!isEnabled) {
         _locationBlockMessage =
             'Activa la ubicacion del telefono para buscar trabajadores cercanos.';
-        _canOpenLocationSettings = true;
+        _locationBlockType = 'disabled';
         return null;
       }
 
@@ -225,7 +225,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           permission = await Geolocator.requestPermission();
         } catch (_) {
           _locationBlockMessage = 'Debes activar el GPS para pedir permisos de ubicacion.';
-          _canOpenLocationSettings = true;
+          _locationBlockType = 'denied';
           return null;
         }
       }
@@ -234,8 +234,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         _locationBlockMessage = permission == LocationPermission.deniedForever
             ? 'El permiso de ubicacion esta bloqueado. Debes habilitarlo en ajustes para continuar.'
             : 'Debes permitir la ubicacion para usar esta pantalla.';
-        _canOpenLocationSettings =
-            permission == LocationPermission.deniedForever;
+        _locationBlockType =
+            permission == LocationPermission.deniedForever ? 'deniedForever' : 'denied';
         return null;
       }
 
@@ -465,20 +465,31 @@ class _ExploreScreenState extends State<ExploreScreen>
               ),
               const SizedBox(height: 14),
               ChambaPrimaryButton(
-                label: 'Permitir ubicacion',
-                onPressed: _load,
+                label: _locationBlockType == 'disabled'
+                    ? 'Activar ubicacion'
+                    : _locationBlockType == 'deniedForever'
+                        ? 'Abrir Ajustes'
+                        : 'Permitir ubicacion',
+                onPressed: () async {
+                  if (_locationBlockType == 'disabled') {
+                    final isEnabled = await Geolocator.isLocationServiceEnabled();
+                    if (isEnabled) {
+                      _load();
+                    } else {
+                      await Geolocator.openLocationSettings();
+                    }
+                  } else if (_locationBlockType == 'deniedForever') {
+                    final perm = await Geolocator.checkPermission();
+                    if (perm == LocationPermission.always || perm == LocationPermission.whileInUse) {
+                      _load();
+                    } else {
+                      await Geolocator.openAppSettings();
+                    }
+                  } else {
+                    _load();
+                  }
+                },
               ),
-              if (_canOpenLocationSettings) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: Geolocator.openAppSettings,
-                  child: const Text('Abrir ajustes'),
-                ),
-                TextButton(
-                  onPressed: Geolocator.openLocationSettings,
-                  child: const Text('Activar servicios de ubicacion'),
-                ),
-              ],
             ],
           ),
         ),

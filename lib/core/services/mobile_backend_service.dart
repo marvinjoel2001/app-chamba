@@ -306,6 +306,16 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> deleteThread({
+    required String threadId,
+    required String userId,
+  }) {
+    return _api.post(
+      '/mobile/messages/$threadId/delete',
+      body: {'userId': userId},
+    );
+  }
+
   Future<Map<String, dynamic>> markThreadRead({
     required String threadId,
     required String userId,

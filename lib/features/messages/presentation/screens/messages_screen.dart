@@ -143,6 +143,59 @@ class _MessagesScreenState extends State<MessagesScreen> {
     });
   }
 
+  Future<void> _deleteThread(ChatThread thread) async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar chat'),
+        content: const Text(
+            '¿Deseas eliminar esta conversación? Solo se eliminará de tu bandeja de entrada.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppTheme.colorMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar',
+                style: TextStyle(color: AppTheme.colorError)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final result = await MessagesDependencies.deleteThread(
+      threadId: thread.id,
+      userId: user.id,
+    );
+
+    result.fold(
+      onSuccess: (_) {
+        setState(() {
+          _threads.removeWhere((t) => t.id == thread.id);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Chat eliminado')),
+          );
+        }
+      },
+      onFailure: (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar chat: ${failure.message}')),
+          );
+        }
+      },
+    );
+  }
+
   Color _statusColor(ChatThreadStatus status) {
     switch (status) {
       case ChatThreadStatus.active:
@@ -407,6 +460,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
     return InkWell(
       onTap: () => _openChat(thread),
+      onLongPress: () => _deleteThread(thread),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
