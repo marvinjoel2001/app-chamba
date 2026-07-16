@@ -646,4 +646,23 @@ class MobileBackendService {
   Future<Map<String, dynamic>> getClientHistory({required String clientUserId}) {
     return _api.get('/mobile/client/history?clientUserId=$clientUserId');
   }
+
+  Future<Map<String, dynamic>> getStripeConfig() {
+    return _api.get('/mobile/stripe/config');
+  }
+
+  Future<Map<String, dynamic>> createPaymentIntent({
+    required double amount,
+    String? currency = 'usd',
+    String? customerId,
+  }) {
+    return _api.post(
+      '/mobile/stripe/payment-intent',
+      body: {
+        'amount': amount,
+        'currency': currency,
+        if (customerId != null) 'customerId': customerId,
+      },
+    );
+  }
 }

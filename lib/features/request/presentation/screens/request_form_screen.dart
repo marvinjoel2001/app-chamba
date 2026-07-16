@@ -10,6 +10,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
+import '../../../../core/services/mobile_backend_service.dart';
+import '../../../../core/services/stripe_service.dart';
+import '../../../../core/services/toast_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -577,6 +580,36 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     setState(() => _loading = true);
 
     try {
+      if (_selectedPaymentMethod?.code == 'card') {
+        if (!StripeService.instance.isInitialized) {
+          throw Exception('Los pagos con tarjeta no estan configurados en este momento.');
+        }
+
+        final intentRes = await MobileBackendService.instance.createPaymentIntent(
+          amount: budget,
+          currency: 'usd',
+          customerId: user.id, // optional depending on if we register customers in stripe
+        );
+
+        final clientSecret = intentRes['paymentIntent'] as String?;
+        final ephemeralKey = intentRes['ephemeralKey'] as String?;
+
+        if (clientSecret == null) {
+          throw Exception('No se pudo generar la intencion de pago.');
+        }
+
+        final paymentSuccess = await StripeService.instance.presentPaymentSheet(
+          clientSecret: clientSecret,
+          ephemeralKey: ephemeralKey,
+          customerId: user.id,
+        );
+
+        if (!paymentSuccess) {
+          setState(() => _loading = false);
+          return;
+        }
+      }
+
       final uploadedPhotos = <Map<String, String>>[];
       for (final image in _pendingImages) {
         final uploaded = await CloudinaryUploadService.uploadImageBytes(

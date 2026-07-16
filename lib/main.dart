@@ -12,6 +12,8 @@ import 'core/push/push_notification_service.dart';
 import 'core/services/call_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/worker_background_service.dart';
+import 'core/services/stripe_service.dart';
+import 'core/services/mobile_backend_service.dart';
 import 'core/session/session_store.dart';
 
 Future<void> main() async {
@@ -74,6 +76,19 @@ Future<void> main() async {
     ]);
   } catch (e) {
     debugPrint('Error configurando orientacion: $e');
+  }
+
+  // Inicializar Stripe si está activo
+  try {
+    final res = await MobileBackendService.instance.getStripeConfig();
+    final bool isActive = res['active'] == true;
+    final String pubKey = res['publishableKey'] ?? '';
+    if (isActive && pubKey.isNotEmpty) {
+      await StripeService.instance.init(pubKey);
+      debugPrint('Stripe inicializado con éxito');
+    }
+  } catch (e) {
+    debugPrint('Error obteniendo config de Stripe: $e');
   }
 
   runApp(const ProviderScope(child: ChambaApp()));
