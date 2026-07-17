@@ -43,3 +43,6 @@
 # Don't warn about missing classes from dependencies
 -dontwarn com.google.**
 -dontwarn io.flutter.**
+
+# Stripe (flutter_stripe) Push Provisioning missing classes in release
+-dontwarn com.stripe.android.pushProvisioning.**

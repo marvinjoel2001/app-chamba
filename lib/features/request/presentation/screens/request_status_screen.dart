@@ -11,6 +11,8 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/stripe_service.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/request_dependencies.dart';
@@ -459,6 +461,41 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     if (user == null) return;
 
     try {
+      final paymentMethodStr = _request?['paymentMethod']?.toString().toLowerCase();
+      if (paymentMethodStr == 'tarjeta') {
+        if (!StripeService.instance.isInitialized) {
+          throw Exception('Los pagos con tarjeta no estan configurados en este momento.');
+        }
+
+        final amount = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
+        if (amount <= 0) {
+          throw Exception('Monto de oferta invalido para pago con tarjeta.');
+        }
+
+        final intentRes = await MobileBackendService.instance.createPaymentIntent(
+          amount: amount,
+          currency: 'usd',
+          customerId: user.id,
+        );
+
+        final clientSecret = intentRes['paymentIntent'] as String?;
+        final ephemeralKey = intentRes['ephemeralKey'] as String?;
+
+        if (clientSecret == null) {
+          throw Exception('No se pudo generar la intencion de pago.');
+        }
+
+        final paymentSuccess = await StripeService.instance.presentPaymentSheet(
+          clientSecret: clientSecret,
+          ephemeralKey: ephemeralKey,
+          customerId: user.id,
+        );
+
+        if (!paymentSuccess) {
+          return; // Cancelado o falló, abortar aceptación.
+        }
+      }
+
       (await OffersDependencies.acceptOffer(
         offerId: item['id'] as String,
         clientUserId: user.id,
