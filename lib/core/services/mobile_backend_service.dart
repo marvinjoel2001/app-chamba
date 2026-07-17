@@ -653,14 +653,16 @@ class MobileBackendService {
 
   Future<Map<String, dynamic>> createPaymentIntent({
     required double amount,
-    String? currency = 'usd',
+    String? currency,
     String? customerId,
   }) {
+    // Si no se envía currency, el backend usa la moneda configurada en
+    // stripe_config (switch centralizado del admin).
     return _api.post(
       '/mobile/stripe/payment-intent',
       body: {
         'amount': amount,
-        'currency': currency,
+        if (currency != null) 'currency': currency,
         if (customerId != null) 'customerId': customerId,
       },
     );

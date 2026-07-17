@@ -38,6 +38,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   bool _updatingBudget = false;
+  bool _acceptingOffer = false;
   String? _error;
   String? _infoMessage;
 
@@ -457,8 +458,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     required Map<String, dynamic> item,
     required Map<String, dynamic> worker,
   }) async {
+    // Evita doble-tap: dos PaymentIntents (doble cobro potencial) o dos
+    // aceptaciones simultáneas.
+    if (_acceptingOffer) return;
     final user = SessionStore.currentUser;
     if (user == null) return;
+
+    setState(() => _acceptingOffer = true);
+    var paymentDone = false;
 
     try {
       final paymentMethodStr = _request?['paymentMethod']?.toString().toLowerCase();
@@ -472,14 +479,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           throw Exception('Monto de oferta invalido para pago con tarjeta.');
         }
 
+        // La moneda la decide el backend (config stripe_config.currency).
         final intentRes = await MobileBackendService.instance.createPaymentIntent(
           amount: amount,
-          currency: 'usd',
           customerId: user.id,
         );
 
         final clientSecret = intentRes['paymentIntent'] as String?;
         final ephemeralKey = intentRes['ephemeralKey'] as String?;
+        final stripeCustomer = intentRes['customer'] as String?;
 
         if (clientSecret == null) {
           throw Exception('No se pudo generar la intencion de pago.');
@@ -488,21 +496,44 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         final paymentSuccess = await StripeService.instance.presentPaymentSheet(
           clientSecret: clientSecret,
           ephemeralKey: ephemeralKey,
-          customerId: user.id,
+          // Debe ser el customer real de Stripe (cus_...), no el UUID interno.
+          customerId: stripeCustomer,
         );
 
         if (!paymentSuccess) {
           return; // Cancelado o falló, abortar aceptación.
         }
+        paymentDone = true;
       }
 
-      (await OffersDependencies.acceptOffer(
-        offerId: item['id'] as String,
-        clientUserId: user.id,
-      )).fold(
-        onSuccess: (value) => value,
-        onFailure: (failure) => throw Exception(failure.message),
-      );
+      // Si el pago ya se hizo, reintentar la aceptación una vez antes de
+      // rendirse: no queremos un cliente cobrado sin trabajo asignado por un
+      // parpadeo de red.
+      Future<void> doAccept() async {
+        (await OffersDependencies.acceptOffer(
+          offerId: item['id'] as String,
+          clientUserId: user.id,
+        )).fold(
+          onSuccess: (value) => value,
+          onFailure: (failure) => throw Exception(failure.message),
+        );
+      }
+
+      try {
+        await doAccept();
+      } catch (_) {
+        if (!paymentDone) rethrow;
+        await Future<void>.delayed(const Duration(seconds: 2));
+        try {
+          await doAccept();
+        } catch (e) {
+          throw Exception(
+            'Tu pago fue procesado, pero no pudimos confirmar la oferta '
+            '($e). Vuelve a intentar aceptar; no se te cobrará de nuevo desde '
+            'la app. Si el problema sigue, contacta a soporte.',
+          );
+        }
+      }
 
       final requestId = _request?['id']?.toString();
       final workerId = worker['id']?.toString();
@@ -533,6 +564,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error al aceptar oferta: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _acceptingOffer = false);
     }
   }
 
@@ -1600,7 +1633,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: () => _acceptOffer(item: offer, worker: worker),
+                    onPressed: _acceptingOffer
+                        ? null
+                        : () => _acceptOffer(item: offer, worker: worker),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8A2BE2),
                       foregroundColor: Colors.white,
@@ -1610,7 +1645,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                     ),
-                    child: const Text('Aceptar', style: TextStyle(fontSize: 12)),
+                    child: _acceptingOffer
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text('Aceptar', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
