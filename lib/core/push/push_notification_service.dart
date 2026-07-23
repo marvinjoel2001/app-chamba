@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zego_uikit/zego_uikit.dart' show ZegoSignalingPluginMessage;
 
 import '../config/firebase_config.dart';
 import '../services/mobile_backend_service.dart';
@@ -15,17 +17,35 @@ import '../../app.dart';
 import 'notification_router.dart';
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
 
-  // Handle data-only messages in background
-  if (message.data['type'] == 'request_new') {
+  // Solo mensajes data-only: si trae bloque notification, Android ya la
+  // mostró y mostrarla aquí la duplicaría.
+  if (message.data['type'] == 'request_new' && message.notification == null) {
     await PushNotificationService.showCallNotification(message.data);
   }
+}
+
+/// Handler registrado en el pipeline de Zego (ZPNs). El receiver nativo de
+/// zego_zpns también intercepta los push FCM data-only con la app cerrada;
+/// Zego invoca todos los handlers registrados y el suyo descarta los mensajes
+/// que no son de llamadas, así que este procesa los de trabajo nuevo.
+@pragma('vm:entry-point')
+Future<void> onZegoBackgroundMessageReceived(
+  ZegoSignalingPluginMessage message,
+) async {
+  final extras = message.extras;
+  if (extras['type']?.toString() != 'request_new') {
+    return;
+  }
+  await PushNotificationService.showCallNotification(
+    Map<String, dynamic>.from(extras),
+  );
 }
 
 // Canal para notificaciones locales
@@ -85,7 +105,8 @@ class PushNotificationService {
       sound: true,
     );
 
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // Nota: FirebaseMessaging.onBackgroundMessage se registra en main(),
+    // antes de cualquier inicialización asíncrona.
 
     // Crear canales de notificación para Android
     if (!kIsWeb && Platform.isAndroid) {
@@ -145,7 +166,7 @@ class PushNotificationService {
     // Mostrar notificación local cuando llega mensaje en foreground
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint('FCM foreground message: ${message.messageId}');
-      if (message.data['type'] == 'request_new' && message.notification == null) {
+      if (message.data['type'] == 'request_new') {
         // Foreground: No mostramos banner nativo porque la pantalla "IncomingRequestScreen"
         // ya se actualiza en tiempo real vía WebSocket y mostrará un Snackbar y degradado.
         debugPrint('Ignorando banner nativo para request_new en foreground');
@@ -268,6 +289,34 @@ class PushNotificationService {
 
     // Fixed ID to prevent multiple simultaneous call notifications and infinite loop overlaps
     const int callNotificationId = 8888;
+
+    // El mismo push puede llegar por dos vías (handler de Firebase y pipeline
+    // de Zego/ZPNs) según qué receiver nativo capture el mensaje: no repetir.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jobId = data['jobId']?.toString() ?? '';
+      if (jobId.isNotEmpty) {
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        final last = prefs.getString('last_call_notification');
+        if (last != null) {
+          final parts = last.split('|');
+          if (parts.length == 2 && parts[0] == jobId) {
+            final lastMs = int.tryParse(parts[1]) ?? 0;
+            if (nowMs - lastMs < 15000) {
+              return;
+            }
+          }
+        }
+        await prefs.setString('last_call_notification', '$jobId|$nowMs');
+      }
+    } catch (_) {}
+
+    // Asegurar que el canal exista aunque este isolate de fondo sea nuevo.
+    if (!kIsWeb && Platform.isAndroid) {
+      final plugin = _localNotifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await plugin?.createNotificationChannel(_callChannel);
+    }
 
     await _localNotifications.show(
       callNotificationId,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/app_permissions_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
@@ -10,6 +11,7 @@ import '../../../worker/presentation/state/worker_dependencies.dart';
 import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../auth/presentation/screens/blocked_screen.dart';
+import 'required_permissions_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -97,6 +99,19 @@ class _SplashScreenState extends State<SplashScreen> {
       if (shouldOpenSkills) {
         nextScreen = const SkillsSelectionScreen(forceToHomeAfterSave: true);
       }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final allPermissionsGranted =
+        await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
+    if (!mounted) {
+      return;
+    }
+    if (!allPermissionsGranted) {
+      nextScreen = RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
     }
 
     _go(nextScreen);

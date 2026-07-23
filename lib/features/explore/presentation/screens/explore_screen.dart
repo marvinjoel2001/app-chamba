@@ -202,6 +202,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         _mapController.move(currentLocation, _currentZoom);
       });
     } catch (error) {
+      if (!mounted) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;

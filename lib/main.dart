@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:zego_uikit/zego_uikit.dart' show ZegoUIKit;
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 
@@ -19,6 +21,11 @@ import 'core/session/session_store.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Registrar el handler de push en segundo plano lo antes posible, antes de
+  // cualquier inicialización asíncrona, para que los mensajes data-only de
+  // trabajo nuevo despierten la app aunque esté cerrada.
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   // Necesario para que las llamadas entrantes puedan abrir su pantalla
   // desde cualquier parte de la app.
   ZegoUIKitPrebuiltCallInvitationService().setNavigatorKey(
@@ -29,7 +36,15 @@ Future<void> main() async {
   // en segundo plano o cerrada (push offline vía ZPNs + FCM).
   unawaited(
     ZegoUIKitPrebuiltCallInvitationService()
-        .useSystemCallingUI([ZegoUIKitSignalingPlugin()]).catchError((e) {
+        .useSystemCallingUI([ZegoUIKitSignalingPlugin()]).then((_) async {
+      // El receiver nativo de Zego (ZPNs) también captura los push FCM
+      // data-only; registrar nuestro handler en su registro para que los
+      // trabajos nuevos suenen aunque ese receiver gane el mensaje.
+      await ZegoUIKit().getSignalingPlugin().setBackgroundMessageHandler(
+            onZegoBackgroundMessageReceived,
+            key: 'chamba_request_new',
+          );
+    }).catchError((e) {
       debugPrint('Error configurando UI de llamadas del sistema: $e');
     }),
   );
