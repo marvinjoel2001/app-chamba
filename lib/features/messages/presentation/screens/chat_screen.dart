@@ -19,8 +19,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
-import 'package:zego_uikit/zego_uikit.dart';
-import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
+
 
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
@@ -1186,41 +1185,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                     ),
-                    // Botón de llamada: envía una invitación real (le suena
-                    // al otro usuario) en vez de solo entrar a la sala.
-                    if (_counterpartId != null)
-                      ZegoSendCallInvitationButton(
-                        isVideoCall: false,
-                        invitees: [
-                          ZegoUIKitUser(
-                            id: _counterpartId!,
-                            name: widget.counterpartName.isEmpty
-                                ? 'Usuario'
-                                : widget.counterpartName,
-                          ),
-                        ],
-                        resourceID: 'chamba_call',
-                        buttonSize: const Size(48, 48),
-                        iconSize: const Size(24, 24),
-                        icon: ButtonIcon(
-                          icon: const Icon(
-                            Icons.phone_outlined,
-                            color: AppTheme.colorPrimary,
-                          ),
-                          backgroundColor: Colors.transparent,
-                        ),
-                        onPressed: (String code, String message, List<String> errorInvitees) {
-                          if (code.isNotEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No se pudo iniciar la llamada ($message)',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
+
+
                   ],
                 ),
               ),
