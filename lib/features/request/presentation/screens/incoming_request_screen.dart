@@ -8,10 +8,12 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/new_request_alert.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/start_date_label.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/new_request_pulse.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
 import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
@@ -458,26 +460,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onNewRequest(dynamic payload) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.new_releases, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text(
-                '¡Nueva solicitud cercana!',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          backgroundColor: AppTheme.colorSuccess,
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-    }
+    // El banner lo muestra el shell (el worker puede estar en otra pestaña) y
+    // el destello de la card lo maneja NewRequestAlert, que además descarta el
+    // duplicado cuando la misma solicitud ya llegó por push.
+    NewRequestAlert.instance.announceFromSocket(payload);
     _load(silent: true);
   }
 
@@ -1104,7 +1090,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
                                   final hasPendingOffer = offerStatus == 'pending';
                                   final isAcceptedOffer = offerStatus == 'accepted';
-                                  return _buildRequestCard(
+                                  final card = _buildRequestCard(
                                     req: req,
                                     workerOffer: workerOffer,
                                     offerStatus: offerStatus,
@@ -1112,6 +1098,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     hasPendingOffer: hasPendingOffer,
                                     isAcceptedOffer: isAcceptedOffer,
                                     clientCountered: false, // You can enhance this if needed
+                                  );
+                                  // Destella solo la solicitud que acaba de
+                                  // anunciarse, para que se distinga del resto
+                                  // de la lista sin abrir nada.
+                                  return ValueListenableBuilder<int>(
+                                    valueListenable:
+                                        NewRequestAlert.instance.highlightRevision,
+                                    builder: (context, _, child) => NewRequestPulse(
+                                      active: NewRequestAlert.instance
+                                          .isHighlighted(req['id']?.toString()),
+                                      child: child!,
+                                    ),
+                                    child: card,
                                   );
                                 },
                               );

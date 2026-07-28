@@ -5,6 +5,7 @@ import '../../../../core/errors/failure_mapper.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/push/push_notification_service.dart';
+import '../../../../core/services/new_request_alert.dart';
 import '../../../../core/session/session_store.dart';
 import '../../domain/entities/auth_payload_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -123,6 +124,7 @@ class AuthRepositoryImpl implements AuthRepository {
     RealtimeService.instance.disconnect();
     await Future.delayed(const Duration(milliseconds: 100));
     RealtimeService.instance.dispose();
+    NewRequestAlert.instance.reset();
     await SessionStore.clear();
     return const Success(null);
   }

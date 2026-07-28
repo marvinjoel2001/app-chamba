@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/new_request_alert.dart';
+import '../../../../core/services/toast_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
@@ -40,6 +42,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
     // Iniciar servicio de background para workers automáticamente
     if (widget.role == 'worker') {
       WorkerBackgroundService.setEnabled(true);
+      // El banner de solicitud nueva vive en el shell, no en la pestaña de
+      // solicitudes: el worker puede estar en Mensajes o Perfil cuando entra.
+      NewRequestAlert.instance.lastEvent.addListener(_onNewRequestAlert);
     }
     
     // Iniciar polling de notificaciones no leidas
@@ -50,7 +55,27 @@ class _MainShellScreenState extends State<MainShellScreen> {
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
     _realtime.off('user.verification.updated', _onVerificationUpdated);
+    NewRequestAlert.instance.lastEvent.removeListener(_onNewRequestAlert);
     super.dispose();
+  }
+
+  void _onNewRequestAlert() {
+    final event = NewRequestAlert.instance.lastEvent.value;
+    if (event == null || !mounted) return;
+
+    ToastService.show(
+      title: event.title,
+      body: event.body,
+      type: ToastType.success,
+      duration: const Duration(seconds: 6),
+      onTap: () {
+        if (!mounted || currentIndex == 0) return;
+        setState(() {
+          currentIndex = 0;
+          _visitedIndices.add(0);
+        });
+      },
+    );
   }
 
   void _onMessageNew(dynamic payload) {

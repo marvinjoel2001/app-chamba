@@ -14,6 +14,7 @@ class ToastService {
     required String body,
     ToastType type = ToastType.info,
     Duration duration = const Duration(seconds: 4),
+    VoidCallback? onTap,
   }) {
     final overlayState = ChambaApp.navigatorKey.currentState?.overlay;
     if (overlayState == null) return;
@@ -41,7 +42,7 @@ class ToastService {
                 ),
               );
             },
-            child: _buildToastWidget(title, body, type),
+            child: _buildToastWidget(title, body, type, onTap),
           ),
         ),
       ),
@@ -69,7 +70,12 @@ class ToastService {
     _overlayEntry = null;
   }
 
-  static Widget _buildToastWidget(String title, String body, ToastType type) {
+  static Widget _buildToastWidget(
+    String title,
+    String body,
+    ToastType type,
+    VoidCallback? onTap,
+  ) {
     Color primaryColor;
     Color bgColor;
     IconData iconData;
@@ -93,7 +99,7 @@ class ToastService {
         break;
     }
 
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(100),
@@ -163,6 +169,16 @@ class ToastService {
           ),
         ],
       ),
+    );
+
+    if (onTap == null) return card;
+
+    return GestureDetector(
+      onTap: () {
+        _hide();
+        onTap();
+      },
+      child: card,
     );
   }
 }

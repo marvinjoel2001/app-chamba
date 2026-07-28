@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/firebase_config.dart';
 import '../services/mobile_backend_service.dart';
+import '../services/new_request_alert.dart';
 import '../../firebase_options.dart';
 import '../session/session_store.dart';
 import '../../app.dart';
@@ -68,6 +69,10 @@ const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
+
+/// `true` solo cuando la UI está al frente y el usuario la puede ver.
+bool get _isAppVisible =>
+    WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
 class PushNotificationService {
   const PushNotificationService();
@@ -170,10 +175,20 @@ class PushNotificationService {
         'notification=${message.notification == null ? 'null (data-only)' : 'presente'}',
       );
       if (message.data['type'] == 'request_new') {
-        // También en foreground: el worker puede tener la app abierta con el
-        // teléfono en el bolsillo, o estar en otra pantalla. Sin esto la
-        // solicitud entra en silencio y se pierde.
-        showCallNotification(message.data);
+        // Con la app visible el worker ya está mirando el teléfono: la alerta
+        // de llamada le taparía la pantalla y el ringtone insistente sigue
+        // sonando hasta que la descarte. Ahí basta con el aviso in-app, que
+        // además destella la card de la solicitud nueva.
+        //
+        // `onMessage` también dispara con la app iniciada pero no visible
+        // (inactive/paused en el instante justo antes de irse a segundo
+        // plano); en ese caso sí hace falta la alerta completa, porque nadie
+        // va a ver el banner.
+        if (_isAppVisible) {
+          NewRequestAlert.instance.announceFromPush(message.data);
+        } else {
+          showCallNotification(message.data);
+        }
       } else {
         _showLocalNotification(message);
       }
