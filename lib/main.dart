@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/worker_background_service.dart';

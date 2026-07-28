@@ -42,7 +42,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       ),
                       padding: const EdgeInsets.all(16),
                       child: Image.asset(
-                        'assets/images/branding/chamba_handshake_icon.png',
+                        'assets/images/icon/icon.png',
                         fit: BoxFit.contain,
                       ),
                     ),

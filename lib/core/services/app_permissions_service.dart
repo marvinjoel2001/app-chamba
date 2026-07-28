@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -11,10 +12,15 @@ enum RequiredAppPermission {
   preciseLocation,
   overlay,
   notifications,
+  fullScreenIntent,
+  batteryUnrestricted,
 }
 
 class AppPermissionsService {
   const AppPermissionsService._();
+
+  /// Expuesto por MainActivity: accesos especiales que permission_handler no cubre.
+  static const MethodChannel _systemChannel = MethodChannel('chamba/system');
 
   static bool get _isAndroid => !kIsWeb && Platform.isAndroid;
   static bool get _isIOS => !kIsWeb && Platform.isIOS;
@@ -28,6 +34,8 @@ class AppPermissionsService {
         RequiredAppPermission.preciseLocation,
         RequiredAppPermission.overlay,
         RequiredAppPermission.notifications,
+        RequiredAppPermission.fullScreenIntent,
+        RequiredAppPermission.batteryUnrestricted,
       ];
     }
 
@@ -96,6 +104,27 @@ class AppPermissionsService {
         }
         final status = await Permission.notification.status;
         return status.isGranted;
+
+      case RequiredAppPermission.fullScreenIntent:
+        if (!_isAndroid) {
+          return true;
+        }
+        try {
+          final allowed = await _systemChannel.invokeMethod<bool>(
+            'canUseFullScreenIntent',
+          );
+          return allowed ?? true;
+        } catch (_) {
+          // Canal no disponible (p. ej. isolate sin actividad): no bloquear.
+          return true;
+        }
+
+      case RequiredAppPermission.batteryUnrestricted:
+        if (!_isAndroid) {
+          return true;
+        }
+        final status = await Permission.ignoreBatteryOptimizations.status;
+        return status.isGranted;
     }
   }
 
@@ -142,6 +171,24 @@ class AppPermissionsService {
         }
         await Permission.notification.request();
         break;
+
+      case RequiredAppPermission.fullScreenIntent:
+        if (!_isAndroid) {
+          return;
+        }
+        try {
+          await _systemChannel.invokeMethod<void>(
+            'openFullScreenIntentSettings',
+          );
+        } catch (_) {}
+        break;
+
+      case RequiredAppPermission.batteryUnrestricted:
+        if (!_isAndroid) {
+          return;
+        }
+        await Permission.ignoreBatteryOptimizations.request();
+        break;
     }
   }
 
@@ -152,10 +199,15 @@ class AppPermissionsService {
         await openAppSettings();
         break;
 
+      case RequiredAppPermission.fullScreenIntent:
+        await requestPermission(permission);
+        break;
+
       case RequiredAppPermission.locationAlways:
       case RequiredAppPermission.preciseLocation:
       case RequiredAppPermission.overlay:
       case RequiredAppPermission.notifications:
+      case RequiredAppPermission.batteryUnrestricted:
         await openAppSettings();
         break;
     }

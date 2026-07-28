@@ -96,6 +96,10 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return 'Superposición sobre apps';
       case RequiredAppPermission.notifications:
         return 'Notificaciones';
+      case RequiredAppPermission.fullScreenIntent:
+        return 'Alertas a pantalla completa';
+      case RequiredAppPermission.batteryUnrestricted:
+        return 'Batería sin restricciones';
     }
   }
 
@@ -113,6 +117,10 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return 'Requerida para trabajadores: permite avisos importantes sobre otras aplicaciones.';
       case RequiredAppPermission.notifications:
         return 'Requerida para trabajadores: recibir nuevas solicitudes y cambios de oferta.';
+      case RequiredAppPermission.fullScreenIntent:
+        return 'Requerida para trabajadores: permite que una solicitud nueva suene y encienda la pantalla como una llamada.';
+      case RequiredAppPermission.batteryUnrestricted:
+        return 'Requerida para trabajadores: evita que el sistema bloquee los avisos con la app cerrada.';
     }
   }
 
@@ -128,6 +136,10 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return Icons.layers_outlined;
       case RequiredAppPermission.notifications:
         return Icons.notifications_active_outlined;
+      case RequiredAppPermission.fullScreenIntent:
+        return Icons.ring_volume_outlined;
+      case RequiredAppPermission.batteryUnrestricted:
+        return Icons.battery_alert_outlined;
     }
   }
 

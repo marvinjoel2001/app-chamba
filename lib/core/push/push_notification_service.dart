@@ -23,6 +23,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
   }
 
+  debugPrint(
+    '[push] background: type=${message.data['type']} '
+    'notification=${message.notification == null ? 'null (data-only)' : 'presente'}',
+  );
+
   // Solo mensajes data-only: si trae bloque notification, Android ya la
   // mostró y mostrarla aquí la duplicaría.
   if (message.data['type'] == 'request_new' && message.notification == null) {
@@ -42,9 +47,17 @@ const AndroidNotificationChannel _androidChannel = AndroidNotificationChannel(
   enableVibration: true,
 );
 
-// Canal para llamadas (prioridad máxima)
+// Canal para llamadas (prioridad máxima).
+//
+// OJO: en Android un canal es inmutable una vez creado. Cambiar `importance`,
+// `sound` o `playSound` aquí NO tiene efecto sobre los dispositivos donde el
+// canal ya existe — y `flutter run` instala como actualización, así que los
+// canales sobreviven entre builds. La única forma de aplicar settings nuevos
+// es un ID nuevo (o desinstalar la app). Si volvés a tocar el sonido o la
+// importancia, subí el sufijo y actualizá `chamba_call_channel_v3` en
+// backend-chamba/src/infrastructure/push/push.service.ts.
 const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
-  'chamba_call_channel_v2', // Change ID to force Android to apply new sound
+  'chamba_call_channel_v3',
   'Llamadas de Trabajo',
   description: 'Alertas prioritarias para nuevas solicitudes de trabajo',
   importance: Importance.max,
@@ -100,6 +113,9 @@ class PushNotificationService {
       if (plugin != null) {
         await plugin.createNotificationChannel(_androidChannel);
         await plugin.createNotificationChannel(_callChannel);
+        if (kDebugMode) {
+          await _debugDumpCallChannel(plugin);
+        }
       }
     }
 
@@ -149,11 +165,15 @@ class PushNotificationService {
 
     // Mostrar notificación local cuando llega mensaje en foreground
     FirebaseMessaging.onMessage.listen((message) {
-      debugPrint('FCM foreground message: ${message.messageId}');
+      debugPrint(
+        '[push] foreground: type=${message.data['type']} '
+        'notification=${message.notification == null ? 'null (data-only)' : 'presente'}',
+      );
       if (message.data['type'] == 'request_new') {
-        // Foreground: No mostramos banner nativo porque la pantalla "IncomingRequestScreen"
-        // ya se actualiza en tiempo real vía WebSocket y mostrará un Snackbar y degradado.
-        debugPrint('Ignorando banner nativo para request_new en foreground');
+        // También en foreground: el worker puede tener la app abierta con el
+        // teléfono en el bolsillo, o estar en otra pantalla. Sin esto la
+        // solicitud entra en silencio y se pierde.
+        showCallNotification(message.data);
       } else {
         _showLocalNotification(message);
       }
@@ -175,6 +195,35 @@ class PushNotificationService {
     messaging.onTokenRefresh.listen((token) async {
       await _syncTokenWithBackend(token);
     });
+  }
+
+  /// Lee del sistema los settings REALES del canal de llamadas. Si no coinciden
+  /// con `_callChannel`, el canal quedó congelado de un build anterior y hay que
+  /// subir el ID (o desinstalar), porque Android nunca lo va a actualizar solo.
+  static Future<void> _debugDumpCallChannel(
+    AndroidFlutterLocalNotificationsPlugin plugin,
+  ) async {
+    try {
+      final channels = await plugin.getNotificationChannels() ?? const [];
+      AndroidNotificationChannel? channel;
+      for (final c in channels) {
+        if (c.id == _callChannel.id) {
+          channel = c;
+          break;
+        }
+      }
+      if (channel == null) {
+        debugPrint('[push] canal ${_callChannel.id} NO existe en el sistema');
+        return;
+      }
+      debugPrint(
+        '[push] canal ${channel.id}: importance=${channel.importance.value} '
+        'playSound=${channel.playSound} sound=${channel.sound?.sound} '
+        'vibration=${channel.enableVibration}',
+      );
+    } catch (e) {
+      debugPrint('[push] no se pudo leer el canal: $e');
+    }
   }
 
   static void _handleNotificationTap(Map<String, dynamic> data) {

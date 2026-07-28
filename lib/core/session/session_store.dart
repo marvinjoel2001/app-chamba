@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/call_service.dart';
+import '../push/push_notification_service.dart';
 
 class SessionUser {
   const SessionUser({
@@ -151,8 +152,14 @@ class SessionStore {
     currentUser = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
-    // Deja al usuario listo para recibir llamadas (idempotente por usuario).
-    await CallService.init();
+    // Registra el token FCM contra este usuario: sin esto el backend no tiene
+    // a dónde enviar la alerta de trabajo nuevo. Es idempotente (upsert) y no
+    // debe bloquear ni romper el login si la red falla.
+    unawaited(
+      const PushNotificationService().syncTokenForCurrentUser().catchError(
+            (_) {},
+          ),
+    );
   }
 
   static Future<void> persistCurrentUser() async {
@@ -166,7 +173,6 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
-    await CallService.uninit();
     currentUser = null;
     activeRequestId = null;
     activeThreadId = null;

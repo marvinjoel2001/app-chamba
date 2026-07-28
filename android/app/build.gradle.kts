@@ -53,6 +53,5 @@ flutter {
 }
 
 dependencies {
-    implementation("im.zego:zpns-fcm:2.7.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
