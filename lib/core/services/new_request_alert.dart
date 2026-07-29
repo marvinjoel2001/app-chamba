@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import 'volume_service.dart';
 
 /// Un aviso de solicitud nueva listo para mostrarse in-app.
 class NewRequestEvent {
@@ -17,23 +20,12 @@ class NewRequestEvent {
 }
 
 /// Aviso in-app de "llegó una solicitud nueva".
-///
-/// El push `request_new` existe para despertar el teléfono cuando la app está
-/// en segundo plano o cerrada. Con la app abierta el worker ya está mirando la
-/// pantalla: lanzarle ahí el full screen intent con el ringtone insistente le
-/// tapa lo que esté haciendo. En ese caso avisamos por acá — banner + vibración
-/// — y marcamos la solicitud como recién llegada para que su card destelle.
-///
-/// La misma solicitud puede anunciarse dos veces (el push de FCM y el evento
-/// `request.new` del socket viajan en paralelo); [announce] descarta el
-/// duplicado dentro de [_dedupeWindow].
 class NewRequestAlert {
   NewRequestAlert._();
 
   static final NewRequestAlert instance = NewRequestAlert._();
 
-  /// Cuánto destella la card recién llegada. Suficiente para que el worker
-  /// alcance a cambiar de pestaña y todavía la vea marcada.
+  /// Cuánto destella la card recién llegada.
   static const Duration highlightDuration = Duration(seconds: 10);
 
   static const Duration _dedupeWindow = Duration(seconds: 15);
@@ -42,13 +34,14 @@ class NewRequestAlert {
   final ValueNotifier<NewRequestEvent?> lastEvent =
       ValueNotifier<NewRequestEvent?>(null);
 
-  /// Cambia cada vez que entra o expira un resaltado. Las listas de solicitudes
-  /// se reconstruyen escuchándolo, sin tener que propagar el set de ids.
+  /// Cambia cada vez que entra o expira un resaltado.
   final ValueNotifier<int> highlightRevision = ValueNotifier<int>(0);
 
   final Map<String, DateTime> _announcedAt = {};
   final Map<String, Timer> _highlightTimers = {};
   final Set<String> _highlighted = {};
+
+  AudioPlayer? _audioPlayer;
 
   bool isHighlighted(String? requestId) =>
       requestId != null && _highlighted.contains(requestId);
@@ -65,7 +58,6 @@ class NewRequestAlert {
   }
 
   /// Aviso disparado por un push FCM recibido con la app en primer plano.
-  /// El backend manda el detalle en `title`/`body` del bloque `data`.
   void announceFromPush(Map<String, dynamic> data) {
     announce(
       requestId: (data['jobId'] ?? data['requestId'])?.toString(),
@@ -92,16 +84,42 @@ class NewRequestAlert {
       _startHighlight(id);
     }
 
-    // Vibración + tono corto del sistema: alcanza para levantar la vista sin
-    // secuestrar la pantalla como hace la alerta de segundo plano.
-    HapticFeedback.heavyImpact();
-    SystemSound.play(SystemSoundType.alert);
+    // Reproducir patrón de vibración + sonido de notificación real
+    _triggerVibration();
+    _playAlertSound();
+    VolumeService.startRampingVolume();
 
     lastEvent.value = NewRequestEvent(
       requestId: id.isEmpty ? null : id,
       title: title,
       body: body,
     );
+  }
+
+  void _triggerVibration() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 250));
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 250));
+    HapticFeedback.vibrate();
+  }
+
+  Future<void> _playAlertSound() async {
+    try {
+      _audioPlayer ??= AudioPlayer();
+      await _audioPlayer?.stop();
+      await _audioPlayer?.play(
+        AssetSource('sounds/universfield-ringtone-091-496417.mp3'),
+      );
+    } catch (e) {
+      debugPrint('[NewRequestAlert] Error reproduciendo audio: $e');
+    }
+  }
+
+  Future<void> _stopAlertSound() async {
+    try {
+      await _audioPlayer?.stop();
+    } catch (_) {}
   }
 
   /// Al cerrar sesión o cambiar de cuenta no deben sobrevivir avisos ni
@@ -117,6 +135,8 @@ class NewRequestAlert {
       highlightRevision.value++;
     }
     lastEvent.value = null;
+    _stopAlertSound();
+    VolumeService.restoreVolume();
   }
 
   void _startHighlight(String requestId) {
@@ -128,6 +148,10 @@ class NewRequestAlert {
       _highlightTimers.remove(requestId);
       if (_highlighted.remove(requestId)) {
         highlightRevision.value++;
+      }
+      if (_highlighted.isEmpty) {
+        _stopAlertSound();
+        VolumeService.restoreVolume();
       }
     });
   }

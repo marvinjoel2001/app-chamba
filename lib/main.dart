@@ -62,18 +62,21 @@ Future<void> main() async {
     debugPrint('Error configurando orientacion: $e');
   }
 
-  // Inicializar Stripe si está activo
-  try {
-    final res = await MobileBackendService.instance.getStripeConfig();
-    final bool isActive = res['active'] == true;
-    final String pubKey = res['publishableKey'] ?? '';
-    if (isActive && pubKey.isNotEmpty) {
-      await StripeService.instance.init(pubKey);
-      debugPrint('Stripe inicializado con éxito');
-    }
-  } catch (e) {
-    debugPrint('Error obteniendo config de Stripe: $e');
-  }
+  // Stripe recién hace falta cuando el usuario llega a una pantalla de pago,
+  // así que NO puede bloquear el arranque: esta llamada sale a la red y espera
+  // hasta 15 s, y hasta que resuelva no se ejecuta runApp() — pantalla negra.
+  // Con el backend dormido (cold start) eso son 15 s de app "colgada".
+  unawaited(
+    MobileBackendService.instance.getStripeConfig().then((res) {
+      final bool isActive = res['active'] == true;
+      final String pubKey = res['publishableKey'] ?? '';
+      if (isActive && pubKey.isNotEmpty) {
+        return StripeService.instance.init(pubKey);
+      }
+    }).catchError((e) {
+      debugPrint('Error obteniendo config de Stripe: $e');
+    }),
+  );
 
   runApp(const ProviderScope(child: ChambaApp()));
 }

@@ -9,6 +9,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/new_request_alert.dart';
+import '../../../../core/services/volume_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/start_date_label.dart';
@@ -190,6 +191,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _locationStreamSubscription?.cancel();
     _acceptedAnimCtrl.dispose();
     _sheetCtrl.dispose();
+    VolumeService.restoreVolume();
     super.dispose();
   }
 
