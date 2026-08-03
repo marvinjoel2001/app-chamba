@@ -19,7 +19,8 @@ class RequiredPermissionsScreen extends StatefulWidget {
       _RequiredPermissionsScreenState();
 }
 
-class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
+class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
+    with WidgetsBindingObserver {
   late final List<RequiredAppPermission> _requiredPermissions;
   final Map<RequiredAppPermission, bool> _grantedByPermission =
       <RequiredAppPermission, bool>{};
@@ -35,15 +36,35 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _requiredPermissions = AppPermissionsService.requiredPermissionsForRole(
       widget.role,
     );
     _refreshPermissions();
   }
 
-  Future<void> _refreshPermissions() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Batería, alertas a pantalla completa y "Configuración" abren una pantalla
+    // del sistema APARTE: `requestPermission` retorna al instante, mucho antes
+    // de que el usuario decida, así que el refresco inmediato leía el estado
+    // viejo y el permiso quedaba sin marcar. Al volver a la app hay que releer.
+    if (state == AppLifecycleState.resumed) {
+      _refreshPermissions(showLoading: false);
+    }
+  }
+
+  Future<void> _refreshPermissions({bool showLoading = true}) async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    if (showLoading) {
+      setState(() => _loading = true);
+    }
 
     final next = <RequiredAppPermission, bool>{};
     for (final permission in _requiredPermissions) {
@@ -92,8 +113,6 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return 'Ubicación siempre activa';
       case RequiredAppPermission.preciseLocation:
         return 'Ubicación precisa';
-      case RequiredAppPermission.overlay:
-        return 'Superposición sobre apps';
       case RequiredAppPermission.notifications:
         return 'Notificaciones';
       case RequiredAppPermission.fullScreenIntent:
@@ -113,8 +132,6 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return 'Requerida para trabajadores: permite seguimiento aunque la app esté cerrada.';
       case RequiredAppPermission.preciseLocation:
         return 'Requerida para trabajadores: mejora la exactitud del punto de llegada.';
-      case RequiredAppPermission.overlay:
-        return 'Requerida para trabajadores: permite avisos importantes sobre otras aplicaciones.';
       case RequiredAppPermission.notifications:
         return 'Requerida para trabajadores: recibir nuevas solicitudes y cambios de oferta.';
       case RequiredAppPermission.fullScreenIntent:
@@ -132,8 +149,6 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen> {
         return Icons.my_location_outlined;
       case RequiredAppPermission.preciseLocation:
         return Icons.gps_fixed;
-      case RequiredAppPermission.overlay:
-        return Icons.layers_outlined;
       case RequiredAppPermission.notifications:
         return Icons.notifications_active_outlined;
       case RequiredAppPermission.fullScreenIntent:

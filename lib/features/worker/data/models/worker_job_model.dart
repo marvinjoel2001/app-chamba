@@ -13,6 +13,7 @@ class WorkerJobModel extends WorkerJob {
     super.clientProfilePhotoUrl,
     super.acceptedAt,
     super.threadId,
+    super.paymentMethod,
   });
 
   factory WorkerJobModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +30,7 @@ class WorkerJobModel extends WorkerJob {
       clientProfilePhotoUrl: client['profilePhotoUrl']?.toString(),
       acceptedAt: _parseDate(json['acceptedAt']?.toString()),
       threadId: json['threadId']?.toString(),
+      paymentMethod: json['paymentMethod']?.toString() ?? json['payment_method']?.toString(),
     );
   }
 

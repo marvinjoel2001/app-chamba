@@ -63,7 +63,7 @@ class MainActivity : FlutterActivity() {
 
         stopRamping()
 
-        var currentPercent = 0.40f
+        var currentPercent = RAMP_START_PERCENT
         fun applyVolume(percent: Float) {
             val ringTarget = (maxRing * percent).toInt().coerceAtLeast(1)
             val notifTarget = (maxNotif * percent).toInt().coerceAtLeast(1)
@@ -80,18 +80,18 @@ class MainActivity : FlutterActivity() {
 
         val runnable = object : Runnable {
             override fun run() {
-                currentPercent += 0.20f
+                currentPercent += RAMP_STEP_PERCENT
                 if (currentPercent >= 1.0f) {
                     applyVolume(1.0f)
                     stopRamping()
                 } else {
                     applyVolume(currentPercent)
-                    handler.postDelayed(this, 1500)
+                    handler.postDelayed(this, RAMP_STEP_MS)
                 }
             }
         }
         rampingRunnable = runnable
-        handler.postDelayed(runnable, 1500)
+        handler.postDelayed(runnable, RAMP_STEP_MS)
     }
 
     private fun stopRamping() {
@@ -138,5 +138,12 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val CHANNEL = "chamba/system"
+
+        /** Volumen inicial del ringtone, como fracción del máximo. */
+        const val RAMP_START_PERCENT = 0.40f
+        /** Cuánto sube en cada paso. */
+        const val RAMP_STEP_PERCENT = 0.30f
+        /** Espera entre pasos. Con estos valores llega al 100% en ~1.6 s. */
+        const val RAMP_STEP_MS = 800L
     }
 }

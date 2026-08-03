@@ -45,7 +45,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.on('job.worker_arrived', _onWorkerArrived);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
-    _realtime.on('chat.message', _onChatMessage);
+    _realtime.on('message.new', _onChatMessage);
     _realtime.on('worker.location.updated', _onWorkerLocation);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _load();
@@ -78,7 +78,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
     // El payload del socket puede llegar como Map<dynamic, dynamic>;
     // un cast directo a Map<String, dynamic> lanza TypeError.
     final msg = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-    if (msg['senderId'] != SessionStore.currentUser?.id) {
+
+    // El backend emite 'message.new' con la forma
+    // { threadId, requestId, message: { id, senderUserId, content, createdAt } }.
+    // Antes se leía msg['senderId'], que no existe en ese payload: el contador
+    // habría subido incluso con los mensajes propios.
+    final requestId = msg['requestId']?.toString();
+    if (requestId != null && requestId != SessionStore.activeRequestId) {
+      // Mensaje de otra conversación: no afecta el contador de esta pantalla.
+      return;
+    }
+
+    final message = msg['message'];
+    final senderId = message is Map ? message['senderUserId']?.toString() : null;
+    if (senderId != SessionStore.currentUser?.id) {
       if (mounted) setState(() => _unreadMessages++);
     }
   }
@@ -88,7 +101,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.off('job.worker_arrived', _onWorkerArrived);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
-    _realtime.off('chat.message', _onChatMessage);
+    _realtime.off('message.new', _onChatMessage);
     _realtime.off('worker.location.updated', _onWorkerLocation);
     _pollTimer?.cancel();
     super.dispose();

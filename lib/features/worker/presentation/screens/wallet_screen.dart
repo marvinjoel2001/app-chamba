@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/services/toast_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/worker_job.dart';
@@ -150,6 +151,16 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
 
   double get _totalEarnings {
     return _filteredJobs.fold(0.0, (sum, job) => sum + job.amount);
+  }
+
+  bool get _hasNonCashEarnings {
+    return _allJobs.any((job) => job.isCompleted && job.isNonCashPayment);
+  }
+
+  double get _nonCashBalance {
+    return _filteredJobs
+        .where((job) => job.isCompleted && job.isNonCashPayment)
+        .fold(0.0, (sum, job) => sum + job.amount);
   }
 
   String _formatDate(DateTime? value) {
@@ -383,21 +394,25 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: _buildActionButton(
-                                icon: Icons.download_rounded,
-                                label: 'Retirar',
-                                color: const Color(0xFF651FFF),
-                                textColor: Colors.white,
+                            if (_hasNonCashEarnings) ...[
+                              Expanded(
+                                child: _buildActionButton(
+                                  icon: Icons.download_rounded,
+                                  label: 'Retirar',
+                                  color: const Color(0xFF651FFF),
+                                  textColor: Colors.white,
+                                  onTap: _showWithdrawModal,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
+                              const SizedBox(width: 12),
+                            ],
                             Expanded(
                               child: _buildActionButton(
                                 icon: Icons.receipt_long_rounded,
                                 label: 'Historial',
                                 color: const Color(0xFF1E2336),
                                 textColor: Colors.white,
+                                onTap: _showHistoryModal,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -407,6 +422,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                 label: 'Estadísticas',
                                 color: const Color(0xFF1E2336),
                                 textColor: Colors.white,
+                                onTap: _showStatsModal,
                               ),
                             ),
                           ],
@@ -474,23 +490,435 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required String label, required Color color, required Color textColor}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: color,
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color textColor,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: textColor, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w600),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              Icon(icon, color: textColor, size: 24),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  void _showWithdrawModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111C30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        String selectedMethod = 'QR';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Retirar Fondos',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E2336),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Saldo disponible (Tarjeta/Digital)',
+                                style: TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                              SizedBox(height: 4),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Bs ${_nonCashBalance.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Color(0xFF00E676),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Método de retiro',
+                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      tileColor: selectedMethod == 'QR' ? const Color(0xFF651FFF).withOpacity(0.2) : const Color(0xFF1E2336),
+                      leading: const Icon(Icons.qr_code_2, color: Colors.white),
+                      title: const Text('Transferencia por QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Abono inmediato a tu cuenta bancaria', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                      trailing: Radio<String>(
+                        value: 'QR',
+                        groupValue: selectedMethod,
+                        activeColor: const Color(0xFF651FFF),
+                        onChanged: (v) => setModalState(() => selectedMethod = v!),
+                      ),
+                      onTap: () => setModalState(() => selectedMethod = 'QR'),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      tileColor: selectedMethod == 'Bank' ? const Color(0xFF651FFF).withOpacity(0.2) : const Color(0xFF1E2336),
+                      leading: const Icon(Icons.account_balance, color: Colors.white),
+                      title: const Text('Cuenta Bancaria Directa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Transferencia interbancaria (24 hrs)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                      trailing: Radio<String>(
+                        value: 'Bank',
+                        groupValue: selectedMethod,
+                        activeColor: const Color(0xFF651FFF),
+                        onChanged: (v) => setModalState(() => selectedMethod = v!),
+                      ),
+                      onTap: () => setModalState(() => selectedMethod = 'Bank'),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF651FFF),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ToastService.show(
+                            title: 'Solicitud enviada',
+                            body: 'Tu retiro de Bs ${_nonCashBalance.toStringAsFixed(0)} ha sido solicitado con éxito.',
+                            type: ToastType.success,
+                          );
+                        },
+                        child: const Text(
+                          'Solicitar Retiro',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showHistoryModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111C30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final jobs = _filteredJobs;
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Historial de Trabajos',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: jobs.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No hay trabajos en este período',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: jobs.length,
+                          itemBuilder: (context, i) {
+                            final job = jobs[i];
+                            final isNonCash = job.isNonCashPayment;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E2336),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: _categoryColor(job.category).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(_categoryIcon(job.category), color: _categoryColor(job.category)),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          job.title,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              _formatDate(job.acceptedAt),
+                                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: isNonCash
+                                                    ? Colors.purple.withOpacity(0.2)
+                                                    : Colors.green.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                isNonCash ? 'Tarjeta/Digital' : 'Efectivo',
+                                                style: TextStyle(
+                                                  color: isNonCash ? Colors.purpleAccent : const Color(0xFF00E676),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    'Bs ${job.amount.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF00E676),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showStatsModal() {
+    final jobs = _filteredJobs;
+    final totalJobs = jobs.length;
+    final totalEarned = _totalEarnings;
+    final avgPerJob = totalJobs > 0 ? totalEarned / totalJobs : 0.0;
+
+    final nonCashJobs = jobs.where((j) => j.isNonCashPayment).toList();
+    final nonCashTotal = nonCashJobs.fold(0.0, (sum, j) => sum + j.amount);
+    final cashTotal = totalEarned - nonCashTotal;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111C30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Estadísticas de Ingresos',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E2336),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('Trabajos', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            Text('$totalJobs', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E2336),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('Promedio', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            Text('Bs ${avgPerJob.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFFB388FF), fontSize: 24, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Desglose por método de pago',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E2336),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.money, color: Color(0xFF00E676), size: 20),
+                          const SizedBox(width: 10),
+                          const Text('Efectivo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          const Spacer(),
+                          Text('Bs ${cashTotal.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(color: Colors.white10, height: 1),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.credit_card, color: Colors.purpleAccent, size: 20),
+                          const SizedBox(width: 10),
+                          const Text('Tarjeta / Digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          const Spacer(),
+                          Text('Bs ${nonCashTotal.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

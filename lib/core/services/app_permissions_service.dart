@@ -10,7 +10,6 @@ enum RequiredAppPermission {
   location,
   locationAlways,
   preciseLocation,
-  overlay,
   notifications,
   fullScreenIntent,
   batteryUnrestricted,
@@ -32,7 +31,6 @@ class AppPermissionsService {
         RequiredAppPermission.location,
         RequiredAppPermission.locationAlways,
         RequiredAppPermission.preciseLocation,
-        RequiredAppPermission.overlay,
         RequiredAppPermission.notifications,
         RequiredAppPermission.fullScreenIntent,
         RequiredAppPermission.batteryUnrestricted,
@@ -90,13 +88,6 @@ class AppPermissionsService {
         final accuracy = await Geolocator.getLocationAccuracy();
         return accuracy == LocationAccuracyStatus.precise ||
             accuracy == LocationAccuracyStatus.unknown;
-
-      case RequiredAppPermission.overlay:
-        if (!_isAndroid) {
-          return true;
-        }
-        final status = await Permission.systemAlertWindow.status;
-        return status.isGranted;
 
       case RequiredAppPermission.notifications:
         if (!_isAndroid && !_isIOS) {
@@ -158,13 +149,6 @@ class AppPermissionsService {
         await Geolocator.requestPermission();
         break;
 
-      case RequiredAppPermission.overlay:
-        if (!_isAndroid) {
-          return;
-        }
-        await Permission.systemAlertWindow.request();
-        break;
-
       case RequiredAppPermission.notifications:
         if (!_isAndroid && !_isIOS) {
           return;
@@ -205,7 +189,6 @@ class AppPermissionsService {
 
       case RequiredAppPermission.locationAlways:
       case RequiredAppPermission.preciseLocation:
-      case RequiredAppPermission.overlay:
       case RequiredAppPermission.notifications:
       case RequiredAppPermission.batteryUnrestricted:
         await openAppSettings();

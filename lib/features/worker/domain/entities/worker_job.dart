@@ -20,6 +20,7 @@ class WorkerJob {
     this.clientProfilePhotoUrl,
     this.acceptedAt,
     this.threadId,
+    this.paymentMethod,
   });
 
   final String id;
@@ -33,6 +34,7 @@ class WorkerJob {
   final String? clientProfilePhotoUrl;
   final DateTime? acceptedAt;
   final String? threadId;
+  final String? paymentMethod;
 
   String get clientFullName {
     final value = '$clientFirstName $clientLastName'.trim();
@@ -41,6 +43,12 @@ class WorkerJob {
 
   bool get isCancelled => status == WorkerJobStatus.cancelled;
   bool get isCompleted => status == WorkerJobStatus.completed;
+
+  bool get isNonCashPayment {
+    if (paymentMethod == null) return false;
+    final pm = paymentMethod!.trim().toLowerCase();
+    return pm != 'efectivo' && pm != 'cash' && pm.isNotEmpty;
+  }
 
   @override
   bool operator ==(Object other) {

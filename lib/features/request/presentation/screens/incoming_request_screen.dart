@@ -854,75 +854,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               child: SizedBox(
                 width: double.infinity,
                 child: Stack(
-                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.topCenter,
                   children: [
-                    // Toggle centrado
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.colorGlassDarkSoft,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: AppTheme.colorGlassBorderSoft,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _AvailabilityLabel(
-                            label: 'DISPONIBLE',
-                            active: _available,
-                            activeColor: AppTheme.colorSuccess,
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: _togglingAvailability
-                                ? null
-                                : () => _toggleAvailability(!_available),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              width: 44,
-                              height: 26,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(13),
-                                color: _available
-                                    ? AppTheme.colorSuccess
-                                    : AppTheme.colorMuted.withValues(
-                                        alpha: 0.4,
-                                      ),
-                              ),
-                              child: AnimatedAlign(
-                                duration: const Duration(milliseconds: 250),
-                                alignment: _available
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  margin: const EdgeInsets.all(3),
-                                  width: 20,
-                                  height: 20,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          _AvailabilityLabel(
-                            label: 'OCUPADO',
-                            active: !_available,
-                            activeColor: AppTheme.colorMuted,
-                          ),
-                        ],
-                      ),
+                    // Toggle centrado con pulso y tooltip cuando está ocupado
+                    _PulsingAvailabilityToggle(
+                      available: _available,
+                      toggling: _togglingAvailability,
+                      onToggle: () => _toggleAvailability(!_available),
                     ),
                     // Botón filtros pegado a la derecha
                     Positioned(
                       right: 0,
+                      top: 0,
                       child: Material(
                         color: (_selectedCategory != null ||
                                 _selectedModality != null)
@@ -961,7 +905,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             minChildSize: 0.15,
             maxChildSize: 0.85,
             snap: true,
-            snapSizes: const [0.15, 0.85],
+            snapSizes: const [0.15, 0.32, 0.85],
             builder: (context, scrollController) {
               final navPadding =
                   92.0 + MediaQuery.viewPaddingOf(context).bottom;
@@ -1241,6 +1185,29 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
           ),
+          if (!isAgency && !_available) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _togglingAvailability
+                  ? null
+                  : () => _toggleAvailability(true),
+              icon: const Icon(Icons.power_settings_new, size: 18),
+              label: const Text(
+                'Ponerme disponible',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.colorSuccess,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 4,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2267,6 +2234,211 @@ class _JobDetailsSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PulsingAvailabilityToggle extends StatefulWidget {
+  const _PulsingAvailabilityToggle({
+    required this.available,
+    required this.toggling,
+    required this.onToggle,
+  });
+
+  final bool available;
+  final bool toggling;
+  final VoidCallback onToggle;
+
+  @override
+  State<_PulsingAvailabilityToggle> createState() =>
+      _PulsingAvailabilityToggleState();
+}
+
+class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _pulseGlow;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _pulseScale = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _pulseGlow = Tween<double>(begin: 0.2, end: 0.8).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    if (!widget.available) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulsingAvailabilityToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.available) {
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
+    } else {
+      if (_pulseController.isAnimating) {
+        _pulseController.stop();
+        _pulseController.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOcupado = !widget.available;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            final scale = isOcupado ? _pulseScale.value : 1.0;
+            final glow = isOcupado ? _pulseGlow.value : 0.0;
+            return Transform.scale(
+              scale: scale,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: isOcupado
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF00E676)
+                                .withValues(alpha: glow * 0.5),
+                            blurRadius: 14 * glow,
+                            spreadRadius: 2 * glow,
+                          ),
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: glow * 0.3),
+                            blurRadius: 8 * glow,
+                          ),
+                        ]
+                      : [],
+                ),
+                child: child,
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.colorGlassDarkSoft,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: isOcupado
+                    ? const Color(0xFF00E676).withValues(alpha: 0.7)
+                    : AppTheme.colorGlassBorderSoft,
+                width: isOcupado ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AvailabilityLabel(
+                  label: 'DISPONIBLE',
+                  active: widget.available,
+                  activeColor: AppTheme.colorSuccess,
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: widget.toggling ? null : widget.onToggle,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: 44,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(13),
+                      color: widget.available
+                          ? AppTheme.colorSuccess
+                          : AppTheme.colorMuted.withValues(alpha: 0.4),
+                    ),
+                    child: AnimatedAlign(
+                      duration: const Duration(milliseconds: 250),
+                      alignment: widget.available
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.all(3),
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _AvailabilityLabel(
+                  label: 'OCUPADO',
+                  active: !widget.available,
+                  activeColor: AppTheme.colorMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isOcupado) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: widget.toggling ? null : widget.onToggle,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.colorGlassDarkSoft,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF00E676).withValues(alpha: 0.6),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.touch_app_rounded,
+                      color: Color(0xFF00E676), size: 15),
+                  SizedBox(width: 6),
+                  Text(
+                    'Toca para ponerte DISPONIBLE y ver trabajos',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

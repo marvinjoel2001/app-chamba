@@ -49,23 +49,34 @@ const AndroidNotificationChannel _androidChannel = AndroidNotificationChannel(
   enableVibration: true,
 );
 
+/// Vibración insistente tipo llamada: buzz largo, pausa corta, repetir.
+final Int64List _callVibrationPattern = Int64List.fromList(
+  <int>[0, 1000, 500, 1000, 500, 1000, 500, 1000],
+);
+
 // Canal para llamadas (prioridad máxima).
 //
 // OJO: en Android un canal es inmutable una vez creado. Cambiar `importance`,
-// `sound` o `playSound` aquí NO tiene efecto sobre los dispositivos donde el
-// canal ya existe — y `flutter run` instala como actualización, así que los
-// canales sobreviven entre builds. La única forma de aplicar settings nuevos
-// es un ID nuevo (o desinstalar la app). Si volvés a tocar el sonido o la
-// importancia, subí el sufijo y actualizá `chamba_call_channel_v3` en
-// backend-chamba/src/infrastructure/push/push.service.ts.
-const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
-  'chamba_call_channel_v3',
+// `sound`, `playSound` o `audioAttributesUsage` aquí NO tiene efecto sobre los
+// dispositivos donde el canal ya existe — y `flutter run` instala como
+// actualización, así que los canales sobreviven entre builds. La única forma
+// de aplicar settings nuevos es un ID nuevo (o desinstalar la app). Si volvés
+// a tocar cualquiera de esos campos, subí el sufijo y actualizá
+// `chamba_call_channel_v4` en backend-chamba/src/infrastructure/push/push.service.ts.
+final AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
+  'chamba_call_channel_v4',
   'Llamadas de Trabajo',
   description: 'Alertas prioritarias para nuevas solicitudes de trabajo',
   importance: Importance.max,
   playSound: true,
   sound: const RawResourceAndroidNotificationSound('chamba_ringtone'),
   enableVibration: true,
+  vibrationPattern: _callVibrationPattern,
+  // Por defecto el paquete usa AudioAttributesUsage.notification, que MIUI y
+  // otros OEMs atenúan/duckean como a cualquier aviso común. notificationRingtone
+  // es lo que usan las apps de llamadas reales: suena al volumen de llamada y
+  // evita esa atenuación — es la causa de que sonara bajo pese a subir el volumen.
+  audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
 );
 
 final FlutterLocalNotificationsPlugin _localNotifications =

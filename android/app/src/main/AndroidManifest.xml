@@ -5,7 +5,6 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -13,21 +12,22 @@
     <!-- Requerida desde API 35 para que android:turnScreenOn encienda la pantalla
          cuando entra la alerta de trabajo nuevo. -->
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
-    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <!-- Sin exención de optimización de batería el sistema (sobre todo MIUI/EMUI)
          retrasa o descarta los push de alta prioridad con la app cerrada. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Requerida por AudioManager.setStreamVolume en el ramp de volumen de la
+         alerta de trabajo nuevo (MainActivity.startRampingVolume). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <!-- ACCESS_NETWORK_STATE no se declara acá: connectivity_plus ya la aporta
+         desde su propio manifest y el merger la incluye igual. -->
     <application
         android:label="Chamba"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
