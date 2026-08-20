@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/firebase_config.dart';
 import '../services/mobile_backend_service.dart';
 import '../services/new_request_alert.dart';
+import '../services/sound_effect_service.dart';
 import '../services/volume_service.dart';
 import '../../firebase_options.dart';
 import '../session/session_store.dart';
@@ -202,6 +203,12 @@ class PushNotificationService {
           showCallNotification(message.data);
         }
       } else {
+        final pushType = message.data['type']?.toString();
+        if (pushType == 'offer_new' ||
+            pushType == 'counter_offer' ||
+            pushType == 'offer_client_counter') {
+          SoundEffectService.playCashSound();
+        }
         _showLocalNotification(message);
       }
     });

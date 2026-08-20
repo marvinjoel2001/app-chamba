@@ -147,6 +147,9 @@ class _RadarScreenState extends State<RadarScreen> {
           _shouldRedirectToLogin = false;
           _loading = false;
         });
+        SessionStore.currentUser =
+            user.copyWith(isAvailable: summary.available);
+        unawaited(SessionStore.persistCurrentUser());
       },
       onFailure: (failure) {
         if (!mounted) {
@@ -180,6 +183,9 @@ class _RadarScreenState extends State<RadarScreen> {
           return;
         }
         setState(() => available = data.available);
+        SessionStore.currentUser =
+            user.copyWith(isAvailable: data.available);
+        unawaited(SessionStore.persistCurrentUser());
         await WorkerBackgroundService.setEnabled(data.available);
         await _load();
       },

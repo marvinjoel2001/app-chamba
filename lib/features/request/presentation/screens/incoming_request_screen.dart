@@ -9,6 +9,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/new_request_alert.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/volume_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -43,7 +44,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   Timer? _pollTimer;
   LatLng? _workerLocation;
   StreamSubscription<Position>? _locationStreamSubscription;
-  bool _available = true; // se actualiza desde la DB en _initLocation
+  bool _available = SessionStore.currentUser?.isAvailable ?? true;
   bool _togglingAvailability = false;
   bool _isMapInitialized = false;
 
@@ -280,6 +281,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
+      SessionStore.currentUser = user.copyWith(isAvailable: value);
+      unawaited(SessionStore.persistCurrentUser());
       await WorkerBackgroundService.setEnabled(value);
       if (mounted && value) {
         await _load(silent: true);
@@ -559,6 +562,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onClientCounter(dynamic payload) {
+    SoundEffectService.playCashSound();
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
     final eventRequestId = map['requestId']?.toString();
     final newBudget = (map['newBudget'] as num?)?.toDouble();
@@ -580,7 +584,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         }
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El cliente envió una contraoferta')),
+        SnackBar(
+          content: Text(
+            newBudget != null
+                ? '💰 El cliente mejoró su oferta a Bs $newBudget'
+                : '💰 El cliente envió una contraoferta',
+          ),
+          backgroundColor: AppTheme.colorPrimary,
+        ),
       );
     }
     _load(silent: true);
@@ -675,16 +686,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
       return;
     }
-    if (!_available) {
-      if (mounted) {
-        setState(() {
-          _clientCountered = false;
-          _loading = false;
-          _error = null;
-        });
-      }
-      return;
-    }
     // Solo mostrar spinner en la carga inicial, no en polling silencioso
     if (!silent) {
       setState(() {
@@ -700,6 +701,34 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 onFailure: (failure) => throw Exception(failure.message),
               )
               .payload;
+
+      final backendAvailable =
+          (response['isAvailable'] ?? response['available']) as bool?;
+      if (backendAvailable != null && _available != backendAvailable) {
+        if (mounted) {
+          setState(() {
+            _available = backendAvailable;
+          });
+        }
+        if (SessionStore.currentUser != null) {
+          SessionStore.currentUser =
+              SessionStore.currentUser!.copyWith(isAvailable: backendAvailable);
+          unawaited(SessionStore.persistCurrentUser());
+        }
+        unawaited(WorkerBackgroundService.setEnabled(backendAvailable));
+      }
+
+      if (!_available) {
+        if (mounted) {
+          setState(() {
+            _requests = [];
+            _clientCountered = false;
+            _loading = false;
+            _error = null;
+          });
+        }
+        return;
+      }
               
       final rawRequests = response['requests'] as List<dynamic>? ?? [];
       final List<Map<String, dynamic>> fetchedRequests = [];

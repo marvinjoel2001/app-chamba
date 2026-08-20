@@ -11,6 +11,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/stripe_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -255,7 +256,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     }
   }
 
-  void _onOfferEvent(dynamic payload) => _load();
+  void _onOfferEvent(dynamic payload) {
+    SoundEffectService.playCashSound();
+    _load();
+  }
 
   void _tickCountdown() {
     if (!mounted || _offers.isEmpty) return;

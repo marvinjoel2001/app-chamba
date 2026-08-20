@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/new_request_alert.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/toast_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
@@ -38,6 +39,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
     super.initState();
     _realtime.on('message.new', _onMessageNew);
     _realtime.on('user.verification.updated', _onVerificationUpdated);
+    _realtime.on('offer.new', _onOfferNew);
+    _realtime.on('offer.client_counter', _onOfferClientCounter);
 
     // Iniciar servicio de background para workers automáticamente
     if (widget.role == 'worker') {
@@ -55,8 +58,56 @@ class _MainShellScreenState extends State<MainShellScreen> {
   void dispose() {
     _realtime.off('message.new', _onMessageNew);
     _realtime.off('user.verification.updated', _onVerificationUpdated);
+    _realtime.off('offer.new', _onOfferNew);
+    _realtime.off('offer.client_counter', _onOfferClientCounter);
     NewRequestAlert.instance.lastEvent.removeListener(_onNewRequestAlert);
     super.dispose();
+  }
+
+  void _onOfferNew(dynamic payload) {
+    if (widget.role != 'client') return;
+    SoundEffectService.playCashSound();
+    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    final amount = map['amount'];
+    final bodyText = amount != null
+        ? 'Un trabajador ofertó Bs $amount'
+        : 'Un trabajador ha enviado una oferta para tu solicitud';
+    ToastService.show(
+      title: '💰 ¡Nueva oferta recibida!',
+      body: bodyText,
+      type: ToastType.success,
+      duration: const Duration(seconds: 6),
+      onTap: () {
+        if (!mounted || currentIndex == 0) return;
+        setState(() {
+          currentIndex = 0;
+          _visitedIndices.add(0);
+        });
+      },
+    );
+  }
+
+  void _onOfferClientCounter(dynamic payload) {
+    if (widget.role != 'worker') return;
+    SoundEffectService.playCashSound();
+    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    final newBudget = map['newBudget'];
+    final bodyText = newBudget != null
+        ? 'Nuevo presupuesto: Bs $newBudget'
+        : 'El cliente mejoró la oferta de su solicitud';
+    ToastService.show(
+      title: '💰 ¡El cliente mejoró su oferta!',
+      body: bodyText,
+      type: ToastType.success,
+      duration: const Duration(seconds: 6),
+      onTap: () {
+        if (!mounted || currentIndex == 0) return;
+        setState(() {
+          currentIndex = 0;
+          _visitedIndices.add(0);
+        });
+      },
+    );
   }
 
   void _onNewRequestAlert() {

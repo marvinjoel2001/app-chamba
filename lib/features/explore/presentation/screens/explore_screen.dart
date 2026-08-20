@@ -12,6 +12,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -92,6 +93,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _onNewOffer(dynamic data) {
+    SoundEffectService.playCashSound();
     if (_activeRequest != null) {
       final current = _activeRequest!['pendingOffersCount'] as int? ?? 0;
       setState(() {
