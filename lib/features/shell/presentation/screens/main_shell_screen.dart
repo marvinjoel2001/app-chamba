@@ -10,6 +10,7 @@ import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/session/unread_notifications_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/confetti_celebration.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
@@ -41,6 +42,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     _realtime.on('user.verification.updated', _onVerificationUpdated);
     _realtime.on('offer.new', _onOfferNew);
     _realtime.on('offer.client_counter', _onOfferClientCounter);
+    _realtime.on('offer.accepted', _onOfferAccepted);
 
     // Iniciar servicio de background para workers automáticamente
     if (widget.role == 'worker') {
@@ -60,8 +62,30 @@ class _MainShellScreenState extends State<MainShellScreen> {
     _realtime.off('user.verification.updated', _onVerificationUpdated);
     _realtime.off('offer.new', _onOfferNew);
     _realtime.off('offer.client_counter', _onOfferClientCounter);
+    _realtime.off('offer.accepted', _onOfferAccepted);
     NewRequestAlert.instance.lastEvent.removeListener(_onNewRequestAlert);
     super.dispose();
+  }
+
+  void _onOfferAccepted(dynamic payload) {
+    final myId = SessionStore.currentUser?.id;
+    final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
+    final workerUserId = map['workerUserId']?.toString();
+    final clientUserId = map['clientUserId']?.toString();
+
+    if (myId == null || (myId != workerUserId && myId != clientUserId)) return;
+
+    if (mounted) {
+      ConfettiCelebration.show(
+        context,
+        title: widget.role == 'worker'
+            ? '🎉 ¡OFERTA ACEPTADA!'
+            : '🎉 ¡TRABAJO CONFIRMADO!',
+        subtitle: widget.role == 'worker'
+            ? '¡El cliente aceptó tu oferta para este trabajo!'
+            : '¡Has confirmado al trabajador con éxito!',
+      );
+    }
   }
 
   void _onOfferNew(dynamic payload) {

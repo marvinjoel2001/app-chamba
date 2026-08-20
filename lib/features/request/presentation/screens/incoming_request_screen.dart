@@ -15,6 +15,7 @@ import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/start_date_label.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/confetti_celebration.dart';
 import '../../../../core/widgets/new_request_pulse.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
@@ -605,6 +606,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       return;
     }
     if (mounted) {
+      ConfettiCelebration.show(
+        context,
+        title: '🎉 ¡OFERTA ACEPTADA!',
+        subtitle: '¡El cliente ha seleccionado tu oferta para este trabajo!',
+      );
       setState(() => _showAcceptedBanner = true);
       _acceptedAnimCtrl.forward(from: 0);
       Future.delayed(const Duration(seconds: 5), () {
@@ -761,12 +767,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         }
       }
       
-      if (newlyAccepted && !_showAcceptedBanner && mounted) {
-        setState(() => _showAcceptedBanner = true);
-        _acceptedAnimCtrl.forward(from: 0);
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted) setState(() => _showAcceptedBanner = false);
-        });
+      if (newlyAccepted && mounted) {
+        if (!_showAcceptedBanner) {
+          ConfettiCelebration.show(
+            context,
+            title: '🎉 ¡OFERTA ACEPTADA!',
+            subtitle: '¡El cliente ha seleccionado tu oferta para este trabajo!',
+          );
+          setState(() => _showAcceptedBanner = true);
+          _acceptedAnimCtrl.forward(from: 0);
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) setState(() => _showAcceptedBanner = false);
+          });
+        }
       }
       
       if (newlyAccepted && mounted) {

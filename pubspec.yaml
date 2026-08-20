@@ -106,6 +106,8 @@ flutter:
     - assets/sounds/mic_stop.wav
     - assets/sounds/universfield-ringtone-091-496417.mp3
     - assets/sounds/cash.mp3
+    - assets/sounds/accepted.mp3
+    - assets/sounds/accepted2.mp3
 
   # To add assets to your application, add an assets section, like this:
   # assets:

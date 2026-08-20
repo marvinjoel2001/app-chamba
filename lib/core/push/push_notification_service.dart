@@ -204,7 +204,9 @@ class PushNotificationService {
         }
       } else {
         final pushType = message.data['type']?.toString();
-        if (pushType == 'offer_new' ||
+        if (pushType == 'offer_accepted') {
+          SoundEffectService.playAcceptedSound();
+        } else if (pushType == 'offer_new' ||
             pushType == 'counter_offer' ||
             pushType == 'offer_client_counter') {
           SoundEffectService.playCashSound();

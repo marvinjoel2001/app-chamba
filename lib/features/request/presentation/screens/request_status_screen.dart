@@ -16,6 +16,7 @@ import '../../../../core/services/stripe_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/confetti_celebration.dart';
 import '../state/request_dependencies.dart';
 import '../../../offers/presentation/state/offers_dependencies.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
@@ -100,7 +101,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.on('offer.new', _onOfferEvent);
     _realtime.on('offer.updated', _onOfferEvent);
     _realtime.on('offer.expired', _onOfferEvent);
-    _realtime.on('offer.accepted', _onOfferEvent);
+    _realtime.on('offer.accepted', _onOfferAcceptedByServer);
     _realtime.on('offer.client_counter', _onOfferEvent);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
@@ -150,7 +151,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.off('offer.new', _onOfferEvent);
     _realtime.off('offer.updated', _onOfferEvent);
     _realtime.off('offer.expired', _onOfferEvent);
-    _realtime.off('offer.accepted', _onOfferEvent);
+    _realtime.off('offer.accepted', _onOfferAcceptedByServer);
     _realtime.off('offer.client_counter', _onOfferEvent);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
@@ -244,16 +245,28 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Nadie ha aceptado aún. Sube tu presupuesto para atraer trabajadores.'),
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 8),
           action: SnackBarAction(
             label: 'Editar',
+            textColor: const Color(0xFF00D26A),
             onPressed: () {
-              setState(() => _showImproveOfferBtn = true);
+              _sendImproveOffer(promptDialog: true);
             },
           ),
         ),
       );
     }
+  }
+
+  void _onOfferAcceptedByServer(dynamic payload) {
+    if (mounted) {
+      ConfettiCelebration.show(
+        context,
+        title: '🎉 ¡TRABAJO CONFIRMADO!',
+        subtitle: 'La oferta ha sido confirmada con éxito',
+      );
+    }
+    _load();
   }
 
   void _onOfferEvent(dynamic payload) {
@@ -552,12 +565,17 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      ConfettiCelebration.show(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Oferta aceptada')));
+        title: '🎉 ¡OFERTA ACEPTADA!',
+        subtitle: 'Trabajo confirmado con ${worker['fullName'] ?? worker['name'] ?? 'el trabajador'}',
+      );
 
       await _load();
 
+      if (!mounted) return;
+
+      await Future<void>.delayed(const Duration(milliseconds: 1400));
       if (!mounted) return;
 
       Navigator.of(
@@ -633,26 +651,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     );
   }
 
-  Future<void> _sendImproveOffer() async {
+  Future<void> _sendImproveOffer({bool promptDialog = false}) async {
     final user = SessionStore.currentUser;
     final requestId = _request?['id']?.toString();
     if (user == null || requestId == null) return;
 
-    if (_draftBudget <= _currentBudget) {
+    if (promptDialog || _draftBudget <= _currentBudget) {
       final prevDraft = _draftBudget;
       await _editOfferAmount();
-      if (_draftBudget == prevDraft) {
-        // Usuario canceló o no cambió el valor
-        return;
-      }
-      if (_draftBudget <= _currentBudget) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Tu nueva oferta debe ser mayor a Bs ${_currentBudget.toStringAsFixed(0)}',
-            ),
-          ),
-        );
+      if (_draftBudget == prevDraft || _draftBudget <= _currentBudget) {
+        // Usuario canceló o no cambió a un valor mayor
         return;
       }
     }
@@ -670,7 +678,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Oferta mejorada correctamente')),
+        SnackBar(
+          content: Text('💰 ¡Oferta mejorada a Bs ${_draftBudget.toStringAsFixed(0)}! Notificando a trabajadores...'),
+          backgroundColor: const Color(0xFF00D26A),
+        ),
       );
       await _load();
     } catch (error) {
@@ -686,9 +697,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   Future<void> _editOfferAmount() async {
-    // La mejora de oferta SIEMPRE trabaja sobre el monto TOTAL del trabajo.
-    // En modalidades por hora/día se muestra el desglose y la tarifa
-    // equivalente para que el cliente sepa exactamente qué está mejorando.
     final modality = _request?['modality']?.toString() ?? 'fixed';
     final units = modality == 'hourly'
         ? (double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0)
@@ -701,19 +709,35 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     String formatRate(double rate) =>
         rate % 1 == 0 ? rate.toStringAsFixed(0) : rate.toStringAsFixed(2);
 
+    final suggested = _draftBudget > _currentBudget
+        ? _draftBudget
+        : (_currentBudget > 0 ? _currentBudget + 10 : 50.0);
     final controller = TextEditingController(
-      text: _draftBudget.toInt().toString(),
+      text: suggested.toInt().toString(),
     );
+
     final value = await showDialog<double>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Mejorar oferta'),
+          backgroundColor: const Color(0xFF151D29),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.monetization_on_outlined, color: Color(0xFF00D26A)),
+              SizedBox(width: 8),
+              Text(
+                'Mejorar oferta',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
           content: StatefulBuilder(
             builder: (context, setDialogState) {
               final parsed = double.tryParse(controller.text.trim());
               final newRate =
                   (parsed != null && parsed > 0 && units > 0) ? parsed / units : null;
+              final isInvalid = parsed == null || parsed <= _currentBudget;
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -724,8 +748,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       padding: const EdgeInsets.all(10),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: AppTheme.colorSurfaceSoft,
+                        color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                       ),
                       child: Text(
                         'Oferta actual:\n'
@@ -745,7 +770,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       child: Text(
                         'Oferta actual: Bs ${_currentBudget.toStringAsFixed(0)}',
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: AppTheme.colorMuted,
                         ),
                       ),
@@ -754,12 +779,27 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     controller: controller,
                     keyboardType: TextInputType.number,
                     autofocus: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
                       prefixText: 'Bs ',
+                      prefixStyle: const TextStyle(color: Color(0xFF00D26A), fontSize: 18, fontWeight: FontWeight.bold),
                       labelText: units > 0
                           ? 'Nuevo monto TOTAL del trabajo'
                           : 'Nueva oferta',
+                      labelStyle: const TextStyle(color: AppTheme.colorMuted),
+                      hintText: 'Ej. ${(suggested + 10).toInt()}',
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      helperText: 'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(0)}',
+                      helperStyle: TextStyle(color: isInvalid ? Colors.orangeAccent : const Color(0xFF00D26A)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFF00D26A), width: 2),
+                      ),
                     ),
                   ),
                   if (newRate != null)
@@ -781,14 +821,28 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
             ),
-            TextButton(
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D26A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
               onPressed: () {
                 final parsed = double.tryParse(controller.text.trim());
-                Navigator.of(context).pop(parsed);
+                if (parsed != null && parsed > _currentBudget) {
+                  Navigator.of(context).pop(parsed);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ingresa un monto mayor a Bs ${_currentBudget.toStringAsFixed(0)}'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
               },
-              child: const Text('Aplicar'),
+              child: const Text('Mejorar oferta', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -931,6 +985,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               ),
               const SizedBox(height: 16),
 
+              ListTile(
+                leading: const Icon(Icons.monetization_on_outlined, color: Color(0xFF00D26A), size: 20),
+                title: const Text('Mejorar presupuesto', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _sendImproveOffer(promptDialog: true);
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.share, color: Colors.white, size: 20),
                 title: const Text('Compartir solicitud', style: TextStyle(color: Colors.white)),
@@ -1371,7 +1433,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                               ),
                                               textStyle: const TextStyle(color: Colors.white, fontSize: 12),
                                               child: ElevatedButton.icon(
-                                                onPressed: _updatingBudget ? null : _sendImproveOffer,
+                                                onPressed: _updatingBudget
+                                                    ? null
+                                                    : () => _sendImproveOffer(promptDialog: true),
                                                 icon: const Icon(Icons.monetization_on_outlined, size: 14, color: Colors.white),
                                                 label: Text(
                                                   _updatingBudget ? '...' : 'Mejorar oferta',
@@ -1390,24 +1454,28 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                           );
                                         },
                                       )
-                                    : Container(
-                                        key: const ValueKey('budgetBadge'),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
+                                    : InkWell(
+                                          onTap: () => _sendImproveOffer(promptDialog: true),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
-                                        ),
-                                        child: Text(
-                                          _budgetBadgeText(),
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
+                                          child: Container(
+                                            key: const ValueKey('budgetBadge'),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
+                                            ),
+                                            child: Text(
+                                              _budgetBadgeText(),
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      ),
                               ),
                               const SizedBox(width: 8),
                               InkWell(
