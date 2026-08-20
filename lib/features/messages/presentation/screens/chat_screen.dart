@@ -18,6 +18,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
 
 
@@ -225,6 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Mensaje entrante del otro usuario con el chat abierto: se lee al instante.
       if (senderId != SessionStore.currentUser?.id) {
+        SoundEffectService.playMessageChime();
         _markThreadReadOnServer();
       }
 

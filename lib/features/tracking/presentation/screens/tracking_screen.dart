@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -10,6 +11,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
@@ -34,6 +36,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Map<String, dynamic>? _tracking;
   Timer? _pollTimer;
   bool _confirmingArrival = false;
+
+  Timer? _workLiveTimer;
+  int _workElapsedSeconds = 0;
+  bool _isWorkPaused = false;
 
   List<LatLng> _routePoints = [];
   LatLng? _lastRouteFetchPos;
@@ -104,15 +110,36 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.off('message.new', _onChatMessage);
     _realtime.off('worker.location.updated', _onWorkerLocation);
     _pollTimer?.cancel();
+    _workLiveTimer?.cancel();
     super.dispose();
+  }
+
+  void _startWorkTimer() {
+    _workLiveTimer?.cancel();
+    _workLiveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_isWorkPaused && mounted) {
+        setState(() => _workElapsedSeconds++);
+      }
+    });
+  }
+
+  void _toggleWorkPause() {
+    if (_isWorkPaused) {
+      SoundEffectService.playTimerStartSound();
+    } else {
+      SoundEffectService.playTimerStopSound();
+    }
+    setState(() => _isWorkPaused = !_isWorkPaused);
   }
 
   void _onWorkerArrived(dynamic _) {
     _load();
+    SoundEffectService.playRadarAlert();
+    HapticFeedback.heavyImpact();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('¡El trabajador ha llegado! Confirma su llegada.'),
+          content: Text('🎉 ¡El trabajador ha llegado! Confirma su llegada.'),
           backgroundColor: AppTheme.colorSuccess,
         ),
       );
@@ -120,12 +147,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   void _onJobCompleted(dynamic _) {
-    // Navegación centralizada: evita que varias pantallas del stack
-    // abran la calificación a la vez.
+    _workLiveTimer?.cancel();
+    SoundEffectService.playCashSound();
     AppFlows.goToRating();
   }
 
   void _onJobCancelled(dynamic _) {
+    _workLiveTimer?.cancel();
     AppFlows.goHomeAfterCancellation();
   }
 
@@ -193,6 +221,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
         }
       }
 
+      final clientConfirmed =
+          _tracking?['clientConfirmedArrival'] as bool? ?? false;
+      if (clientConfirmed && _workLiveTimer == null) {
+        _startWorkTimer();
+      }
+
       if (!mounted) return;
       setState(() => _loading = false);
     } catch (error) {
@@ -240,11 +274,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
         onSuccess: (value) => value,
         onFailure: (failure) => throw Exception(failure.message),
       );
+      SoundEffectService.playTimerStartSound();
+      _startWorkTimer();
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Llegada confirmada. El trabajador puede iniciar.'),
+          content: Text('Llegada confirmada. El cronómetro ha iniciado.'),
           backgroundColor: AppTheme.colorSuccess,
         ),
       );
@@ -795,6 +831,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   ],
                                 ),
                               ),
+                            
+                            // Tarjeta de Seguimiento en Vivo por Modalidad (Cronómetro/Jornada)
+                            _LiveModalityTrackingCard(
+                              modality: modality,
+                              elapsedSeconds: _workElapsedSeconds,
+                              isPaused: _isWorkPaused,
+                              onTogglePause: _toggleWorkPause,
+                              totalAmount: totalAmount,
+                              estimatedHours: estimatedHours,
+                              days: days,
+                              clientConfirmed: clientConfirmed,
+                            ),
+
                             const SizedBox(height: 16),
                             // Botones
                             Row(
@@ -1038,6 +1087,441 @@ class _MapBtn extends StatelessWidget {
             size: 20,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Tarjeta de seguimiento en vivo adaptada a la modalidad (Cronómetro / Jornadas / Fijo)
+class _LiveModalityTrackingCard extends StatelessWidget {
+  const _LiveModalityTrackingCard({
+    required this.modality,
+    required this.elapsedSeconds,
+    required this.isPaused,
+    required this.onTogglePause,
+    required this.totalAmount,
+    required this.estimatedHours,
+    required this.days,
+    required this.clientConfirmed,
+  });
+
+  final String modality;
+  final int elapsedSeconds;
+  final bool isPaused;
+  final VoidCallback onTogglePause;
+  final double? totalAmount;
+  final double estimatedHours;
+  final double days;
+  final bool clientConfirmed;
+
+  String _formatTimer(int totalSecs) {
+    final h = totalSecs ~/ 3600;
+    final m = (totalSecs % 3600) ~/ 60;
+    final s = totalSecs % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!clientConfirmed) {
+      return const SizedBox.shrink();
+    }
+
+    if (modality == 'hourly') {
+      final hourlyRate = estimatedHours > 0 && totalAmount != null ? totalAmount! / estimatedHours : 40.0;
+      final currentCost = hourlyRate * (elapsedSeconds / 3600.0);
+      final estimatedSecs = (estimatedHours * 3600).toInt();
+      final progress = estimatedSecs > 0 ? (elapsedSeconds / estimatedSecs).clamp(0.0, 1.0) : 0.0;
+      final isOvertime = estimatedSecs > 0 && elapsedSeconds > estimatedSecs;
+
+      return Container(
+        margin: const EdgeInsets.only(top: 16, bottom: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141F32),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isOvertime
+                ? AppTheme.colorWarning.withValues(alpha: 0.5)
+                : AppTheme.colorPrimary.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isOvertime ? AppTheme.colorWarning : AppTheme.colorPrimary)
+                  .withValues(alpha: 0.15),
+              blurRadius: 16,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.timer,
+                    color: AppTheme.colorPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CRONÓMETRO EN VIVO',
+                        style: TextStyle(
+                          color: AppTheme.colorPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        isPaused ? 'En pausa (descanso)' : 'Trabajando activamente',
+                        style: TextStyle(
+                          color: isPaused ? AppTheme.colorWarning : AppTheme.colorSuccess,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Botón Pausar / Reanudar
+                InkWell(
+                  onTap: onTogglePause,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isPaused
+                          ? AppTheme.colorSuccessSoft
+                          : AppTheme.colorWarningSoft,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isPaused
+                            ? AppTheme.colorSuccess.withValues(alpha: 0.4)
+                            : AppTheme.colorWarning.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isPaused ? Icons.play_arrow : Icons.pause,
+                          size: 16,
+                          color: isPaused ? AppTheme.colorSuccess : AppTheme.colorWarning,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isPaused ? 'Reanudar' : 'Pausar',
+                          style: TextStyle(
+                            color: isPaused ? AppTheme.colorSuccess : AppTheme.colorWarning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Contador grande
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TIEMPO TRANSCURRIDO',
+                      style: TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatTimer(elapsedSeconds),
+                      style: const TextStyle(
+                        color: AppTheme.colorText,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'COSTO ACUMULADO',
+                      style: TextStyle(
+                        color: AppTheme.colorMuted,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Bs ${currentCost.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: AppTheme.colorSuccess,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Barra de progreso hacia horas estimadas
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isOvertime ? AppTheme.colorWarning : AppTheme.colorPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Tarifa: Bs ${hourlyRate.toStringAsFixed(0)}/hr',
+                  style: const TextStyle(color: AppTheme.colorMuted, fontSize: 10),
+                ),
+                Text(
+                  estimatedHours > 0 ? 'Estimado: ${estimatedHours.toStringAsFixed(0)}h' : '',
+                  style: TextStyle(
+                    color: isOvertime ? AppTheme.colorWarning : AppTheme.colorMuted,
+                    fontSize: 10,
+                    fontWeight: isOvertime ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+            if (isOvertime) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.colorWarningSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: AppTheme.colorWarning, size: 14),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Se superó el tiempo estimado. El costo se ajusta por minuto extra.',
+                        style: TextStyle(color: AppTheme.colorWarning, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (modality == 'daily') {
+      final daysCount = days > 0 ? days.toInt() : 1;
+      final dailyRate = daysCount > 0 && totalAmount != null ? totalAmount! / daysCount : 150.0;
+
+      return Container(
+        margin: const EdgeInsets.only(top: 16, bottom: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141F32),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.colorPrimary.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.colorPrimary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TRABAJO POR JORNADA DIARIA',
+                        style: TextStyle(
+                          color: AppTheme.colorPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        'Jornada 1 de $daysCount en progreso',
+                        style: const TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorSuccessSoft,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Bs ${dailyRate.toStringAsFixed(0)}/día',
+                    style: const TextStyle(
+                      color: AppTheme.colorSuccess,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Pasos de días
+            Row(
+              children: List.generate(daysCount, (index) {
+                final isCurrent = index == 0;
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(right: index < daysCount - 1 ? 6 : 0),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? AppTheme.colorPrimary.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isCurrent
+                            ? AppTheme.colorPrimary
+                            : Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          isCurrent ? Icons.play_circle_fill : Icons.schedule,
+                          size: 16,
+                          color: isCurrent ? AppTheme.colorPrimary : AppTheme.colorMuted,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Día ${index + 1}',
+                          style: TextStyle(
+                            color: isCurrent ? AppTheme.colorText : AppTheme.colorMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Modalidad Precio Fijo
+    return Container(
+      margin: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141F32),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.colorSuccess.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.colorSuccessSoft,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.verified,
+              color: AppTheme.colorSuccess,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'PRECIO FIJO GARANTIZADO',
+                  style: TextStyle(
+                    color: AppTheme.colorSuccess,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Text(
+                  'Monto final acordado: Bs ${(totalAmount ?? 0).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: AppTheme.colorText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

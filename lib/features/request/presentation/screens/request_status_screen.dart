@@ -259,6 +259,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferAcceptedByServer(dynamic payload) {
+    SoundEffectService.playAcceptedSound();
     if (mounted) {
       ConfettiCelebration.show(
         context,
@@ -270,7 +271,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferEvent(dynamic payload) {
-    SoundEffectService.playCashSound();
+    SoundEffectService.playTimerStartSound();
     _load();
   }
 

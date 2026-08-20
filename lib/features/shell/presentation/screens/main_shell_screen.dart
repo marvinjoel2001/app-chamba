@@ -157,6 +157,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final myId = SessionStore.currentUser?.id;
     final map = payload is Map ? payload : <dynamic, dynamic>{};
     final senderUserId = map['message']?['senderUserId']?.toString();
+    final rawContent = map['message']?['content']?.toString() ?? '';
 
     // Ignorar mensajes enviados por nosotros o mensajes del sistema (senderUserId null)
     if (senderUserId == null ||
@@ -165,12 +166,54 @@ class _MainShellScreenState extends State<MainShellScreen> {
       return;
     }
 
-    // Si estamos en la pestaña de mensajes, asumimos que se leerán pronto
-    // NOTA: Si el usuario está en el ChatScreen abierto desde TrackingScreen,
-    // también podríamos querer evitar incrementar, pero por ahora seguimos la lógica base.
-    if (currentIndex == _messagesTabIndex) return;
+    // 1. Reproducir sonido de notificación háptica
+    SoundEffectService.playMessageChime();
 
-    UnreadMessagesNotifier.instance.increment();
+    // 2. Incrementar badge de no leídos si no estamos en la pestaña de mensajes
+    if (currentIndex != _messagesTabIndex) {
+      UnreadMessagesNotifier.instance.increment();
+    }
+
+    // 3. Formatear vista previa del mensaje
+    String previewText = rawContent.trim();
+    if (previewText.startsWith('[Foto]') ||
+        previewText.startsWith('[Imagen]') ||
+        previewText.contains('/image/upload/') ||
+        previewText.endsWith('.jpg') ||
+        previewText.endsWith('.png')) {
+      previewText = '📷 Te envió una foto';
+    } else if (previewText.startsWith('[Audio]') ||
+        previewText.startsWith('[Voz]') ||
+        previewText.endsWith('.mp3') ||
+        previewText.endsWith('.m4a') ||
+        previewText.endsWith('.wav')) {
+      previewText = '🎤 Te envió un mensaje de voz';
+    } else if (previewText.startsWith('[Ubicación]')) {
+      previewText = '📍 Te envió una ubicación';
+    } else if (previewText.length > 60) {
+      previewText = '${previewText.substring(0, 57)}...';
+    }
+
+    final senderRoleTitle = widget.role == 'worker'
+        ? '💬 Mensaje de tu cliente'
+        : '💬 Mensaje de tu trabajador';
+
+    // 4. Mostrar toast in-app si no estamos viendo la pestaña de mensajes
+    if (currentIndex != _messagesTabIndex) {
+      ToastService.show(
+        title: senderRoleTitle,
+        body: previewText.isNotEmpty ? previewText : 'Te envió un mensaje',
+        type: ToastType.info,
+        duration: const Duration(seconds: 5),
+        onTap: () {
+          if (!mounted) return;
+          setState(() {
+            currentIndex = _messagesTabIndex;
+            _visitedIndices.add(_messagesTabIndex);
+          });
+        },
+      );
+    }
   }
 
   Future<void> _onVerificationUpdated(dynamic payload) async {

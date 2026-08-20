@@ -605,6 +605,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         map['workerUserId'].toString() != userId) {
       return;
     }
+    SoundEffectService.playAcceptedSound();
     if (mounted) {
       ConfettiCelebration.show(
         context,

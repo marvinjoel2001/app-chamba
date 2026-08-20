@@ -210,6 +210,8 @@ class PushNotificationService {
             pushType == 'counter_offer' ||
             pushType == 'offer_client_counter') {
           SoundEffectService.playCashSound();
+        } else if (pushType == 'message_new' || pushType == 'chat_message') {
+          SoundEffectService.playMessageChime();
         }
         _showLocalNotification(message);
       }
