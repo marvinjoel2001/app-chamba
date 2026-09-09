@@ -236,12 +236,16 @@ class ChambaChip extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? AppTheme.colorTextOnPurple : effectiveColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: TextStyle(
+                  color: selected ? AppTheme.colorTextOnPurple : effectiveColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
