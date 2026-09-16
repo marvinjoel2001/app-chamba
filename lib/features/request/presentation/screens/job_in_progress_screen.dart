@@ -148,6 +148,16 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           actions: [
             TextButton(
               onPressed: () {
+                Navigator.of(context).pop();
+                _showReportDialog();
+              },
+              child: const Text(
+                'Reportar problema',
+                style: TextStyle(color: AppTheme.colorMuted),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
                 // Cerrar diálogo y volver al inicio (pop hasta la raíz)
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
@@ -390,6 +400,16 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           actions: [
             TextButton(
               onPressed: () {
+                Navigator.of(context).pop();
+                _showReportDialog();
+              },
+              child: const Text(
+                'Reportar problema',
+                style: TextStyle(color: AppTheme.colorMuted),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
                 // Cerrar diálogo y volver al inicio
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
@@ -539,7 +559,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (SessionStore.activeRequestId == null && mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
               child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
             ),
             ElevatedButton(
@@ -561,6 +586,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Reporte enviado con éxito.'), backgroundColor: AppTheme.colorSuccess),
                         );
+                        if (SessionStore.activeRequestId == null && mounted) {
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        }
                       } catch (e) {
                         if (!ctx.mounted) return;
                         ScaffoldMessenger.of(ctx).showSnackBar(
