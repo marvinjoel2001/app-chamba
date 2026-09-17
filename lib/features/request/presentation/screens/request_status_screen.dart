@@ -259,6 +259,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferAcceptedByServer(dynamic payload) {
+    if (_acceptingOffer) {
+      // Ya se procesó la celebración y transición localmente en _acceptOffer
+      _load();
+      return;
+    }
     SoundEffectService.playAcceptedSound();
     if (mounted) {
       ConfettiCelebration.show(

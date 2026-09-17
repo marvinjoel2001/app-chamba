@@ -72,6 +72,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     for (final req in _requests) {
       final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
       if (workerOffer?['status'] == 'accepted') return true;
+      if (req['status'] == 'assigned') return true;
     }
     return false;
   }
@@ -266,8 +267,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       _togglingAvailability = true;
       _available = value;
       if (!value) {
-        // Al marcar OCUPADO ocultamos inmediatamente solicitudes/ofertas.
-        _requests = [];
+        // Al marcar OCUPADO ocultamos solicitudes pendientes pero preservamos el trabajo aceptado si existe
+        _requests.removeWhere((r) {
+          final workerOffer = r['workerOffer'] as Map<String, dynamic>?;
+          final isAccepted =
+              workerOffer?['status'] == 'accepted' || r['status'] == 'assigned';
+          return !isAccepted;
+        });
         _clientCountered = false;
         _showAcceptedBanner = false;
         _error = null;
@@ -496,6 +502,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'completed');
       });
+      _load(silent: true);
     }
   }
 
@@ -515,6 +522,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'cancelled');
       });
+      _load(silent: true);
 
       final map = payload is Map ? Map<String, dynamic>.from(payload) : {};
       final cancelerId = map['cancelerUserId']?.toString();
@@ -598,12 +606,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     _load(silent: true);
   }
 
-  void _onOfferAccepted(dynamic payload) {
+  void _onOfferAccepted(dynamic payload) async {
     final userId = SessionStore.currentUser?.id;
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
     if (map['workerUserId'] != null &&
         map['workerUserId'].toString() != userId) {
       return;
+    }
+    final reqId = map['requestId']?.toString();
+    if (reqId != null) {
+      SessionStore.activeRequestId = reqId;
+      _notifiedAcceptedRequests.add(reqId);
     }
     SoundEffectService.playAcceptedSound();
     if (mounted) {
@@ -618,7 +631,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         if (mounted) setState(() => _showAcceptedBanner = false);
       });
     }
-    _load(silent: true);
+    await _load(silent: true);
+    if (mounted && reqId != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 1400));
+      if (mounted) {
+        _openJobInProgress(reqId);
+      }
+    }
   }
 
   void _onOfferRejected(dynamic payload) {
@@ -725,18 +744,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         unawaited(WorkerBackgroundService.setEnabled(backendAvailable));
       }
 
-      if (!_available) {
-        if (mounted) {
-          setState(() {
-            _requests = [];
-            _clientCountered = false;
-            _loading = false;
-            _error = null;
-          });
-        }
-        return;
-      }
-              
       final rawRequests = response['requests'] as List<dynamic>? ?? [];
       final List<Map<String, dynamic>> fetchedRequests = [];
       
@@ -753,12 +760,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         return st == 'completed' || st == 'cancelled';
       });
       
-      // Chequear si alguna oferta fue aceptada
+      // Chequear si alguna oferta fue aceptada o si el trabajo está asignado
       bool newlyAccepted = false;
+      String? acceptedReqId;
       for (final req in fetchedRequests) {
         final offerStatus = (req['workerOffer'] as Map?)?['status']?.toString();
+        final st = req['status']?.toString();
         final reqId = req['id']?.toString();
-        if (offerStatus == 'accepted' && reqId != null) {
+        if ((offerStatus == 'accepted' || st == 'assigned') && reqId != null) {
+          acceptedReqId = reqId;
           SessionStore.activeRequestId = reqId;
           if (!_notifiedAcceptedRequests.contains(reqId)) {
             _notifiedAcceptedRequests.add(reqId);
@@ -766,6 +776,29 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           }
           break;
         }
+      }
+
+      // Si el trabajador está marcado como NO DISPONIBLE pero NO tiene trabajos activos, limpiar
+      if (!_available && acceptedReqId == null) {
+        if (mounted) {
+          setState(() {
+            _requests = [];
+            _clientCountered = false;
+            _loading = false;
+            _error = null;
+          });
+        }
+        return;
+      }
+
+      // Si el trabajador está ocupado pero tiene un trabajo aceptado/asignado, dejamos ese trabajo activo en _requests
+      List<Map<String, dynamic>> finalRequests = fetchedRequests;
+      if (!_available && acceptedReqId != null) {
+        finalRequests = fetchedRequests.where((req) {
+          final offerStatus = (req['workerOffer'] as Map?)?['status']?.toString();
+          final st = req['status']?.toString();
+          return offerStatus == 'accepted' || st == 'assigned';
+        }).toList();
       }
       
       if (newlyAccepted && mounted) {
@@ -792,12 +825,20 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               curve: Curves.easeOut,
             );
           }
+          final targetJobId = acceptedReqId;
+          if (targetJobId != null) {
+            Future.delayed(const Duration(milliseconds: 1400), () {
+              if (mounted) {
+                _openJobInProgress(targetJobId);
+              }
+            });
+          }
         });
       }
       
       if (mounted) {
         setState(() {
-          _requests = fetchedRequests;
+          _requests = finalRequests;
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
           // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
@@ -815,12 +856,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  void _openJobInProgress(String requestId) {
-    Navigator.of(context).push(
+  void _openJobInProgress(String requestId) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => JobInProgressScreen(requestId: requestId),
       ),
     );
+    if (mounted) {
+      _load(silent: true);
+    }
   }
 
   @override
@@ -1046,8 +1090,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                               if (hasAcceptedRequest) {
                                 final acceptedReq = _requests.firstWhere((req) {
                                   final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
-                                  return workerOffer?['status'] == 'accepted';
-                                });
+                                  return workerOffer?['status'] == 'accepted' || req['status'] == 'assigned';
+                                }, orElse: () => _requests.first);
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   child: _buildFloatingAcceptedCard(acceptedReq),
@@ -1078,7 +1122,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   final offerStatus = workerOffer?['status']?.toString();
                                   final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
                                   final hasPendingOffer = offerStatus == 'pending';
-                                  final isAcceptedOffer = offerStatus == 'accepted';
+                                  final isAcceptedOffer = offerStatus == 'accepted' || req['status'] == 'assigned';
                                   final card = _buildRequestCard(
                                     req: req,
                                     workerOffer: workerOffer,

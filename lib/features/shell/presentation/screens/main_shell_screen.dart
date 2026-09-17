@@ -75,6 +75,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     if (myId == null || (myId != workerUserId && myId != clientUserId)) return;
 
+    final requestId = map['requestId']?.toString();
+    if (requestId != null) {
+      SessionStore.activeRequestId = requestId;
+    }
+
     if (mounted) {
       ConfettiCelebration.show(
         context,
