@@ -14,6 +14,7 @@ import '../../../../core/widgets/confetti_celebration.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
+import '../../../request/presentation/screens/job_in_progress_screen.dart';
 import '../../../worker/presentation/screens/wallet_screen.dart';
 import '../../../worker/presentation/screens/profile_menu_screen.dart';
 
@@ -38,6 +39,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+
     _realtime.on('message.new', _onMessageNew);
     _realtime.on('user.verification.updated', _onVerificationUpdated);
     _realtime.on('offer.new', _onOfferNew);
@@ -80,16 +84,34 @@ class _MainShellScreenState extends State<MainShellScreen> {
       SessionStore.activeRequestId = requestId;
     }
 
-    if (mounted) {
+    if (widget.role == 'worker' && myId == workerUserId && requestId != null && mounted) {
+      SoundEffectService.playAcceptedSound();
       ConfettiCelebration.show(
         context,
-        title: widget.role == 'worker'
-            ? '🎉 ¡OFERTA ACEPTADA!'
-            : '🎉 ¡TRABAJO CONFIRMADO!',
-        subtitle: widget.role == 'worker'
-            ? '¡El cliente aceptó tu oferta para este trabajo!'
-            : '¡Has confirmado al trabajador con éxito!',
+        title: '🎉 ¡OFERTA ACEPTADA!',
+        subtitle: '¡El cliente aceptó tu oferta para este trabajo!',
+        duration: const Duration(milliseconds: 2000),
       );
+
+      // Cerrar modales o bottom sheets que pudiesen estar abiertos en el worker
+      try {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+      } catch (_) {}
+
+      // Navegar a JobInProgressScreen
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) {
+          ConfettiCelebration.dismiss();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => JobInProgressScreen(requestId: requestId),
+            ),
+          );
+        }
+      });
+    } else if (widget.role == 'client' && myId == clientUserId && mounted) {
+      // Notificación sonora para el cliente
+      SoundEffectService.playAcceptedSound();
     }
   }
 
@@ -228,7 +250,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     }
 
     final data = payload is Map
-        ? Map<String, dynamic>.from(payload as Map)
+        ? Map<String, dynamic>.from(payload)
         : <String, dynamic>{};
     final nextVerificationStatus = data['verificationStatus']?.toString() ??
         currentUser.verificationStatus;

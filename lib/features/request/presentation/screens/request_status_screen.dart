@@ -15,7 +15,6 @@ import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/stripe_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/widgets/confetti_celebration.dart';
 import '../state/request_dependencies.dart';
 import '../../../offers/presentation/state/offers_dependencies.dart';
@@ -23,7 +22,6 @@ import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../offers/presentation/screens/worker_profile_screen.dart';
-import 'request_form_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen({this.latitude, this.longitude, super.key});
@@ -276,7 +274,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferEvent(dynamic payload) {
-    SoundEffectService.playTimerStartSound();
+    SoundEffectService.playCashSound();
     _load();
   }
 
@@ -584,9 +582,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       await Future<void>.delayed(const Duration(milliseconds: 1400));
       if (!mounted) return;
 
+      // Cerrar la tarjeta de celebración antes de navegar para no tapar la pantalla de seguimiento
+      ConfettiCelebration.dismiss();
+
       Navigator.of(
         context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const TrackingScreen()));
+      ).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const TrackingScreen()),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

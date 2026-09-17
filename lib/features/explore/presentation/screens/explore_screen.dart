@@ -68,12 +68,14 @@ class _ExploreScreenState extends State<ExploreScreen>
   @override
   void initState() {
     super.initState();
+    final userId = SessionStore.currentUser?.id;
+    _realtime.connect(userId: userId);
+
     _speechToText = stt.SpeechToText();
     _micPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    _micSoundPlayer.setPlayerMode(PlayerMode.lowLatency);
     // Escuchar eventos de trabajo completado/cancelado para limpiar el banner
     _realtime.on('job.completed', _onJobFinished);
     _realtime.on('job.cancelled', _onJobFinished);

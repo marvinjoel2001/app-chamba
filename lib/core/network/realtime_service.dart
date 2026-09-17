@@ -17,6 +17,10 @@ class RealtimeService {
   /// para no perder mensajes en tiempo real tras una caída de conexión.
   final Set<String> _joinedThreadIds = {};
 
+  /// Registro en memoria de todos los event listeners para no perder
+  /// suscripciones si se registran antes de que connect() cree el socket.
+  final Map<String, Set<void Function(dynamic)>> _listeners = {};
+
   /// Estado de conexión del socket, útil para mostrar avisos en UI.
   final ValueNotifier<bool> isConnectedNotifier = ValueNotifier<bool>(false);
 
@@ -59,6 +63,9 @@ class RealtimeService {
 
     _connectedUserId = userId;
 
+    // Vincular todos los listeners acumulados en el nuevo socket
+    _bindAllListeners();
+
     // Siempre re-emitir join.user y join.thread al (re)conectar
     // (cubre hot restart, reconexiones y caídas de red).
     _socket!.off('connect');
@@ -70,6 +77,7 @@ class RealtimeService {
       for (final threadId in _joinedThreadIds) {
         _socket?.emit('join.thread', {'threadId': threadId});
       }
+      _bindAllListeners();
       if (kDebugMode) {
         print('[RealtimeService] Conectado → join.user $userId');
       }
@@ -164,14 +172,32 @@ class RealtimeService {
     _socket?.emit('join.thread', {'threadId': normalized});
   }
 
+  void _bindAllListeners() {
+    if (_socket == null) return;
+    for (final entry in _listeners.entries) {
+      final event = entry.key;
+      for (final handler in entry.value) {
+        _socket!.off(event, handler);
+        _socket!.on(event, handler);
+      }
+    }
+  }
+
   void on(String event, void Function(dynamic payload) handler) {
+    _listeners.putIfAbsent(event, () => <void Function(dynamic)>{}).add(handler);
+    _socket?.off(event, handler);
     _socket?.on(event, handler);
   }
 
   void off(String event, [void Function(dynamic payload)? handler]) {
     if (handler == null) {
+      _listeners.remove(event);
       _socket?.off(event);
       return;
+    }
+    _listeners[event]?.remove(handler);
+    if (_listeners[event]?.isEmpty ?? false) {
+      _listeners.remove(event);
     }
     _socket?.off(event, handler);
   }

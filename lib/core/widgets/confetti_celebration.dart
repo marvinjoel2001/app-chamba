@@ -8,29 +8,35 @@ class ConfettiCelebration {
   static OverlayEntry? _activeEntry;
   static DateTime? _lastShownAt;
 
-  /// Muestra una lluvia de confetis en pantalla completa con animación y sonido.
-  static void show(
-    BuildContext context, {
-    String title = '🎉 ¡OFERTA ACEPTADA!',
-    String subtitle = '¡El trabajo ha sido confirmado con éxito!',
-    Duration duration = const Duration(milliseconds: 3800),
-    bool playSound = true,
-  }) {
-    final now = DateTime.now();
-    if (_lastShownAt != null &&
-        now.difference(_lastShownAt!) < const Duration(milliseconds: 3500)) {
-      // Ignorar llamadas repetidas en rápida sucesión (evita doble overlay y doble sonido)
-      return;
-    }
-    _lastShownAt = now;
-
-    // Si ya existe un overlay activo, removerlo antes de crear uno nuevo
+  /// Cierra y elimina de inmediato cualquier overlay de celebración activo.
+  static void dismiss() {
     if (_activeEntry != null) {
       try {
         _activeEntry!.remove();
       } catch (_) {}
       _activeEntry = null;
     }
+  }
+
+  /// Muestra una lluvia de confetis en pantalla completa con animación y sonido.
+  static void show(
+    BuildContext context, {
+    String title = '🎉 ¡OFERTA ACEPTADA!',
+    String subtitle = '¡El trabajo ha sido confirmado con éxito!',
+    Duration duration = const Duration(milliseconds: 2500),
+    bool playSound = true,
+    bool showCard = true,
+  }) {
+    final now = DateTime.now();
+    if (_lastShownAt != null &&
+        now.difference(_lastShownAt!) < const Duration(milliseconds: 2000)) {
+      // Ignorar llamadas repetidas en rápida sucesión (evita doble overlay y doble sonido)
+      return;
+    }
+    _lastShownAt = now;
+
+    // Si ya existe un overlay activo, removerlo antes de crear uno nuevo
+    dismiss();
 
     if (playSound) {
       SoundEffectService.playAcceptedSound();
@@ -45,6 +51,7 @@ class ConfettiCelebration {
         title: title,
         subtitle: subtitle,
         duration: duration,
+        showCard: showCard,
         onFinished: () {
           if (_activeEntry == entry) {
             _activeEntry = null;
@@ -67,12 +74,14 @@ class _ConfettiOverlayWidget extends StatefulWidget {
     required this.subtitle,
     required this.duration,
     required this.onFinished,
+    this.showCard = true,
   });
 
   final String title;
   final String subtitle;
   final Duration duration;
   final VoidCallback onFinished;
+  final bool showCard;
 
   @override
   State<_ConfettiOverlayWidget> createState() => _ConfettiOverlayWidgetState();
@@ -136,8 +145,9 @@ class _ConfettiOverlayWidgetState extends State<_ConfettiOverlayWidget>
                 ),
 
                 // Tarjeta central de celebración
-                Center(
-                  child: Transform.scale(
+                if (widget.showCard)
+                  Center(
+                    child: Transform.scale(
                     scale: cardScale,
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 32),

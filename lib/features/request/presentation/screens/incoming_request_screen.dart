@@ -624,6 +624,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         context,
         title: '🎉 ¡OFERTA ACEPTADA!',
         subtitle: '¡El cliente ha seleccionado tu oferta para este trabajo!',
+        duration: const Duration(milliseconds: 2000),
       );
       setState(() => _showAcceptedBanner = true);
       _acceptedAnimCtrl.forward(from: 0);
@@ -631,10 +632,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         if (mounted) setState(() => _showAcceptedBanner = false);
       });
     }
-    await _load(silent: true);
+
+    // Cerrar modales o bottom sheets que pudiesen estar abiertos
+    try {
+      Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+    } catch (_) {}
+
+    unawaited(_load(silent: true));
+
     if (mounted && reqId != null) {
-      await Future<void>.delayed(const Duration(milliseconds: 1400));
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
       if (mounted) {
+        ConfettiCelebration.dismiss();
         _openJobInProgress(reqId);
       }
     }
@@ -779,7 +788,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       }
 
       // Si el trabajador está marcado como NO DISPONIBLE pero NO tiene trabajos activos, limpiar
-      if (!_available && acceptedReqId == null) {
+      final activeReqId = acceptedReqId ?? SessionStore.activeRequestId;
+      if (!_available && activeReqId == null) {
         if (mounted) {
           setState(() {
             _requests = [];
@@ -791,14 +801,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         return;
       }
 
-      // Si el trabajador está ocupado pero tiene un trabajo aceptado/asignado, dejamos ese trabajo activo en _requests
+      // Si hay un trabajo aceptado/asignado, aseguramos que quede visible
       List<Map<String, dynamic>> finalRequests = fetchedRequests;
-      if (!_available && acceptedReqId != null) {
-        finalRequests = fetchedRequests.where((req) {
+      if (activeReqId != null) {
+        final acceptedSubset = fetchedRequests.where((req) {
           final offerStatus = (req['workerOffer'] as Map?)?['status']?.toString();
           final st = req['status']?.toString();
-          return offerStatus == 'accepted' || st == 'assigned';
+          final reqId = req['id']?.toString();
+          return offerStatus == 'accepted' || st == 'assigned' || reqId == activeReqId;
         }).toList();
+        if (acceptedSubset.isNotEmpty) {
+          finalRequests = acceptedSubset;
+        }
       }
       
       if (newlyAccepted && mounted) {
@@ -1301,9 +1315,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   Widget _buildFloatingAcceptedCard(Map<String, dynamic> req) {
+    final title = req['title']?.toString() ?? 'Trabajo en curso';
+    final budget = req['budget'] != null ? 'Bs ${req['budget']}' : '';
     return GestureDetector(
       onTap: () {
-        final reqId = req['id']?.toString();
+        final reqId = req['id']?.toString() ?? SessionStore.activeRequestId;
         if (reqId != null) _openJobInProgress(reqId);
       },
       child: Container(
@@ -1327,23 +1343,42 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   color: AppTheme.colorPrimary, size: 24),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Trabajo en curso',
-                    style: TextStyle(
-                      color: AppTheme.colorPrimary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (budget.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          budget,
+                          style: const TextStyle(
+                            color: AppTheme.colorSuccess,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Toca para ir al seguimiento',
+                  const SizedBox(height: 4),
+                  const Text(
+                    '⚡ Trabajo asignado · Toca para ir al seguimiento',
                     style: TextStyle(
-                        color: AppTheme.colorMuted, fontSize: 13),
+                        color: AppTheme.colorPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
