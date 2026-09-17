@@ -1,4 +1,4 @@
-package com.example.mobile
+package com.chambatrabajo.app
 
 import android.app.NotificationManager
 import android.content.Context

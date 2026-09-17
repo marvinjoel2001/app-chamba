@@ -46,6 +46,7 @@ app.*.map.json
 
 # Local runtime defines (secrets)
 /env/*.local.json
+/env/*.prod.json
 /env/*.secret.json
 .env.local.json
 .env.production.json

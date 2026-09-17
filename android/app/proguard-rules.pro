@@ -32,7 +32,7 @@
 -keep class com.baseflow.geolocator.** { *; }
 
 # Keep MainActivity
--keep class com.example.mobile.MainActivity { *; }
+-keep class com.chambatrabajo.app.MainActivity { *; }
 
 # Prevent R8 from stripping interface info for serialized classes
 -keepattributes *Annotation*

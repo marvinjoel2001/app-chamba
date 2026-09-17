@@ -1,0 +1,10 @@
+# Archivo de ejemplo para la configuración de firma de Google Play / Release.
+# Para producción:
+# 1. Copia este archivo como "android/key.properties"
+# 2. Reemplaza los valores con las contraseñas y alias de tu Keystore.
+# Nota: "android/key.properties" ya está en .gitignore para que tus llaves nunca se suban a git.
+
+storePassword=tu_contraseña_del_almacen
+keyPassword=tu_contraseña_de_la_llave
+keyAlias=upload
+storeFile=upload-keystore.jks

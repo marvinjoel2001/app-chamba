@@ -420,7 +420,7 @@ class _RadarScreenState extends State<RadarScreen> {
                                       urlTemplate:
                                           'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                                       userAgentPackageName:
-                                          'com.example.mobile',
+                                          'com.chambatrabajo.app',
                                       additionalOptions: {
                                         'accessToken':
                                             AppConfig.mapboxAccessToken,

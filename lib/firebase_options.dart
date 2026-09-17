@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDeUwMnmX-bpqmd3W8k57ttTaAmo_XocGs',
-    appId: '1:899491855193:android:7dd6a185131eab5eaf6a48',
+    appId: '1:899491855193:android:7e3921f13b1c0700af6a48',
     messagingSenderId: '899491855193',
     projectId: 'chamba-9f6db',
     storageBucket: 'chamba-9f6db.firebasestorage.app',
