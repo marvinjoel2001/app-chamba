@@ -39,7 +39,7 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Error(ServerFailure('Respuesta de login invalida.'));
       }
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);
       unawaited(_syncPushTokenBestEffort());
       return Success(AuthPayloadModel.fromJson(response));
     } catch (error) {
@@ -110,7 +110,7 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Error(ServerFailure('Respuesta de registro invalida.'));
       }
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson));
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);
       unawaited(_syncPushTokenBestEffort());
       return Success(AuthPayloadModel.fromJson(response));
     } catch (error) {
@@ -120,6 +120,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<void>> logout() async {
+    await const PushNotificationService().unregisterCurrentDevice();
     // Desconectar socket primero, luego limpiar
     RealtimeService.instance.disconnect();
     await Future.delayed(const Duration(milliseconds: 100));

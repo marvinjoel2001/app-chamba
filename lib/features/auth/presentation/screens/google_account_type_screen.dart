@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/network/realtime_service.dart';
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
-import '../../domain/usecases/auth_usecases.dart';
-import '../state/auth_dependencies.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 
 class GoogleAccountTypeScreen extends StatefulWidget {
@@ -30,14 +30,17 @@ class _GoogleAccountTypeScreenState extends State<GoogleAccountTypeScreen> {
         firstName: widget.googleData['firstName'] ?? 'Usuario',
         lastName: widget.googleData['lastName'],
         googleId: widget.googleData['googleId'] ?? '',
+        registrationToken: widget.googleData['registrationToken'] ?? '',
         type: type,
       );
 
       final userData = result['user'] as Map<String, dynamic>;
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userData));
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userData), token: result['token'] as String?);
 
       if (!mounted) return;
+      RealtimeService.instance.connect(userId: SessionStore.currentUser?.id);
+      AppFlows.initialRouteResolved = true;
       
       if (type == 'worker') {
         Navigator.of(context).pushAndRemoveUntil(

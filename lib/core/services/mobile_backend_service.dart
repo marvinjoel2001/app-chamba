@@ -20,6 +20,12 @@ class MobileBackendService {
     client: _client,
   );
 
+  Future<Map<String, dynamic>> notificationRequest({required String requestId}) =>
+      _api.get('/mobile/requests/$requestId/notification-context');
+
+  Future<Map<String, dynamic>> unregisterPushToken({required String userId, required String token}) =>
+      _api.post('/mobile/push/logout', body: {'userId': userId, 'token': token});
+
   Future<Map<String, dynamic>> login({
     required String identifier,
     required String password,
@@ -71,6 +77,7 @@ class MobileBackendService {
     required String firstName,
     String? lastName,
     required String googleId,
+    required String registrationToken,
     required String type,
   }) {
     return _api.post(
@@ -80,6 +87,7 @@ class MobileBackendService {
         'firstName': firstName,
         'lastName': lastName,
         'googleId': googleId,
+        'registrationToken': registrationToken,
         'type': type,
       },
     );

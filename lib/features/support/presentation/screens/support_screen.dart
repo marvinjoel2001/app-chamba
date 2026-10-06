@@ -1,4 +1,7 @@
 import 'dart:async';
+import '../../../../app.dart';
+import '../../../../core/network/realtime_service.dart';
+import '../../../../core/session/session_credentials.dart';
 
 import 'package:flutter/material.dart';
 
@@ -52,11 +55,13 @@ class _ReasonOption {
 class SupportScreen extends StatefulWidget {
   const SupportScreen({
     this.requestId,
+    this.disputeId,
     this.reportedUserId,
     super.key,
   });
 
   final String? requestId;
+  final String? disputeId;
   final String? reportedUserId;
 
   @override
@@ -72,6 +77,8 @@ class _SupportScreenState extends State<SupportScreen> {
   @override
   void initState() {
     super.initState();
+    _disputeId = widget.disputeId;
+    if (_disputeId != null) _selectedReason = 'Soporte';
     _loadActiveDisputes();
   }
 
@@ -299,7 +306,7 @@ class _SupportChatView extends StatefulWidget {
   State<_SupportChatView> createState() => _SupportChatViewState();
 }
 
-class _SupportChatViewState extends State<_SupportChatView> {
+class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
@@ -313,6 +320,8 @@ class _SupportChatViewState extends State<_SupportChatView> {
   @override
   void initState() {
     super.initState();
+    RealtimeService.instance.on('dispute.message', _onDisputeMessage);
+    RealtimeService.instance.reconnectCount.addListener(_onReconnect);
     _loadMessages();
     _pollTimer = Timer.periodic(
       const Duration(seconds: 5),
@@ -321,6 +330,29 @@ class _SupportChatViewState extends State<_SupportChatView> {
     _scrollController.addListener(_onScroll);
     _scrollController.addListener(_markVisibleMessagesAsRead);
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) ChambaApp.routeObserver.subscribe(this, route);
+    if (route?.isCurrent == true) SessionCredentials.visibleDisputeId = widget.disputeId;
+  }
+  @override
+  void didPush() { SessionCredentials.visibleDisputeId = widget.disputeId; }
+  @override
+  void didPopNext() { SessionCredentials.visibleDisputeId = widget.disputeId; _fetchNewMessagesOnly(); }
+  @override
+  void didPushNext() { if (SessionCredentials.visibleDisputeId == widget.disputeId) SessionCredentials.visibleDisputeId = null; }
+  @override
+  void didPop() { didPushNext(); }
+  String? get _readBy => SessionCredentials.visibleDisputeId == widget.disputeId &&
+    WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed && _isNearBottom ? 'user' : null;
+
+  void _onDisputeMessage(dynamic data) {
+    if (data is Map && data['disputeId'] == widget.disputeId && mounted) _fetchNewMessagesOnly();
+  }
+  void _onReconnect() { if (mounted) _fetchNewMessagesOnly(); }
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
@@ -335,7 +367,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
     try {
       final result = await MobileBackendService.instance.getDisputeMessages(
         disputeId: widget.disputeId,
-        readBy: 'user',
+        readBy: _readBy,
       );
       final newMsgs = (result['messages'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>() ??
@@ -402,6 +434,10 @@ class _SupportChatViewState extends State<_SupportChatView> {
 
   @override
   void dispose() {
+    ChambaApp.routeObserver.unsubscribe(this);
+    RealtimeService.instance.off('dispute.message', _onDisputeMessage);
+    RealtimeService.instance.reconnectCount.removeListener(_onReconnect);
+    if (SessionCredentials.visibleDisputeId == widget.disputeId) SessionCredentials.visibleDisputeId = null;
     _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
@@ -413,7 +449,7 @@ class _SupportChatViewState extends State<_SupportChatView> {
     try {
       final result = await MobileBackendService.instance.getDisputeMessages(
         disputeId: widget.disputeId,
-        readBy: 'user',
+        readBy: _readBy,
       );
       final msgs = (result['messages'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>() ??

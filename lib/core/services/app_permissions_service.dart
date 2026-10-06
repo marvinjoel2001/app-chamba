@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Permisos obligatorios por rol.
 enum RequiredAppPermission {
@@ -32,12 +33,52 @@ class AppPermissionsService {
         RequiredAppPermission.locationAlways,
         RequiredAppPermission.preciseLocation,
         RequiredAppPermission.notifications,
-        RequiredAppPermission.fullScreenIntent,
-        RequiredAppPermission.batteryUnrestricted,
       ];
     }
 
     return const [RequiredAppPermission.location];
+  }
+
+  /// Permisos recomendados (NO bloquean el acceso). El cliente necesita
+  /// notificaciones para enterarse de ofertas, mensajes y de la llegada del
+  /// trabajador con la app cerrada; en Android 13+ sin este permiso el push
+  /// se descarta en silencio y el cliente cree que nadie le respondió.
+  static List<RequiredAppPermission> recommendedPermissionsForRole(
+    String role,
+  ) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'worker') {
+      return const [];
+    }
+    return const [RequiredAppPermission.notifications];
+  }
+
+  static String _recommendedPromptKey(String role) =>
+      'recommended_permissions_prompted_${role.trim().toLowerCase()}';
+
+  /// true si hay algún permiso recomendado sin conceder y todavía no se le
+  /// mostró la pantalla de permisos al usuario por ese motivo (se muestra una
+  /// sola vez para no molestar en cada arranque).
+  static Future<bool> shouldPromptRecommendedPermissions(String role) async {
+    final recommended = recommendedPermissionsForRole(role);
+    if (recommended.isEmpty) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_recommendedPromptKey(role)) == true) return false;
+    } catch (_) {
+      return false;
+    }
+    for (final permission in recommended) {
+      if (!await isPermissionGranted(permission)) return true;
+    }
+    return false;
+  }
+
+  static Future<void> markRecommendedPermissionsPrompted(String role) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_recommendedPromptKey(role), true);
+    } catch (_) {}
   }
 
   static Future<bool> areAllRequiredPermissionsGranted(String role) async {

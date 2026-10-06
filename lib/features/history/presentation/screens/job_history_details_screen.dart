@@ -21,7 +21,7 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     final address = job['address'] as String? ?? 'Ubicación no especificada';
     final category = job['category'] as String? ?? 'General';
     final requestStatus = job['requestStatus'] as String? ?? '';
-    final amount = job['amount'] != null ? NumberFormat.currency(symbol: '\$').format(job['amount']) : 'N/A';
+    final amount = job['amount'] != null ? NumberFormat.currency(symbol: 'Bs ').format(job['amount']) : 'N/A';
 
     final isCompleted = requestStatus == 'completed';
     final isCancelled = requestStatus == 'cancelled';
@@ -36,7 +36,7 @@ class JobHistoryDetailsScreen extends StatelessWidget {
       statusText = 'Cancelado';
     }
 
-    final rawDate = isClient ? job['createdAt'] : job['acceptedAt'];
+    final rawDate = job['completedAt'] ?? (isClient ? job['createdAt'] : job['acceptedAt']);
     String formattedDate = '';
     if (rawDate != null) {
       try {

@@ -22,6 +22,12 @@ class RequiredPermissionsScreen extends StatefulWidget {
 class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
     with WidgetsBindingObserver {
   late final List<RequiredAppPermission> _requiredPermissions;
+
+  /// Recomendados: se muestran en la lista pero no bloquean "Continuar".
+  late final List<RequiredAppPermission> _recommendedPermissions;
+
+  /// Lista mostrada = obligatorios + recomendados.
+  late final List<RequiredAppPermission> _visiblePermissions;
   final Map<RequiredAppPermission, bool> _grantedByPermission =
       <RequiredAppPermission, bool>{};
 
@@ -40,6 +46,14 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
     _requiredPermissions = AppPermissionsService.requiredPermissionsForRole(
       widget.role,
     );
+    _recommendedPermissions =
+        AppPermissionsService.recommendedPermissionsForRole(widget.role)
+            .where((p) => !_requiredPermissions.contains(p))
+            .toList();
+    _visiblePermissions = [..._requiredPermissions, ..._recommendedPermissions];
+    if (_recommendedPermissions.isNotEmpty) {
+      AppPermissionsService.markRecommendedPermissionsPrompted(widget.role);
+    }
     _refreshPermissions();
   }
 
@@ -67,7 +81,7 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
     }
 
     final next = <RequiredAppPermission, bool>{};
-    for (final permission in _requiredPermissions) {
+    for (final permission in _visiblePermissions) {
       next[permission] = await AppPermissionsService.isPermissionGranted(
         permission,
       );
@@ -133,7 +147,9 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
       case RequiredAppPermission.preciseLocation:
         return 'Requerida para trabajadores: mejora la exactitud del punto de llegada.';
       case RequiredAppPermission.notifications:
-        return 'Requerida para trabajadores: recibir nuevas solicitudes y cambios de oferta.';
+        return _isWorker
+            ? 'Requerida para trabajadores: recibir nuevas solicitudes y cambios de oferta.'
+            : 'Recomendada: te avisamos cuando lleguen ofertas, mensajes y cuando el trabajador llegue, aunque tengas la app cerrada.';
       case RequiredAppPermission.fullScreenIntent:
         return 'Requerida para trabajadores: permite que una solicitud nueva suene y encienda la pantalla como una llamada.';
       case RequiredAppPermission.batteryUnrestricted:
@@ -178,7 +194,7 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
                 Text(
                   _isWorker
                       ? 'Para continuar como trabajador debes habilitar todos estos permisos.'
-                      : 'Para continuar como cliente debes habilitar el permiso de ubicación.',
+                      : 'Para continuar como cliente debes habilitar el permiso de ubicación. Te recomendamos activar también las notificaciones.',
                   style: const TextStyle(color: AppTheme.colorMuted),
                 ),
                 const SizedBox(height: 14),
@@ -186,9 +202,9 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : ListView.builder(
-                          itemCount: _requiredPermissions.length,
+                          itemCount: _visiblePermissions.length,
                           itemBuilder: (context, index) {
-                            final permission = _requiredPermissions[index];
+                            final permission = _visiblePermissions[index];
                             final granted =
                                 _grantedByPermission[permission] == true;
                             return Padding(

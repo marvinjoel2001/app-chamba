@@ -42,12 +42,12 @@ void main() {
       expect(find.text('test@test.com'), findsOneWidget);
     });
 
-    testWidgets('boton Volver esta presente', (tester) async {
+    testWidgets('primer paso no pide contraseña todavía', (tester) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: LoginScreen())),
       );
       await tester.pump();
-      expect(find.text('Volver'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Contraseña'), findsNothing);
     });
 
     testWidgets('boton Crear cuenta esta presente', (tester) async {
@@ -111,6 +111,10 @@ void main() {
         const ProviderScope(child: MaterialApp(home: RegisterScreen())),
       );
       await tester.pump();
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Crear cuenta'));
       await tester.tap(find.text('Crear cuenta'));
       await tester.pump();
       expect(find.text('Ingresa tu nombre'), findsOneWidget);
@@ -126,6 +130,10 @@ void main() {
         'Juan',
       );
       await tester.pump();
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Crear cuenta'));
       await tester.tap(find.text('Crear cuenta'));
       await tester.pump();
       expect(find.text('Ingresa tu correo'), findsOneWidget);
@@ -149,6 +157,10 @@ void main() {
         '123',
       );
       await tester.pump();
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Crear cuenta'));
       await tester.tap(find.text('Crear cuenta'));
       await tester.pump();
       expect(find.text('Mínimo 4 caracteres'), findsOneWidget);

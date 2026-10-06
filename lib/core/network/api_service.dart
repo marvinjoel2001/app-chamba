@@ -3,6 +3,10 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../services/connectivity_service.dart';
+import 'api_exceptions.dart';
+import '../session/session_credentials.dart';
+
 class ApiService {
   ApiService({required this.baseUrl, required this.client});
 
@@ -62,79 +66,101 @@ class ApiService {
     return ['$primary$suffix', '$fallback$suffix'];
   }
 
+  /// Mensajes pensados para el usuario final (no para el desarrollador).
+  static const String _timeoutGetMessage =
+      'La conexión está lenta. No pudimos cargar la información, intenta de nuevo.';
+  static const String _timeoutPostMessage =
+      'La conexión está lenta y no recibimos respuesta. Es posible que tu acción '
+      'sí se haya enviado: revisa antes de intentarlo de nuevo.';
+  static const String _offlineMessage =
+      'No pudimos conectarnos. Revisa tu conexión a internet e intenta de nuevo.';
+
+  /// Reintentos automáticos SOLO para GET (idempotentes). Un POST nunca se
+  /// reintenta solo: con red lenta podría duplicar solicitudes/ofertas/pagos.
+  static const List<Duration> _getRetryBackoff = [
+    Duration(milliseconds: 600),
+    Duration(milliseconds: 1800),
+  ];
+
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
   }) async {
-    Exception? lastNetworkError;
-
-    for (final candidate in _candidateBaseUrls()) {
+    for (var attempt = 0; ; attempt++) {
       try {
-        final response = await client
-            .get(
-              _buildUri(candidate, path, queryParameters),
-              headers: _jsonHeaders(headers),
-            )
-            .timeout(_requestTimeout);
-
-        return _parseResponse(response);
-      } on TimeoutException {
-        lastNetworkError = Exception(
-          'Tiempo de espera agotado al conectar con el servidor.',
+        return await _send(
+          (candidate) => client.get(
+            _buildUri(candidate, path, queryParameters),
+            headers: _jsonHeaders(headers),
+          ),
+          timeoutMessage: _timeoutGetMessage,
         );
-      } on http.ClientException {
-        lastNetworkError = Exception(
-          'No se pudo conectar con el servidor. Verifica que el backend este encendido.',
-        );
+      } on NetworkException catch (e) {
+        // Un timeout ya hizo esperar 15 s al usuario: no multiplicar la espera.
+        // Solo se reintentan los cortes rápidos (DNS/socket caído un instante).
+        if (e.isTimeout || attempt >= _getRetryBackoff.length) rethrow;
+      } on ApiException catch (e) {
+        // 502/503/504: el servidor/proxy está despertando o saturado.
+        final transient = e.statusCode == 502 ||
+            e.statusCode == 503 ||
+            e.statusCode == 504;
+        if (!transient || attempt >= _getRetryBackoff.length) rethrow;
       }
+      await Future<void>.delayed(_getRetryBackoff[attempt]);
     }
-
-    if (lastNetworkError != null) {
-      throw lastNetworkError;
-    }
-
-    throw Exception('Error inesperado al conectar con el servidor.');
   }
 
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
+  }) {
+    return _send(
+      (candidate) => client.post(
+        _buildUri(candidate, path),
+        headers: _jsonHeaders(headers),
+        body: jsonEncode(body ?? {}),
+      ),
+      timeoutMessage: _timeoutPostMessage,
+    );
+  }
+
+  Future<Map<String, dynamic>> _send(
+    Future<http.Response> Function(String candidateBaseUrl) request, {
+    required String timeoutMessage,
   }) async {
-    Exception? lastNetworkError;
+    NetworkException? lastNetworkError;
 
     for (final candidate in _candidateBaseUrls()) {
+      final stopwatch = Stopwatch()..start();
       try {
-        final response = await client
-            .post(
-              _buildUri(candidate, path),
-              headers: _jsonHeaders(headers),
-              body: jsonEncode(body ?? {}),
-            )
-            .timeout(_requestTimeout);
-
+        final response = await request(candidate).timeout(_requestTimeout);
+        ConnectivityService.instance.reportRequest(
+          stopwatch.elapsed,
+          failed: false,
+        );
         return _parseResponse(response);
       } on TimeoutException {
-        lastNetworkError = Exception(
-          'Tiempo de espera agotado al conectar con el servidor.',
+        ConnectivityService.instance.reportRequest(
+          stopwatch.elapsed,
+          failed: true,
         );
+        lastNetworkError = NetworkException(timeoutMessage, isTimeout: true);
       } on http.ClientException {
-        lastNetworkError = Exception(
-          'No se pudo conectar con el servidor. Verifica que el backend este encendido.',
+        ConnectivityService.instance.reportRequest(
+          stopwatch.elapsed,
+          failed: true,
         );
+        lastNetworkError = const NetworkException(_offlineMessage);
       }
     }
 
-    if (lastNetworkError != null) {
-      throw lastNetworkError;
-    }
-
-    throw Exception('Error inesperado al conectar con el servidor.');
+    throw lastNetworkError ?? const NetworkException(_offlineMessage);
   }
 
   Map<String, String> _jsonHeaders(Map<String, String>? headers) {
-    return {'Content-Type': 'application/json', ...?headers};
+    return {...SessionCredentials.headers, ...?headers};
   }
 
   Map<String, dynamic> _decodeBody(String body) {
@@ -163,11 +189,12 @@ class ApiService {
 
     if (response.statusCode >= 400) {
       final bodyMessage = _extractBodyMessage(payload);
-      throw Exception(
+      throw ApiException(
         _mapHttpErrorMessage(
           statusCode: response.statusCode,
           bodyMessage: bodyMessage,
         ),
+        statusCode: response.statusCode,
       );
     }
 

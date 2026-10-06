@@ -22,6 +22,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   int _currentPage = 1;
   final ScrollController _scrollController = ScrollController();
 
+  String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -47,23 +49,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _loadNotifications() async {
     setState(() {
       _isLoading = true;
+      _error = null;
       _currentPage = 1;
     });
 
-    final result = await NotificationsService.getNotifications(
-      page: _currentPage,
-      limit: 20,
-    );
+    try {
+      final result = await NotificationsService.getNotifications(
+        page: _currentPage,
+        limit: 20,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _notifications = result.items;
-      _hasMore = result.hasMore;
-      _isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _notifications = result.items;
+        _hasMore = result.hasMore;
+        _isLoading = false;
+        _error = null;
+      });
 
-    // Marcar como leídas
-    await NotificationsService.markAsRead();
+      // Marcar como leídas
+      await _markPageRead(result.items);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No pudimos cargar tus notificaciones. Revisa tu conexión.';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadMoreNotifications() async {
@@ -72,17 +84,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _isLoadingMore = true);
     _currentPage++;
 
-    final result = await NotificationsService.getNotifications(
-      page: _currentPage,
-      limit: 20,
-    );
+    try {
+      final result = await NotificationsService.getNotifications(
+        page: _currentPage,
+        limit: 20,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _notifications.addAll(result.items);
-      _hasMore = result.hasMore;
-      _isLoadingMore = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _notifications.addAll(result.items);
+        _hasMore = result.hasMore;
+        _isLoadingMore = false;
+      });
+      await _markPageRead(result.items);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _currentPage--;
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _markPageRead(List<AppNotification> items) async {
+    try {
+      await NotificationsService.markAsRead(ids: items.map((n) => n.id).toList());
+    } catch (_) {
+      // Keep the loaded page and the server's unread count on a network failure.
+    }
   }
 
   IconData _getIconForType(String type) {
@@ -161,14 +190,45 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _notifications.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No tienes notificaciones.',
-                    style: TextStyle(color: AppTheme.colorMuted),
+          : _error != null && _notifications.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 52,
+                          color: AppTheme.colorMuted,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.colorMuted,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        ChambaSecondaryButton(
+                          label: 'Reintentar',
+                          icon: Icons.refresh,
+                          onPressed: _loadNotifications,
+                        ),
+                      ],
+                    ),
                   ),
                 )
-              : RefreshIndicator(
+              : _notifications.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No tienes notificaciones.',
+                        style: TextStyle(color: AppTheme.colorMuted),
+                      ),
+                    )
+                  : RefreshIndicator(
                   onRefresh: _loadNotifications,
                   child: ListView.builder(
                     controller: _scrollController,
@@ -194,10 +254,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             : AppTheme.colorPrimary.withOpacity(0.1),
                         child: ListTile(
                           onTap: () {
-                            NotificationRouter.openFromData({
-                              'type': item.type,
-                              ...?item.data,
-                            });
+                            NotificationRouter.openFromData(
+                              {
+                                'type': item.type,
+                                ...?item.data,
+                              },
+                              fromNotificationCenter: true,
+                            );
                           },
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 8),

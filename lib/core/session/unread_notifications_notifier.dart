@@ -21,7 +21,11 @@ class UnreadNotificationsNotifier extends ValueNotifier<int> {
     });
   }
 
+  Future<void> refresh() => _fetchCount();
+
+  bool _fetching = false;
   Future<void> _fetchCount() async {
+    if (_fetching) return;
     if (!SessionStore.isLoggedIn) {
       if (value != 0) {
         value = 0;
@@ -30,11 +34,12 @@ class UnreadNotificationsNotifier extends ValueNotifier<int> {
       return;
     }
 
-    final count = await NotificationsService.getUnreadCount();
-    if (count != value) {
-      value = count;
-      await _updateAppBadge(count);
-    }
+    final userId = SessionStore.currentUser?.id;
+    _fetching = true;
+    try {
+      final count = await NotificationsService.getUnreadCount();
+      if (SessionStore.currentUser?.id == userId && count != value) { value = count; await _updateAppBadge(count); }
+    } catch (_) {} finally { _fetching = false; }
   }
 
   Future<void> markAllAsRead() async {

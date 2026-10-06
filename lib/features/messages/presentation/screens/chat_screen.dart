@@ -14,11 +14,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/session/session_credentials.dart';
+import '../../../../core/session/unread_messages_notifier.dart';
+import '../../../../app.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
-import '../../../../core/services/sound_effect_service.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
 
 
@@ -68,7 +70,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with RouteAware {
   GetThreadMessagesUseCase get _getThreadMessagesUseCase =>
       widget.getThreadMessagesUseCase ?? MessagesDependencies.getThreadMessages;
   SendMessageUseCase get _sendMessageUseCase =>
@@ -128,10 +130,31 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtime.connect(userId: userId);
     _realtime.joinThread(widget.threadId);
     _realtime.on('message.new', _onMessageNew);
+    _realtime.reconnectCount.addListener(_onReconnect);
     _scrollController.addListener(_onScroll);
     _scrollController.addListener(_markVisibleMessagesAsRead);
     _initAudioListeners();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) ChambaApp.routeObserver.subscribe(this, route);
+    if (route?.isCurrent == true) SessionCredentials.visibleThreadId = widget.threadId;
+  }
+  @override
+  void didPush() { SessionCredentials.visibleThreadId = widget.threadId; }
+  @override
+  void didPopNext() { SessionCredentials.visibleThreadId = widget.threadId; _load(); }
+  @override
+  void didPushNext() { if (SessionCredentials.visibleThreadId == widget.threadId) SessionCredentials.visibleThreadId = null; }
+  @override
+  void didPop() { didPushNext(); }
+
+  void _onReconnect() {
+    if (mounted) _load();
   }
 
   void _initAudioListeners() {
@@ -157,6 +180,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    ChambaApp.routeObserver.unsubscribe(this);
+    didPushNext();
+    _realtime.leaveThread(widget.threadId);
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('message.new', _onMessageNew);
     _playerCompleteSub?.cancel();
     _positionSub?.cancel();
@@ -226,8 +253,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Mensaje entrante del otro usuario con el chat abierto: se lee al instante.
       if (senderId != SessionStore.currentUser?.id) {
-        SoundEffectService.playMessageChime();
-        _markThreadReadOnServer();
+            _markThreadReadOnServer();
       }
 
       if (_isNearBottom) {
@@ -960,12 +986,15 @@ class _ChatScreenState extends State<ChatScreen> {
   /// red no debe interrumpir la lectura del chat.
   Future<void> _markThreadReadOnServer() async {
     final userId = SessionStore.currentUser?.id;
-    if (userId == null || widget.threadId.isEmpty) return;
+    if (!_isNearBottom || userId == null || widget.threadId.isEmpty ||
+        SessionCredentials.visibleThreadId != widget.threadId ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
     try {
       await MobileBackendService.instance.markThreadRead(
         threadId: widget.threadId,
         userId: userId,
       );
+      UnreadMessagesNotifier.instance.refresh();
     } catch (_) {
       // Silencioso: se reintentará en la próxima apertura/lectura.
     }
@@ -975,6 +1004,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Implement read tracking based on viewport visibility
     // For now, mark last few messages as read when near bottom
     if (_isNearBottom && _messages.isNotEmpty) {
+      _markThreadReadOnServer();
       final currentUserId = SessionStore.currentUser?.id;
       final lastMessages = _messages.reversed.take(5);
 
@@ -1287,11 +1317,82 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
 
+              if (_isOffline && _messages.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Sin conexión o red inestable. Mostrando mensajes en caché.',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _load,
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? Center(child: Text(_error!))
+                    : _error != null && _messages.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 40),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text(
+                                    'No se pudieron cargar los mensajes',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ChambaSecondaryButton(
+                                    label: 'Reintentar',
+                                    icon: Icons.refresh,
+                                    onPressed: _load,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: ListView.builder(

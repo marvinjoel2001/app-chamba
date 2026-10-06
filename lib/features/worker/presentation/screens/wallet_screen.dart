@@ -6,6 +6,7 @@ import '../../../../core/errors/failure.dart';
 import '../../../../core/services/toast_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/chamba_widgets.dart';
 import '../../domain/entities/worker_job.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
@@ -144,7 +145,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
 
     return completed
         .where(
-          (job) => job.acceptedAt != null && job.acceptedAt!.isAfter(cutoff),
+          (job) => job.completedAt != null && !job.completedAt!.isBefore(cutoff),
         )
         .toList();
   }
@@ -350,7 +351,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                       ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Disponible para retirar',
+                                  'Importe de trabajos completados',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.6),
                                     fontSize: 13,
@@ -371,7 +372,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      total > 0 ? '+18% vs. semana pasada' : '— 0% vs. semana pasada',
+                                      'Los importes no confirman el cobro',
                                       style: TextStyle(
                                         color: total > 0 ? const Color(0xFF00E676) : Colors.white.withOpacity(0.5),
                                         fontSize: 13,
@@ -398,10 +399,10 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                               Expanded(
                                 child: _buildActionButton(
                                   icon: Icons.download_rounded,
-                                  label: 'Retirar',
+                                  label: 'Información',
                                   color: const Color(0xFF651FFF),
                                   textColor: Colors.white,
-                                  onTap: _showWithdrawModal,
+                                  onTap: () => ToastService.show(title: 'Importes de trabajos', body: 'Estos importes no son un saldo retirable. Consulta el estado del pago con tu cliente.', type: ToastType.info),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -459,18 +460,77 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                       ),
                       const SizedBox(height: 24),
 
-                      if (_error != null && !_loading)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Center(
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(color: AppTheme.colorError),
-                            ),
+                      if (_error != null && !_loading && total > 0)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _load,
+                                child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           ),
                         ),
 
-                      if (!_loading && total == 0 && filtered.isEmpty)
+                      if (_error != null && !_loading && total == 0)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 40),
+                                ),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Error al cargar billetera',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                ChambaSecondaryButton(
+                                  label: 'Reintentar',
+                                  icon: Icons.refresh,
+                                  onPressed: _load,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (!_loading && total == 0 && filtered.isEmpty)
                         _buildEmptyState()
                       else if (!_loading && filtered.isNotEmpty) ...[
                         _buildSummary(filtered),
@@ -520,141 +580,6 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
     );
   }
 
-  void _showWithdrawModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF111C30),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        String selectedMethod = 'QR';
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Retirar Fondos',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white70),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E2336),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Saldo disponible (Tarjeta/Digital)',
-                                style: TextStyle(color: Colors.white70, fontSize: 13),
-                              ),
-                              SizedBox(height: 4),
-                            ],
-                          ),
-                          const Spacer(),
-                          Text(
-                            'Bs ${_nonCashBalance.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              color: Color(0xFF00E676),
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Método de retiro',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: selectedMethod == 'QR' ? const Color(0xFF651FFF).withOpacity(0.2) : const Color(0xFF1E2336),
-                      leading: const Icon(Icons.qr_code_2, color: Colors.white),
-                      title: const Text('Transferencia por QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('Abono inmediato a tu cuenta bancaria', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                      trailing: Radio<String>(
-                        value: 'QR',
-                        groupValue: selectedMethod,
-                        activeColor: const Color(0xFF651FFF),
-                        onChanged: (v) => setModalState(() => selectedMethod = v!),
-                      ),
-                      onTap: () => setModalState(() => selectedMethod = 'QR'),
-                    ),
-                    const SizedBox(height: 8),
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: selectedMethod == 'Bank' ? const Color(0xFF651FFF).withOpacity(0.2) : const Color(0xFF1E2336),
-                      leading: const Icon(Icons.account_balance, color: Colors.white),
-                      title: const Text('Cuenta Bancaria Directa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('Transferencia interbancaria (24 hrs)', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                      trailing: Radio<String>(
-                        value: 'Bank',
-                        groupValue: selectedMethod,
-                        activeColor: const Color(0xFF651FFF),
-                        onChanged: (v) => setModalState(() => selectedMethod = v!),
-                      ),
-                      onTap: () => setModalState(() => selectedMethod = 'Bank'),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF651FFF),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ToastService.show(
-                            title: 'Solicitud enviada',
-                            body: 'Tu retiro de Bs ${_nonCashBalance.toStringAsFixed(0)} ha sido solicitado con éxito.',
-                            type: ToastType.success,
-                          );
-                        },
-                        child: const Text(
-                          'Solicitar Retiro',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _showHistoryModal() {
     showModalBottomSheet(

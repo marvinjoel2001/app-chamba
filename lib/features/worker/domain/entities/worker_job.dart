@@ -19,6 +19,7 @@ class WorkerJob {
     required this.clientLastName,
     this.clientProfilePhotoUrl,
     this.acceptedAt,
+    this.completedAt,
     this.threadId,
     this.paymentMethod,
   });
@@ -33,6 +34,7 @@ class WorkerJob {
   final String clientLastName;
   final String? clientProfilePhotoUrl;
   final DateTime? acceptedAt;
+  final DateTime? completedAt;
   final String? threadId;
   final String? paymentMethod;
 

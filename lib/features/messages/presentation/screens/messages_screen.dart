@@ -32,18 +32,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   void initState() {
     super.initState();
-    UnreadMessagesNotifier.instance.reset();
+    UnreadMessagesNotifier.instance.refresh();
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
     _realtime.on('message.new', _onMessageEvent);
+    _realtime.reconnectCount.addListener(_onReconnect);
     _load();
   }
 
   @override
   void dispose() {
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('message.new', _onMessageEvent);
     super.dispose();
   }
+
+  void _onReconnect() { if (mounted) _load(silent: true); }
 
   void _onMessageEvent(dynamic payload) {
     // Refresco silencioso: no mostrar spinner cuando llega un mensaje nuevo.
@@ -359,7 +363,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         return InkWell(
           onTap: () async {
-            UnreadNotificationsNotifier.instance.markAllAsRead();
+            UnreadNotificationsNotifier.instance.refresh();
             await Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             );

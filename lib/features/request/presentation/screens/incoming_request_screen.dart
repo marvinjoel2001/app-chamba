@@ -9,7 +9,6 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/new_request_alert.dart';
-import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/volume_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -24,7 +23,9 @@ import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
 class IncomingRequestScreen extends StatefulWidget {
-  const IncomingRequestScreen({this.isActive = true, super.key});
+  const IncomingRequestScreen({this.isActive = true, this.focusRequestId, super.key});
+
+  final String? focusRequestId;
 
   final bool isActive;
 
@@ -158,6 +159,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
     _realtime.on('request.new', _onNewRequest);
+    _realtime.reconnectCount.addListener(_onReconnect);
     _realtime.on('offer.updated', _onRequestUpdated);
     _realtime.on('offer.client_counter', _onClientCounter);
     _realtime.on('offer.accepted', _onOfferAccepted);
@@ -180,6 +182,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   @override
   void dispose() {
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('request.new', _onNewRequest);
     _realtime.off('offer.updated', _onRequestUpdated);
     _realtime.off('offer.client_counter', _onClientCounter);
@@ -465,11 +468,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
+  void _onReconnect() { if (mounted) _load(silent: true); }
+
   void _onNewRequest(dynamic payload) {
     // El banner lo muestra el shell (el worker puede estar en otra pestaña) y
     // el destello de la card lo maneja NewRequestAlert, que además descarta el
     // duplicado cuando la misma solicitud ya llegó por push.
-    NewRequestAlert.instance.announceFromSocket(payload);
+
     _load(silent: true);
   }
 
@@ -489,9 +494,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  void _onJobCompleted(dynamic _) {
-    SessionStore.activeRequestId = null;
-    SessionStore.activeThreadId = null;
+  void _onJobCompleted(dynamic payload) {
+    SessionStore.clearActiveJob(requestId: payload is Map ? payload['requestId']?.toString() : null);
     if (mounted) {
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'completed');
@@ -509,46 +513,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onJobCancelled(dynamic payload) {
-    SessionStore.activeRequestId = null;
-    SessionStore.activeThreadId = null;
+    SessionStore.clearActiveJob(requestId: payload is Map ? payload['requestId']?.toString() : null);
     if (mounted) {
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'cancelled');
       });
 
-      final map = payload is Map ? Map<String, dynamic>.from(payload) : {};
-      final cancelerId = map['cancelerUserId']?.toString();
-      final myId = SessionStore.currentUser?.id;
 
-      final isMe = cancelerId != null && cancelerId == myId;
-      final message = isMe ? 'Cancelaste el trabajo' : 'El cliente canceló el trabajo';
-      final bgColor = isMe ? AppTheme.colorMuted : AppTheme.colorError;
-      final icon = isMe ? Icons.info_outline : Icons.cancel;
-
-      // Banner rojo de cancelación
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                message,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: bgColor,
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
     }
   }
 
@@ -563,7 +534,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onClientCounter(dynamic payload) {
-    SoundEffectService.playCashSound();
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
     final eventRequestId = map['requestId']?.toString();
     final newBudget = (map['newBudget'] as num?)?.toDouble();
@@ -584,16 +554,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           _requests[currentIdx]['workerOffer'] = null;
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            newBudget != null
-                ? '💰 El cliente mejoró su oferta a Bs $newBudget'
-                : '💰 El cliente envió una contraoferta',
-          ),
-          backgroundColor: AppTheme.colorPrimary,
-        ),
-      );
+
     }
     _load(silent: true);
   }
@@ -605,7 +566,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         map['workerUserId'].toString() != userId) {
       return;
     }
-    SoundEffectService.playAcceptedSound();
     if (mounted) {
       ConfettiCelebration.show(
         context,
@@ -625,13 +585,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final userId = SessionStore.currentUser?.id;
     final map = payload is Map ? Map<String, dynamic>.from(payload) : const {};
     if (map['workerUserId']?.toString() != userId) return;
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tu oferta no fue seleccionada. Puedes mejorarla.'),
-        ),
-      );
-    }
     _load(silent: true);
   }
 
@@ -798,6 +751,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       if (mounted) {
         setState(() {
           _requests = fetchedRequests;
+          if (widget.focusRequestId != null) _requests.sort((a, b) => (b['id'] == widget.focusRequestId ? 1 : 0) - (a['id'] == widget.focusRequestId ? 1 : 0));
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
           // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
@@ -984,8 +938,46 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       )
                     else if (_error != null && _requests.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Center(child: Text(_error!)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 40),
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                'Error de conexión',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              ChambaSecondaryButton(
+                                label: 'Reintentar',
+                                icon: Icons.refresh,
+                                onPressed: () => _load(),
+                              ),
+                            ],
+                          ),
+                        ),
                       )
                     else if (_requests.isEmpty)
                       _buildEmptyContent(navPadding)
@@ -995,6 +987,32 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_error != null)
+                              Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _error!,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => _load(),
+                                      child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             if (!hasAcceptedRequest)
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

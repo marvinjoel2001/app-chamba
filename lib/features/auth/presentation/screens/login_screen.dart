@@ -163,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         final userData = result['user'] as Map<String, dynamic>;
 
-        await SessionStore.setCurrentUser(SessionUser.fromJson(userData));
+        await SessionStore.setCurrentUser(SessionUser.fromJson(userData), token: result['token'] as String?);
 
         if (!mounted) return;
         _handleAuthenticated();

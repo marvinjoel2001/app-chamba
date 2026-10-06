@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../../core/session/session_credentials.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -439,7 +440,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       );
       final response = await _client.get(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: SessionCredentials.headers,
       );
 
       if (response.statusCode == 200) {

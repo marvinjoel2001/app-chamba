@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../support/presentation/screens/support_screen.dart';
+import '../../../tracking/presentation/state/tracking_dependencies.dart';
 import '../state/review_dependencies.dart';
 
 class RatingScreen extends StatefulWidget {
-  const RatingScreen({super.key});
+  const RatingScreen({this.requestId, super.key});
+  final String? requestId;
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -19,6 +21,76 @@ class _RatingScreenState extends State<RatingScreen> {
   final _commentController = TextEditingController();
   bool _loading = false;
 
+  /// Trabajador del servicio (id, nombre, foto) leído del tracking.
+  Map<String, dynamic>? _worker;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorker();
+  }
+
+  /// El endpoint de ofertas solo devuelve ofertas `pending`, así que buscar
+  /// ahí la oferta `accepted` NUNCA encontraba al trabajador y calificar
+  /// fallaba siempre con "No se encontro trabajador aceptado". El tracking sí
+  /// hace JOIN con la oferta aceptada (también para trabajos completados).
+  Future<Map<String, dynamic>?> _loadWorker() async {
+    final requestId = widget.requestId ?? SessionStore.activeRequestId;
+    if (requestId == null) return null;
+    final result = await TrackingDependencies.getTracking(requestId: requestId);
+    final worker = result.fold<Map<String, dynamic>?>(
+      onSuccess: (value) => value.payload['worker'] as Map<String, dynamic>?,
+      onFailure: (_) => null,
+    );
+    if (mounted && worker != null) {
+      setState(() => _worker = worker);
+    }
+    return worker;
+  }
+
+  Future<String?> _resolveWorkerId() async {
+    final cached = _worker?['id']?.toString();
+    if (cached != null && cached.isNotEmpty) return cached;
+    final worker = await _loadWorker();
+    return worker?['id']?.toString();
+  }
+
+  void _goHome() {
+    SessionStore.clearActiveJob(requestId: widget.requestId);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => const MainShellScreen(role: 'client'),
+      ),
+      (route) => false,
+    );
+  }
+
+  /// Reportar usa el mismo flujo que el resto de la app (SupportScreen):
+  /// motivos, disputa formal y chat con soporte en tiempo real.
+  Future<void> _openReport() async {
+    final requestId = widget.requestId ?? SessionStore.activeRequestId;
+    final workerId = await _resolveWorkerId();
+    if (!mounted) return;
+    if (requestId == null || workerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos cargar los datos del servicio. Revisa tu conexión e intenta de nuevo.',
+          ),
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SupportScreen(
+          requestId: requestId,
+          reportedUserId: workerId,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -27,7 +99,7 @@ class _RatingScreenState extends State<RatingScreen> {
 
   Future<void> _submit() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
+    final requestId = widget.requestId ?? SessionStore.activeRequestId;
 
     if (user == null || requestId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,26 +113,11 @@ class _RatingScreenState extends State<RatingScreen> {
     setState(() => _loading = true);
 
     try {
-      final offers =
-          (await ReviewDependencies.getOffers(
-                requestId: requestId,
-                clientUserId: user.id,
-              ))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
-      final offerList = offers['offers'] as List<dynamic>? ?? const [];
-      final accepted = offerList.cast<Map<String, dynamic>>().firstWhere(
-        (item) => item['status'] == 'accepted',
-        orElse: () => <String, dynamic>{},
-      );
-
-      final worker = accepted['worker'] as Map<String, dynamic>?;
-      final workerId = worker?['id'] as String?;
+      final workerId = await _resolveWorkerId();
       if (workerId == null) {
-        throw Exception('No se encontro trabajador aceptado.');
+        throw Exception(
+          'No pudimos cargar los datos del trabajador. Revisa tu conexión e intenta de nuevo.',
+        );
       }
 
       (await ReviewDependencies.createReview(
@@ -78,8 +135,7 @@ class _RatingScreenState extends State<RatingScreen> {
         return;
       }
 
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: requestId);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -110,77 +166,6 @@ class _RatingScreenState extends State<RatingScreen> {
     }
   }
 
-  Future<void> _showReportDialog(String workerId) async {
-    final reasonCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    bool submitting = false;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          backgroundColor: AppTheme.colorBackgroundAccent,
-          title: const Text('Reportar Problema', style: TextStyle(color: AppTheme.colorError)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: reasonCtrl,
-                  decoration: const InputDecoration(labelText: 'Razón (ej. Fraude, Llegó tarde)'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Descripción detallada'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
-            ),
-            ElevatedButton(
-              onPressed: submitting
-                  ? null
-                  : () async {
-                      if (reasonCtrl.text.trim().isEmpty) return;
-                      setStateDialog(() => submitting = true);
-                      try {
-                        await MobileBackendService.instance.createDispute(
-                          requestId: SessionStore.activeRequestId,
-                          reportedBy: SessionStore.currentUser!.id,
-                          reportedUser: workerId,
-                          reason: reasonCtrl.text.trim(),
-                          description: descCtrl.text.trim(),
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.of(ctx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Reporte enviado con éxito.'), backgroundColor: AppTheme.colorSuccess),
-                        );
-                      } catch (e) {
-                        if (!ctx.mounted) return;
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.colorError),
-                        );
-                        setStateDialog(() => submitting = false);
-                      }
-                    },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.colorError),
-              child: submitting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Enviar Reporte', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,15 +187,33 @@ class _RatingScreenState extends State<RatingScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const CircleAvatar(
+                      // Antes era una foto de stock fija: el cliente veía a
+                      // un desconocido en lugar de su trabajador.
+                      CircleAvatar(
                         radius: 58,
-                        backgroundImage: NetworkImage(
-                          'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7',
-                        ),
+                        backgroundColor: AppTheme.colorSurfaceSoft,
+                        backgroundImage:
+                            (_worker?['profilePhotoUrl']?.toString() ?? '')
+                                    .isNotEmpty
+                                ? NetworkImage(
+                                    _worker!['profilePhotoUrl'].toString(),
+                                  )
+                                : null,
+                        child: (_worker?['profilePhotoUrl']?.toString() ?? '')
+                                .isNotEmpty
+                            ? null
+                            : const Icon(
+                                Icons.person_rounded,
+                                size: 56,
+                                color: AppTheme.colorMuted,
+                              ),
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'Como fue tu Chamba?',
+                        (_worker?['firstName']?.toString() ?? '').isNotEmpty
+                            ? '¿Cómo fue tu Chamba con ${_worker!['firstName']}?'
+                            : '¿Cómo fue tu Chamba?',
+                        textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.displaySmall
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
@@ -278,16 +281,7 @@ class _RatingScreenState extends State<RatingScreen> {
                         onPressed: _loading ? null : _submit,
                       ),
                       TextButton(
-                        onPressed: () {
-                          SessionStore.activeRequestId = null;
-                          SessionStore.activeThreadId = null;
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const MainShellScreen(role: 'client'),
-                            ),
-                            (route) => false,
-                          );
-                        },
+                        onPressed: _goHome,
                         child: const Text(
                           'Omitir por ahora',
                           style: TextStyle(color: AppTheme.colorMuted),
@@ -295,22 +289,7 @@ class _RatingScreenState extends State<RatingScreen> {
                       ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed: () async {
-                          final user = SessionStore.currentUser;
-                          final reqId = SessionStore.activeRequestId;
-                          if (user == null || reqId == null) return;
-                          try {
-                            final offers = (await ReviewDependencies.getOffers(requestId: reqId, clientUserId: user.id)).fold(onSuccess: (v)=>v.payload, onFailure: (_)=>null);
-                            if (offers == null) return;
-                            final offerList = offers['offers'] as List<dynamic>? ?? const [];
-                            final accepted = offerList.cast<Map<String, dynamic>>().firstWhere((item) => item['status'] == 'accepted', orElse: () => <String, dynamic>{});
-                            final worker = accepted['worker'] as Map<String, dynamic>?;
-                            final workerId = worker?['id'] as String?;
-                            if (workerId != null) {
-                              await _showReportDialog(workerId);
-                            }
-                          } catch (_) {}
-                        },
+                        onPressed: _loading ? null : _openReport,
                         child: const Text(
                           'Reportar Problema',
                           style: TextStyle(color: AppTheme.colorError, fontWeight: FontWeight.bold),

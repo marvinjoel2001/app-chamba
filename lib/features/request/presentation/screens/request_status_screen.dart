@@ -11,7 +11,6 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
-import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/services/stripe_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -26,7 +25,8 @@ import '../../../offers/presentation/screens/worker_profile_screen.dart';
 import 'request_form_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
-  const RequestStatusScreen({this.latitude, this.longitude, super.key});
+  const RequestStatusScreen({this.requestId, this.latitude, this.longitude, super.key});
+  final String? requestId;
 
   final double? latitude;
   final double? longitude;
@@ -112,12 +112,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       (_) => _tickCountdown(),
     );
     
-    _btnTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) {
-        if (mounted) setState(() => _showImproveOfferBtn = !_showImproveOfferBtn);
-      },
-    );
+    _showImproveOfferBtn = true;
 
     _pulseCtrl = AnimationController(
       vsync: this,
@@ -129,25 +124,22 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       duration: const Duration(milliseconds: 1500),
     );
 
-    final baseLat = widget.latitude ?? -16.5002;
-    final baseLng = widget.longitude ?? -68.1342;
-    _workerLocations = [
-      LatLng(baseLat + 0.005, baseLng + 0.005),
-      LatLng(baseLat - 0.004, baseLng - 0.006),
-      LatLng(baseLat - 0.008, baseLng + 0.003),
-    ];
-    _workerAvatars = [
-      '',
-      '',
-      '',
-    ];
+    _workerLocations = [];
+    _workerAvatars = [];
+
+    _realtime.reconnectCount.addListener(_onReconnect);
 
     _startPingLoop();
     _load();
   }
 
+  void _onReconnect() {
+    if (mounted) _load();
+  }
+
   @override
   void dispose() {
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('offer.new', _onOfferEvent);
     _realtime.off('offer.updated', _onOfferEvent);
     _realtime.off('offer.expired', _onOfferEvent);
@@ -222,25 +214,20 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     }
   }
 
-  void _onJobCompleted(dynamic _) {
-    AppFlows.goToRating();
+  String? get _requestId => widget.requestId ?? _request?['id']?.toString() ?? SessionStore.activeRequestId;
+
+  void _onJobCompleted(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (widget.requestId ?? _request?['id']?.toString() ?? SessionStore.activeRequestId)) return;
+    AppFlows.goToRating(requestId: _requestId);
   }
 
   void _onJobCancelled(dynamic payload) {
-    if (payload is Map && payload['reason'] == 'timeout') {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tu solicitud se canceló por falta de trabajadores disponibles. Intenta de nuevo.'),
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    }
-    AppFlows.goHomeAfterCancellation();
+    if (payload is Map && payload['requestId'] != (widget.requestId ?? _request?['id']?.toString() ?? SessionStore.activeRequestId)) return;
+    AppFlows.goHomeAfterCancellation(requestId: _requestId);
   }
 
   void _onJobReminder(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (widget.requestId ?? _request?['id']?.toString() ?? SessionStore.activeRequestId)) return;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -259,7 +246,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferAcceptedByServer(dynamic payload) {
-    SoundEffectService.playAcceptedSound();
+    if (payload is Map && payload['requestId'] != _requestId) return;
     if (mounted) {
       ConfettiCelebration.show(
         context,
@@ -271,7 +258,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   }
 
   void _onOfferEvent(dynamic payload) {
-    SoundEffectService.playTimerStartSound();
+    if (payload is Map && payload['requestId'] != _requestId) return;
     _load();
   }
 
@@ -331,7 +318,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
     for (final thread in threads) {
       if (thread.jobId == requestId && thread.workerId == workerId) {
-        SessionStore.activeThreadId = thread.id;
+        if (SessionStore.activeRequestId == requestId) SessionStore.activeThreadId = thread.id;
         return;
       }
     }
@@ -365,9 +352,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       });
     }
 
+    final requestedId = widget.requestId ?? SessionStore.activeRequestId;
     try {
       final response = (await OffersDependencies.getOffers(
-        requestId: SessionStore.activeRequestId,
+        requestId: requestedId,
         clientUserId: user.id,
       ))
           .fold(
@@ -378,7 +366,43 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
       final request = response['request'] as Map<String, dynamic>?;
       if (request != null) {
-        SessionStore.activeRequestId = request['id'] as String?;
+        final isRequestedJob = requestedId == null || requestedId == request['id'];
+        if (widget.requestId == null) SessionStore.activeRequestId = request['id'] as String?;
+
+        final status = request['status']?.toString();
+        if (status == 'assigned' || status == 'in_progress') {
+          if (_acceptingOffer) return;
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(builder: (_) => TrackingScreen(requestId: _requestId)),
+            );
+          }
+          return;
+        } else if (status == 'completed' && isRequestedJob) {
+          if (mounted) {
+            AppFlows.goToRating(requestId: _requestId);
+          }
+          return;
+        } else if (status == 'cancelled' && isRequestedJob) {
+          if (mounted) {
+            AppFlows.goHomeAfterCancellation(
+              requestId: _requestId,
+              message: 'Esta solicitud ya fue cancelada.',
+            );
+          }
+          return;
+        } else if (status == 'expired' || !isRequestedJob) {
+          if (mounted) {
+            setState(() {
+              _infoMessage = status == 'expired'
+                  ? 'Esta solicitud ha expirado.'
+                  : 'No tienes una solicitud activa en este momento.';
+              _loading = false;
+            });
+            _radarCtrl.stop();
+          }
+          return;
+        }
       }
 
       final offersList = response['offers'] as List<dynamic>? ?? const [];
@@ -425,19 +449,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             _workerAvatars = uniqueMarkers.map((m) => m['avatar'] as String?).toList();
             _currentRoutePoints = [];
           } else {
-            _isSimulating = true;
-            final baseLat = widget.latitude ?? -16.5002;
-            final baseLng = widget.longitude ?? -68.1342;
-            _workerLocations = [
-              LatLng(baseLat + 0.005, baseLng + 0.005),
-              LatLng(baseLat - 0.004, baseLng - 0.006),
-              LatLng(baseLat - 0.008, baseLng + 0.003),
-            ];
-            _workerAvatars = [
-              'https://i.pravatar.cc/150?img=11',
-              'https://i.pravatar.cc/150?img=33',
-              'https://i.pravatar.cc/150?img=60',
-            ];
+            _isSimulating = false;
+            _workerLocations = [];
+            _workerAvatars = [];
+            _currentRoutePoints = [];
           }
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
@@ -458,7 +473,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             _infoMessage = 'Aun no tienes una solicitud activa.';
             _request = null;
             _offers = const [];
-            SessionStore.activeRequestId = null;
+            SessionStore.clearActiveJob(requestId: widget.requestId);
           });
         }
         return;
@@ -581,7 +596,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
       Navigator.of(
         context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const TrackingScreen()));
+      ).push(MaterialPageRoute<void>(builder: (_) => TrackingScreen(requestId: _requestId)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -870,7 +885,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
         userId: userId,
       )).fold(
         onSuccess: (_) {
-          AppFlows.goHomeAfterCancellation();
+          AppFlows.goHomeAfterCancellation(requestId: _requestId);
         },
         onFailure: (failure) => throw Exception(failure.message),
       );
@@ -1160,9 +1175,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     Expanded(
                       child: Column(
                         children: [
-                          const Text(
-                            'Buscando trabajadores...',
-                            style: TextStyle(
+                          Text(
+                            _infoMessage != null
+                                ? 'Solicitud no activa'
+                                : _error != null && _request == null
+                                    ? 'Problema de conexión'
+                                    : 'Buscando trabajadores...',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -1170,7 +1189,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Estamos conectando con los mejores\nperfiles cerca de ti',
+                            _infoMessage ??
+                                (_error != null && _request == null
+                                    ? 'No se pudo conectar con el servidor.\nVerifica tu red y reintenta abajo.'
+                                    : 'Estamos conectando con los mejores\nperfiles cerca de ti'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
@@ -1185,7 +1207,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => SupportScreen(
-                              requestId: SessionStore.activeRequestId,
+                              requestId: _requestId,
                             ),
                           ),
                         );
@@ -1299,7 +1321,105 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     ),
                                     const SizedBox(height: 16),
                                     const SizedBox(height: 16),
-                                    if (offers.isEmpty)
+                                    if (_infoMessage != null)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(14),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withValues(alpha: 0.12),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.info_outline_rounded, color: Colors.amberAccent, size: 36),
+                                              ),
+                                              const SizedBox(height: 14),
+                                              const Text(
+                                                'Solicitud no disponible',
+                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                _infoMessage!,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                                              ),
+                                              const SizedBox(height: 18),
+                                              ChambaSecondaryButton(
+                                                label: 'Volver al inicio',
+                                                icon: Icons.home_rounded,
+                                                onPressed: () => AppFlows.goHome(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    else if (_error != null && offers.isNotEmpty)
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 16),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                _error!,
+                                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: _load,
+                                              child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (_error != null && offers.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(14),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red.withValues(alpha: 0.12),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 36),
+                                              ),
+                                              const SizedBox(height: 14),
+                                              const Text(
+                                                'Problema de conexión',
+                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                _error!,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                                              ),
+                                              const SizedBox(height: 18),
+                                              ChambaSecondaryButton(
+                                                label: 'Reintentar conexión',
+                                                icon: Icons.refresh,
+                                                onPressed: _load,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    else if (offers.isEmpty)
                                       const Padding(
                                         padding: EdgeInsets.symmetric(vertical: 24),
                                         child: Center(

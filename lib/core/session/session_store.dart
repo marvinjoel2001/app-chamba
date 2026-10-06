@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'session_credentials.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,6 +133,12 @@ class SessionStore {
   static const _workerBgEnabledKey = 'worker_bg_enabled';
 
   static SessionUser? currentUser;
+  static void clearActiveJob({String? requestId}) {
+    if (requestId != null && requestId != activeRequestId) return;
+    activeRequestId = null;
+    activeThreadId = null;
+  }
+
   static String? activeRequestId;
   static String? activeThreadId;
 
@@ -139,6 +146,8 @@ class SessionStore {
 
   static Future<void> hydrate() async {
     final prefs = await SharedPreferences.getInstance();
+    SessionCredentials.accessToken = prefs.getString('session_access_token');
+    if (SessionCredentials.accessToken == null) { await prefs.remove(_keySessionUser); return; }
     final raw = prefs.getString(_keySessionUser);
     if (raw == null || raw.isEmpty) {
       return;
@@ -154,10 +163,12 @@ class SessionStore {
     }
   }
 
-  static Future<void> setCurrentUser(SessionUser user) async {
+  static Future<void> setCurrentUser(SessionUser user, {String? token}) async {
+    if (token != null) SessionCredentials.accessToken = token;
     currentUser = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
+    if (token != null) await prefs.setString('session_access_token', token);
     // Registra el token FCM contra este usuario: sin esto el backend no tiene
     // a dónde enviar la alerta de trabajo nuevo. Es idempotente (upsert) y no
     // debe bloquear ni romper el login si la red falla.
@@ -179,12 +190,18 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
+    SessionCredentials.accessToken = null;
+    SessionCredentials.pushToken = null;
+    SessionCredentials.visibleThreadId = null;
+    SessionCredentials.visibleRequestId = null;
+    SessionCredentials.visibleDisputeId = null;
     currentUser = null;
     activeRequestId = null;
     activeThreadId = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keySessionUser);
+    await prefs.remove('session_access_token');
     await prefs.remove(_workerBgEnabledKey);
   }
 }

@@ -19,18 +19,13 @@ class WorkerBackgroundService {
   static const String _channelDescription =
       'Mantiene el estado de trabajador disponible y su ubicacion.';
   static const String _notifTitle = 'Chamba Worker activo';
-  static const String _workerKey = 'session_user';
   static const String _enabledKey = 'worker_bg_enabled';
 
   static final FlutterBackgroundService _service = FlutterBackgroundService();
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  static final http.Client _client = http.Client();
 
   static Future<void> initialize() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidInit);
-    await _notifications.initialize(settings);
 
     if (Platform.isAndroid) {
       const channel = AndroidNotificationChannel(
@@ -116,13 +111,16 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
   Timer.periodic(const Duration(seconds: 25), (_) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       final enabled = prefs.getBool('worker_bg_enabled') ?? false;
       if (!enabled) {
         return;
       }
 
+      final accessToken = prefs.getString('session_access_token');
       final rawUser = prefs.getString('session_user');
-      if (rawUser == null || rawUser.isEmpty) {
+      if (rawUser == null || rawUser.isEmpty || accessToken == null) {
+        service.stopSelf();
         return;
       }
 
@@ -158,7 +156,7 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
       final uri = Uri.parse('$base/mobile/worker/location');
       await client.post(
         uri,
-        headers: const {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $accessToken'},
         body: jsonEncode({
           'workerUserId': userId,
           'latitude': pos.latitude,

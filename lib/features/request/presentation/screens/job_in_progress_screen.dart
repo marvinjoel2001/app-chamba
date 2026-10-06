@@ -17,8 +17,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
+import '../../../support/presentation/screens/support_screen.dart';
 import '../state/request_dependencies.dart';
-import '../../../../core/services/mobile_backend_service.dart';
 
 class JobInProgressScreen extends StatefulWidget {
   const JobInProgressScreen({required this.requestId, super.key});
@@ -38,6 +38,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   Timer? _pollTimer;
   Timer? _locationTimer;
   LatLng? _deviceLocation; // ubicación real del GPS
+  double? _deviceAccuracy; // margen de error del GPS en metros
 
   /// Auto-centrar el mapa en el worker. Se desactiva apenas el usuario
   /// arrastra o hace zoom (el gesto del usuario manda) y se reactiva con
@@ -53,6 +54,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     _realtime.on('job.client_confirmed', _onClientConfirmed);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
+    _realtime.reconnectCount.addListener(_onReconnect);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     // Actualizar ubicación GPS cada 5 segundos
     _locationTimer = Timer.periodic(
@@ -63,8 +65,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     _updateDeviceLocation();
   }
 
+  void _onReconnect() {
+    if (mounted) _load();
+  }
+
   @override
   void dispose() {
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('job.client_confirmed', _onClientConfirmed);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
@@ -98,7 +105,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       final loc = LatLng(pos.latitude, pos.longitude);
 
       if (mounted) {
-        setState(() => _deviceLocation = loc);
+        setState(() {
+          _deviceLocation = loc;
+          _deviceAccuracy = pos.accuracy;
+        });
         // Solo seguir al worker si el usuario no está explorando el mapa;
         // se conserva el zoom actual en todo caso.
         if (_followWorker) {
@@ -124,13 +134,16 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     } catch (_) {}
   }
 
-  void _onClientConfirmed(dynamic _) => _load();
+  void _onClientConfirmed(dynamic payload) {
+    if (payload is Map && payload['requestId'] != widget.requestId) return;
+    _load();
+  }
 
-  void _onJobCompleted(dynamic _) {
+  void _onJobCompleted(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (widget.requestId)) return;
     if (mounted) {
       // Limpiar sesión del trabajo activo
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: widget.requestId);
 
       showDialog<void>(
         context: context,
@@ -149,7 +162,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _showReportDialog();
+                _openReport();
               },
               child: const Text(
                 'Reportar problema',
@@ -169,10 +182,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     }
   }
 
-  void _onJobCancelled(dynamic _) {
+  void _onJobCancelled(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (widget.requestId)) return;
     if (mounted) {
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: widget.requestId);
       // El aviso visual lo muestra IncomingRequestScreen (siempre montada en
       // el shell del worker); aquí solo volvemos al inicio para no duplicar.
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -277,7 +290,54 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final destination = LatLng(destLat, destLng);
     final distance = _calculateDistanceInMeters(_deviceLocation!, destination);
 
-    return distance <= 100; // 100 metros de tolerancia
+    return distance <= _arrivalToleranceMeters;
+  }
+
+  /// 100 m + el margen de error que reporta el GPS (máx. +100 m). En zonas
+  /// con edificios altos el GPS puede marcar 120-150 m estando en la puerta.
+  double get _arrivalToleranceMeters {
+    final accuracy = (_deviceAccuracy ?? 0).clamp(0, 100).toDouble();
+    return 100 + accuracy;
+  }
+
+  String _formatDistance(double? meters) {
+    if (meters == null) return 'desconocida';
+    if (meters < 1000) return '${meters.round()} m';
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
+  /// Fuera de la zona (o sin GPS): en vez de bloquear al worker, se le deja
+  /// avisar igual. Es seguro porque el cliente debe CONFIRMAR la llegada
+  /// antes de que empiece el trabajo.
+  Future<bool> _confirmArrivalOutsideZone() async {
+    final distanceText = _formatDistance(_distanceToDestinationInMeters);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.colorBackgroundAccent,
+        title: const Text('¿Ya estás en el lugar?'),
+        content: Text(
+          _deviceLocation == null
+              ? 'No pudimos obtener tu ubicación GPS. Si ya estás en la dirección del cliente, puedes avisarle igual: él deberá confirmar tu llegada.'
+              : 'Tu GPS marca $distanceText del destino. A veces el GPS falla cerca de edificios. Si ya estás en la dirección del cliente, puedes avisarle igual: él deberá confirmar tu llegada.',
+          style: const TextStyle(color: AppTheme.colorMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Todavía no'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Estoy en el lugar',
+              style: TextStyle(color: AppTheme.colorSuccess),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result == true;
   }
 
   /// Obtiene la distancia actual al destino en metros
@@ -299,23 +359,15 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final user = SessionStore.currentUser;
     if (user == null) return;
 
-    // Validación de geofencing: debe estar a menos de 100m del destino
+    // Geocerca: dentro de la zona marca directo; fuera, pide confirmación
+    // explícita en vez de bloquear (drift del GPS).
     if (!_isWithinArrivalZone) {
-      final distance = _distanceToDestinationInMeters;
-      final distanceText = distance != null
-          ? '${(distance / 1000).toStringAsFixed(1)} km'
-          : 'desconocida';
-
+      await _updateDeviceLocation();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Debes estar a menos de 100m del destino para marcar llegada. Distancia actual: $distanceText',
-          ),
-          backgroundColor: AppTheme.colorError,
-        ),
-      );
-      return;
+      if (!_isWithinArrivalZone && !await _confirmArrivalOutsideZone()) {
+        return;
+      }
+      if (!mounted) return;
     }
 
     try {
@@ -381,8 +433,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       if (!mounted) return;
 
       // Limpiar sesión del trabajo activo
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: widget.requestId);
 
       showDialog<void>(
         context: context,
@@ -401,7 +452,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _showReportDialog();
+                _openReport();
               },
               child: const Text(
                 'Reportar problema',
@@ -431,7 +482,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final user = SessionStore.currentUser;
     if (user == null) return;
 
-    String? threadId = SessionStore.activeThreadId;
+    String? threadId = widget.requestId == SessionStore.activeRequestId ? SessionStore.activeThreadId : null;
     final client = _tracking?['client'] as Map<String, dynamic>?;
 
     if (threadId == null) {
@@ -448,7 +499,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           final map = t as Map<String, dynamic>;
           if (map['requestId']?.toString() == widget.requestId) {
             threadId = map['id']?.toString();
-            SessionStore.activeThreadId = threadId;
+            if (SessionStore.activeRequestId == widget.requestId) SessionStore.activeThreadId = threadId;
             break;
           }
         }
@@ -514,8 +565,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         onFailure: (failure) => throw Exception(failure.message),
       );
       if (!mounted) return;
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: widget.requestId);
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
@@ -525,87 +575,26 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     }
   }
 
-  Future<void> _showReportDialog() async {
-    final reasonCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    bool submitting = false;
-
+  /// Reportar usa el flujo estándar de la app (SupportScreen): motivos,
+  /// disputa formal y chat con soporte. Antes era un popup aparte sin chat.
+  Future<void> _openReport() async {
     final isWorker = SessionStore.currentUser?.type == 'worker';
-    final targetUser = isWorker ? _tracking?['client']?['id'] : _tracking?['worker']?['id'];
-    if (targetUser == null) return;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          backgroundColor: AppTheme.colorBackgroundAccent,
-          title: const Text('Reportar Problema', style: TextStyle(color: AppTheme.colorError)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: reasonCtrl,
-                  decoration: const InputDecoration(labelText: 'Razón (ej. Fraude, Inseguridad)'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Descripción detallada'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                if (SessionStore.activeRequestId == null && mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
-              },
-              child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
-            ),
-            ElevatedButton(
-              onPressed: submitting
-                  ? null
-                  : () async {
-                      if (reasonCtrl.text.trim().isEmpty) return;
-                      setStateDialog(() => submitting = true);
-                      try {
-                        await MobileBackendService.instance.createDispute(
-                          requestId: widget.requestId,
-                          reportedBy: SessionStore.currentUser!.id,
-                          reportedUser: targetUser,
-                          reason: reasonCtrl.text.trim(),
-                          description: descCtrl.text.trim(),
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.of(ctx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Reporte enviado con éxito.'), backgroundColor: AppTheme.colorSuccess),
-                        );
-                        if (SessionStore.activeRequestId == null && mounted) {
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                        }
-                      } catch (e) {
-                        if (!ctx.mounted) return;
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.colorError),
-                        );
-                        setStateDialog(() => submitting = false);
-                      }
-                    },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.colorError),
-              child: submitting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Enviar Reporte', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+    final targetUser = (isWorker
+            ? _tracking?['client']?['id']
+            : _tracking?['worker']?['id'])
+        ?.toString();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SupportScreen(
+          requestId: widget.requestId,
+          reportedUserId: targetUser,
         ),
       ),
     );
+    // Si el trabajo ya terminó/canceló mientras reportaba, volver al inicio.
+    if (mounted && SessionStore.activeRequestId == null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
@@ -981,12 +970,45 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                         padding: EdgeInsets.all(32),
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    else if (_error != null)
+                    else if (_error != null && _tracking == null)
                       Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: AppTheme.colorError),
+                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 36),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Error de conexión',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            ChambaSecondaryButton(
+                              label: 'Reintentar',
+                              icon: Icons.refresh,
+                              onPressed: _load,
+                            ),
+                          ],
                         ),
                       )
                     else
@@ -994,6 +1016,32 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (_error != null)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _error!,
+                                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _load,
+                                    child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ),
                           Row(
                               children: [
                                 Container(
@@ -1168,17 +1216,13 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                               text:
                                                   'Esperando confirmación del cliente…',
                                             )
-                                          : _isWithinArrivalZone
-                                              ? ChambaPrimaryButton(
-                                                  label: 'LLEGUÉ AL SITIO',
-                                                  icon: Icons.location_on,
-                                                  onPressed: _markArrived,
-                                                )
-                                              : const _JobStatusBanner(
-                                                  icon: Icons.location_disabled,
-                                                  text:
-                                                      'Acércate al destino para marcar tu llegada',
-                                                ),
+                                          : ChambaPrimaryButton(
+                                              label: 'LLEGUÉ AL SITIO',
+                                              icon: _isWithinArrivalZone
+                                                  ? Icons.location_on
+                                                  : Icons.location_searching,
+                                              onPressed: _markArrived,
+                                            ),
                                 ),
                                 const SizedBox(width: 10),
                                 // Chat directo con el cliente + badge de no leídos
@@ -1242,7 +1286,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                 ),
                                 const SizedBox(width: 16),
                                 TextButton(
-                                  onPressed: _showReportDialog,
+                                  onPressed: _openReport,
                                   child: const Text(
                                     'Reportar Problema',
                                     style: TextStyle(color: AppTheme.colorError, fontWeight: FontWeight.bold),

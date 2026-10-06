@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/app_permissions_service.dart';
 import '../../../../core/session/session_store.dart';
@@ -110,7 +111,14 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) {
       return;
     }
-    if (!allPermissionsGranted) {
+    final promptRecommended = allPermissionsGranted &&
+        await AppPermissionsService.shouldPromptRecommendedPermissions(
+          user.type,
+        );
+    if (!mounted) {
+      return;
+    }
+    if (!allPermissionsGranted || promptRecommended) {
       nextScreen = RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
     }
 
@@ -122,6 +130,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute<void>(builder: (_) => screen));
+    AppFlows.initialRouteResolved = true;
   }
 
   @override

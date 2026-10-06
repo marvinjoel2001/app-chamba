@@ -12,6 +12,7 @@ class WorkerJobModel extends WorkerJob {
     required super.clientLastName,
     super.clientProfilePhotoUrl,
     super.acceptedAt,
+    super.completedAt,
     super.threadId,
     super.paymentMethod,
   });
@@ -19,7 +20,7 @@ class WorkerJobModel extends WorkerJob {
   factory WorkerJobModel.fromJson(Map<String, dynamic> json) {
     final client = (json['client'] as Map<String, dynamic>?) ?? const {};
     return WorkerJobModel(
-      id: json['id']?.toString() ?? '',
+      id: (json['requestId'] ?? json['id'])?.toString() ?? '',
       title: json['title']?.toString() ?? 'Trabajo',
       category: json['category']?.toString() ?? 'General',
       address: json['address']?.toString() ?? '',
@@ -29,6 +30,7 @@ class WorkerJobModel extends WorkerJob {
       clientLastName: client['lastName']?.toString() ?? '',
       clientProfilePhotoUrl: client['profilePhotoUrl']?.toString(),
       acceptedAt: _parseDate(json['acceptedAt']?.toString()),
+      completedAt: _parseDate(json['completedAt']?.toString()),
       threadId: json['threadId']?.toString(),
       paymentMethod: json['paymentMethod']?.toString() ?? json['payment_method']?.toString(),
     );
@@ -43,6 +45,7 @@ class WorkerJobModel extends WorkerJob {
       'amount': amount,
       'requestStatus': _statusToRaw(status),
       'acceptedAt': acceptedAt?.toUtc().toIso8601String(),
+      'completedAt': completedAt?.toUtc().toIso8601String(),
       'threadId': threadId,
       'client': {
         'firstName': clientFirstName,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../../core/session/session_credentials.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
@@ -19,6 +20,7 @@ class NotificationsService {
             Uri.parse(
               '${AppConfig.apiBaseUrl}/mobile/notifications?userId=$userId&page=$page&limit=$limit',
             ),
+            headers: SessionCredentials.headers,
           )
           .timeout(const Duration(seconds: 12));
 
@@ -38,16 +40,16 @@ class NotificationsService {
     }
   }
 
-  static Future<void> markAsRead() async {
+  static Future<void> markAsRead({required List<String> ids}) async {
     final userId = SessionStore.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null || ids.isEmpty) return;
 
     try {
       final response = await http
           .patch(
             Uri.parse('${AppConfig.apiBaseUrl}/mobile/notifications/read'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'userId': userId}),
+            headers: SessionCredentials.headers,
+            body: jsonEncode({'userId': userId, 'ids': ids}),
           )
           .timeout(const Duration(seconds: 12));
           
@@ -69,6 +71,7 @@ class NotificationsService {
             Uri.parse(
               '${AppConfig.apiBaseUrl}/mobile/notifications/unread-count?userId=$userId',
             ),
+            headers: SessionCredentials.headers,
           )
           .timeout(const Duration(seconds: 12));
 

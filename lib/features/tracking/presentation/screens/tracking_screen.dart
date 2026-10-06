@@ -22,13 +22,16 @@ import '../state/tracking_dependencies.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
-  const TrackingScreen({super.key});
+  const TrackingScreen({this.requestId, super.key});
+  final String? requestId;
 
   @override
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
+  String? _threadId;
+  String? get _requestId => widget.requestId ?? SessionStore.activeRequestId;
   final RealtimeService _realtime = RealtimeService.instance;
   final MapController _mapController = MapController();
   bool _loading = true;
@@ -53,8 +56,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.on('job.cancelled', _onJobCancelled);
     _realtime.on('message.new', _onChatMessage);
     _realtime.on('worker.location.updated', _onWorkerLocation);
+    _realtime.reconnectCount.addListener(_onReconnect);
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
     _load();
+  }
+
+  void _onReconnect() {
+    if (mounted) _load();
   }
 
   /// Posición del worker en vivo (el worker la emite cada ~5 s). Solo mueve
@@ -90,7 +98,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     // Antes se leía msg['senderId'], que no existe en ese payload: el contador
     // habría subido incluso con los mensajes propios.
     final requestId = msg['requestId']?.toString();
-    if (requestId != null && requestId != SessionStore.activeRequestId) {
+    if (requestId != null && requestId != _requestId) {
       // Mensaje de otra conversación: no afecta el contador de esta pantalla.
       return;
     }
@@ -104,6 +112,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   void dispose() {
+    _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('job.worker_arrived', _onWorkerArrived);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
@@ -132,34 +141,28 @@ class _TrackingScreenState extends State<TrackingScreen> {
     setState(() => _isWorkPaused = !_isWorkPaused);
   }
 
-  void _onWorkerArrived(dynamic _) {
+  void _onWorkerArrived(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (_requestId)) return;
     _load();
-    SoundEffectService.playRadarAlert();
     HapticFeedback.heavyImpact();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 ¡El trabajador ha llegado! Confirma su llegada.'),
-          backgroundColor: AppTheme.colorSuccess,
-        ),
-      );
-    }
+
   }
 
-  void _onJobCompleted(dynamic _) {
+  void _onJobCompleted(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (_requestId)) return;
     _workLiveTimer?.cancel();
-    SoundEffectService.playCashSound();
-    AppFlows.goToRating();
+    AppFlows.goToRating(requestId: _requestId);
   }
 
-  void _onJobCancelled(dynamic _) {
+  void _onJobCancelled(dynamic payload) {
+    if (payload is Map && payload['requestId'] != (_requestId)) return;
     _workLiveTimer?.cancel();
-    AppFlows.goHomeAfterCancellation();
+    AppFlows.goHomeAfterCancellation(requestId: _requestId);
   }
 
   Future<void> _ensureActiveThread() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
+    final requestId = _requestId;
     final workerId = _tracking?['worker']?['id']?.toString();
     if (user == null || requestId == null || workerId == null) return;
 
@@ -170,14 +173,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
     for (final thread in threads) {
       if (thread.jobId == requestId && thread.workerId == workerId) {
-        SessionStore.activeThreadId = thread.id;
+        _threadId = thread.id;
+        if (SessionStore.activeRequestId == requestId) SessionStore.activeThreadId = thread.id;
         return;
       }
     }
   }
 
   Future<void> _load() async {
-    final requestId = SessionStore.activeRequestId;
+    final requestId = _requestId;
     if (requestId == null) {
       setState(() {
         _error = 'No hay solicitud activa para rastrear.';
@@ -201,7 +205,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
               )
               .payload;
       _tracking = response;
-      if (SessionStore.activeThreadId == null) {
+      final status = _tracking?['status']?.toString();
+      if (status == 'completed') {
+        _workLiveTimer?.cancel();
+            AppFlows.goToRating(requestId: _requestId);
+        return;
+      }
+      if (status == 'cancelled') {
+        _workLiveTimer?.cancel();
+        AppFlows.goHomeAfterCancellation(requestId: _requestId);
+        return;
+      }
+      if (_threadId == null) {
         await _ensureActiveThread();
       }
 
@@ -261,7 +276,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   Future<void> _confirmArrival() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
+    final requestId = _requestId;
     if (user == null || requestId == null) return;
 
     setState(() => _confirmingArrival = true);
@@ -296,7 +311,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   Future<void> _cancelJob() async {
     final user = SessionStore.currentUser;
-    final requestId = SessionStore.activeRequestId;
+    final requestId = _requestId;
     if (user == null || requestId == null) return;
 
     final confirmed = await showDialog<bool>(
@@ -333,10 +348,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       );
       if (!mounted) return;
       // Limpiar sesión del cliente
-      SessionStore.activeRequestId = null;
-      SessionStore.activeThreadId = null;
+      SessionStore.clearActiveJob(requestId: _requestId);
       // Volver al inicio usando AppFlows para evitar doble pop (y pantalla negra) al recibir el socket
-      AppFlows.goHomeAfterCancellation(message: 'Trabajo cancelado exitosamente');
+      AppFlows.goHomeAfterCancellation(requestId: _requestId, showNotice: true, message: 'Trabajo cancelado exitosamente');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -653,11 +667,52 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                 child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Text(
-                          _error!,
-                          style: const TextStyle(color: AppTheme.colorError),
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  : _error != null && _tracking == null
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 36),
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                'Error de conexión',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              ChambaSecondaryButton(
+                                label: 'Reintentar',
+                                icon: Icons.refresh,
+                                onPressed: _load,
+                              ),
+                            ],
+                          ),
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -676,6 +731,32 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 ),
                               ),
                             ),
+                            if (_error != null)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _error!,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: _load,
+                                      child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             // Status + monto
                             Row(
                               children: [
@@ -876,11 +957,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       color: AppTheme.colorPrimary,
                                       onTap: () async {
                                         setState(() => _unreadMessages = 0);
-                                        if (SessionStore.activeThreadId == null) {
+                                        if (_threadId == null) {
                                           await _ensureActiveThread();
                                         }
                                         final threadId =
-                                            SessionStore.activeThreadId;
+                                            _threadId;
                                         if (threadId == null) {
                                           if (!context.mounted) return;
                                           Navigator.of(context).push(
@@ -953,7 +1034,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       MaterialPageRoute<void>(
                                         builder: (_) => SupportScreen(
                                           requestId:
-                                              SessionStore.activeRequestId,
+                                              _requestId,
                                           reportedUserId:
                                               worker?['id']?.toString(),
                                         ),

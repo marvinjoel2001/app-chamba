@@ -7,12 +7,15 @@ import 'features/onboarding/presentation/screens/splash_screen.dart';
 class ChambaApp extends StatelessWidget {
   const ChambaApp({super.key});
 
+  static final RouteObserver<PageRoute<dynamic>> routeObserver = RouteObserver<PageRoute<dynamic>>();
+
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
+      navigatorObservers: [routeObserver],
       title: 'Chamba',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,

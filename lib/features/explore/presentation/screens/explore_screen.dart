@@ -12,7 +12,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
-import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -93,7 +92,6 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _onNewOffer(dynamic data) {
-    SoundEffectService.playCashSound();
     if (_activeRequest != null) {
       final current = _activeRequest!['pendingOffersCount'] as int? ?? 0;
       setState(() {
@@ -1349,7 +1347,39 @@ class _ExploreScreenState extends State<ExploreScreen>
               right: 20,
               top: 110,
               child: GlassCard(
-                child: Text(_error!, textAlign: TextAlign.center),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _load,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Reintentar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           if (_locationBlockMessage == null) ...[

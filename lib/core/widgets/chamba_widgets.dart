@@ -188,6 +188,97 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
   }
 }
 
+class ChambaSecondaryButton extends StatefulWidget {
+  const ChambaSecondaryButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.compact = false,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool compact;
+
+  @override
+  State<ChambaSecondaryButton> createState() => _ChambaSecondaryButtonState();
+}
+
+class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final minHeight = widget.compact ? 44.0 : 52.0;
+    final horizontalPadding = widget.compact ? 12.0 : 16.0;
+    final verticalPadding = widget.compact ? 10.0 : 13.0;
+    final iconSize = widget.compact ? 20.0 : 22.0;
+    final textSize = widget.compact ? 14.0 : 15.0;
+    final iconGap = widget.compact ? 8.0 : 10.0;
+
+    final decoration = BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      color: _pressed
+          ? Colors.white.withValues(alpha: 0.12)
+          : AppTheme.colorGlassInputSoft,
+      border: Border.all(
+        color: AppTheme.colorGlassBorderSoft,
+        width: 1,
+      ),
+    );
+
+    const foreground = Colors.white;
+
+    return GestureDetector(
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: enabled
+          ? (_) {
+              setState(() => _pressed = false);
+              widget.onPressed?.call();
+            }
+          : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        scale: _pressed ? 0.97 : 1,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: enabled ? 1 : 0.6,
+          child: Container(
+            constraints: BoxConstraints(minHeight: minHeight),
+            decoration: decoration,
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: verticalPadding,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, color: foreground, size: iconSize),
+                  SizedBox(width: iconGap),
+                ],
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: textSize,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ChambaChip extends StatelessWidget {
   const ChambaChip({
     required this.label,

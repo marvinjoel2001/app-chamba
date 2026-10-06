@@ -87,7 +87,6 @@ class NewRequestAlert {
     // Reproducir patrón de vibración + sonido de notificación real
     _triggerVibration();
     _playAlertSound();
-    VolumeService.startRampingVolume();
 
     lastEvent.value = NewRequestEvent(
       requestId: id.isEmpty ? null : id,
@@ -109,7 +108,7 @@ class NewRequestAlert {
       _audioPlayer ??= AudioPlayer();
       await _audioPlayer?.stop();
       await _audioPlayer?.play(
-        AssetSource('sounds/universfield-ringtone-091-496417.mp3'),
+        AssetSource('sounds/mic_start.wav'),
       );
     } catch (e) {
       debugPrint('[NewRequestAlert] Error reproduciendo audio: $e');

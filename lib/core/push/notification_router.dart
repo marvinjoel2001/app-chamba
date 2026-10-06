@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+import '../services/toast_service.dart';
 import '../session/session_store.dart';
+import '../services/mobile_backend_service.dart';
+import '../../features/request/presentation/screens/request_outcome_screen.dart';
 import '../../features/messages/presentation/screens/chat_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
@@ -18,9 +21,22 @@ import '../../features/worker/presentation/screens/profile_menu_screen.dart';
 class NotificationRouter {
   const NotificationRouter._();
 
+  static const String _routePrefix = 'notif:';
+  static const String _notificationsRouteName = '${_routePrefix}center';
+
   /// Abre la pantalla que corresponde a la notificación.
+  ///
+  /// [fromNotificationCenter]: true cuando el tap viene de la lista de
+  /// `NotificationsScreen`. En ese caso, si la notificación no tiene destino
+  /// NO se vuelve a abrir `NotificationsScreen` encima de sí misma (antes se
+  /// apilaba una copia por cada tap).
+  ///
   /// Devuelve `false` si no había datos suficientes para navegar.
-  static bool openFromData(Map<String, dynamic> data) {
+  static bool openFromData(
+    Map<String, dynamic> data, {
+    bool fromNotificationCenter = false,
+  }) {
+    if (!SessionStore.isLoggedIn || (data['userId'] != null && data['userId'] != SessionStore.currentUser?.id)) return false;
     final navigator = ChambaApp.navigatorKey.currentState;
     if (navigator == null) return false;
 
@@ -37,62 +53,147 @@ class NotificationRouter {
     ]);
     final isWorker = SessionStore.currentUser?.type == 'worker';
 
-    Widget? destination;
+    if (requestId != null && (deepLink.startsWith('/request') || [
+      'request_new', 'offer_new', 'offer_accepted', 'counter_offer', 'offer_client_counter', 'arrival_confirmed',
+      'worker_arrived', 'job_finished', 'job_cancelled', 'job_starting_soon', 'request_timeout',
+      'offer_rejected', 'request_closed', 'agency_offer_sent', 'improve_offer_reminder'].contains(type))) {
+      _openRequest(requestId, type);
+      return true;
+    }
 
-    if (type == 'message_new' || deepLink.startsWith('/chat')) {
+    Widget? destination;
+    String? routeKey;
+
+    if (type == 'message_new' ||
+        type == 'chat_message' ||
+        deepLink.startsWith('/chat')) {
       destination = threadId == null
           ? const MessagesScreen()
           : ChatScreen(threadId: threadId);
+      routeKey = 'chat:${threadId ?? 'list'}';
     } else if (type == 'support_message' ||
         type == 'dispute_created' ||
         type == 'dispute_resolved' ||
         deepLink.startsWith('/support')) {
-      destination = const SupportScreen();
+      destination = SupportScreen(disputeId: data['disputeId']?.toString());
+      routeKey = 'support';
     } else if (type == 'new_review' ||
         type == 'verification_update' ||
         deepLink.startsWith('/profile')) {
       destination = const ProfileMenuScreen();
+      routeKey = 'profile';
     } else if (type == 'request_new') {
       // Nueva solicitud cerca: solo tiene sentido para el worker.
-      destination = isWorker ? const IncomingRequestScreen() : null;
+      if (isWorker) {
+        destination = const IncomingRequestScreen();
+        routeKey = 'incoming';
+      }
     } else if (type == 'offer_accepted' ||
         type == 'arrival_confirmed' ||
-        type == 'job_starting_soon') {
-      if (isWorker) {
-        destination = requestId == null
-            ? const IncomingRequestScreen()
-            : JobInProgressScreen(requestId: requestId);
-      } else {
-        if (requestId != null) {
-          SessionStore.activeRequestId = requestId;
-        }
-        destination = const TrackingScreen();
-      }
-    } else if (type == 'worker_arrived' || type == 'job_finished') {
+        type == 'job_starting_soon' ||
+        type == 'worker_arrived' ||
+        type == 'job_finished') {
       if (requestId != null) {
         SessionStore.activeRequestId = requestId;
       }
-      destination = const TrackingScreen();
+      if (isWorker) {
+        // El worker nunca debe caer en TrackingScreen (es la vista del
+        // cliente); su pantalla del trabajo es JobInProgressScreen.
+        destination = requestId == null
+            ? const IncomingRequestScreen()
+            : JobInProgressScreen(requestId: requestId);
+        routeKey = requestId == null ? 'incoming' : 'job:$requestId';
+      } else {
+        // TrackingScreen consulta el estado real: si el trabajo ya está
+        // `completed` redirige a calificar, si está `cancelled` vuelve al
+        // inicio (cubre el cold start desde el push `job_finished`).
+        destination = const TrackingScreen();
+        routeKey = 'tracking:${requestId ?? ''}';
+      }
     } else if (type == 'offer_new' ||
         type == 'counter_offer' ||
+        type == 'offer_client_counter' ||
         type == 'improve_offer_reminder' ||
         type == 'request_timeout' ||
         type == 'offer_rejected' ||
         type == 'request_closed' ||
-        type == 'job_cancelled' ||
         deepLink.startsWith('/request')) {
       // Novedades de la negociación: el cliente ve el estado de su solicitud
       // con las ofertas; el worker vuelve a la lista de solicitudes cercanas.
-      destination =
-          isWorker ? const IncomingRequestScreen() : const RequestStatusScreen();
+      if (isWorker) {
+        destination = const IncomingRequestScreen();
+        routeKey = 'incoming';
+      } else {
+        if (requestId != null) {
+          SessionStore.activeRequestId = requestId;
+        }
+        // RequestStatusScreen ahora detecta si la solicitud ya fue asignada,
+        // completada o cancelada y redirige.
+        destination = const RequestStatusScreen();
+        routeKey = 'request:${requestId ?? ''}';
+      }
     }
 
+    if (destination == null) {
+      if (fromNotificationCenter) {
+        // Ya está en el centro de notificaciones: no apilar otra copia.
+        return false;
+      }
+      _pushUnlessOnTop(
+        navigator,
+        const NotificationsScreen(),
+        _notificationsRouteName,
+      );
+      return false;
+    }
+
+    _pushUnlessOnTop(navigator, destination, '$_routePrefix$routeKey');
+    return true;
+  }
+
+  static Future<void> _openRequest(String requestId, String type) async {
+    final userId = SessionStore.currentUser?.id;
+    try {
+      final response = await MobileBackendService.instance.notificationRequest(requestId: requestId);
+      if (SessionStore.currentUser?.id != userId) return;
+      final nav = ChambaApp.navigatorKey.currentState;
+      if (nav == null) return;
+      final job = response['request'] as Map<String, dynamic>;
+      final status = job['requestStatus'];
+      final worker = SessionStore.currentUser?.type == 'worker';
+      final terminal = status == 'cancelled' || status == 'completed' || status == 'expired' || ['offer_rejected', 'request_closed', 'request_timeout'].contains(type);
+      final Widget screen = terminal ? RequestOutcomeScreen(requestId: requestId)
+        : status == 'assigned' ? (worker ? JobInProgressScreen(requestId: requestId) : TrackingScreen(requestId: requestId))
+        : worker ? IncomingRequestScreen(focusRequestId: requestId) : RequestStatusScreen(requestId: requestId);
+      _pushUnlessOnTop(nav, screen, 'notif:request:' + requestId + ':' + status.toString());
+    } catch (_) {
+      ToastService.show(title: 'No pudimos abrir la solicitud', body: 'Revisa tu conexión o consulta tus notificaciones.', type: ToastType.info);
+    }
+  }
+
+  /// Evita apilar la misma pantalla varias veces cuando el usuario toca
+  /// varias notificaciones seguidas del mismo tipo/trabajo.
+  static void _pushUnlessOnTop(
+    NavigatorState navigator,
+    Widget screen,
+    String routeName,
+  ) {
+    Route<dynamic>? top;
+    // popUntil con un predicado que devuelve true NO saca ninguna ruta:
+    // es la forma estándar de leer la ruta superior.
+    navigator.popUntil((route) {
+      top = route;
+      return true;
+    });
+    if (top?.settings.name == routeName) {
+      return;
+    }
     navigator.push(
-      MaterialPageRoute(
-        builder: (_) => destination ?? const NotificationsScreen(),
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: routeName),
+        builder: (_) => screen,
       ),
     );
-    return destination != null;
   }
 
   static String? _firstNonEmpty(List<String?> values) {
