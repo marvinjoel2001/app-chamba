@@ -20,11 +20,14 @@ class MobileBackendService {
     client: _client,
   );
 
-  Future<Map<String, dynamic>> notificationRequest({required String requestId}) =>
+  Future<Map<String, dynamic>> notificationRequest(
+          {required String requestId}) =>
       _api.get('/mobile/requests/$requestId/notification-context');
 
-  Future<Map<String, dynamic>> unregisterPushToken({required String userId, required String token}) =>
-      _api.post('/mobile/push/logout', body: {'userId': userId, 'token': token});
+  Future<Map<String, dynamic>> unregisterPushToken(
+          {required String userId, required String token}) =>
+      _api.post('/mobile/push/logout',
+          body: {'userId': userId, 'token': token});
 
   Future<Map<String, dynamic>> login({
     required String identifier,
@@ -289,8 +292,10 @@ class MobileBackendService {
     return _api.get('/mobile/messages', queryParameters: {'userId': userId});
   }
 
-  Future<Map<String, dynamic>> threadMessages({required String threadId, String? before}) {
-    return _api.get('/mobile/messages/$threadId', queryParameters: _cleanQuery({'before': before}));
+  Future<Map<String, dynamic>> threadMessages(
+      {required String threadId, String? before}) {
+    return _api.get('/mobile/messages/$threadId',
+        queryParameters: _cleanQuery({'before': before}));
   }
 
   Future<Map<String, dynamic>> sendMessage({
@@ -340,8 +345,8 @@ class MobileBackendService {
     required String caption,
   }) {
     return _api.post('/mobile/messages/$threadId/photo',
-      timeout: const Duration(seconds: 60),
-      body: {'imageBase64': imageBase64, 'caption': caption});
+        timeout: const Duration(seconds: 60),
+        body: {'imageBase64': imageBase64, 'caption': caption});
   }
 
   Future<Map<String, dynamic>> incomingRequest({required String workerUserId}) {
@@ -547,6 +552,12 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> setWorkPaused(
+      {required String requestId, required bool paused}) {
+    return _api.post('/mobile/tracking/clock',
+        body: {'requestId': requestId, 'paused': paused});
+  }
+
   Future<Map<String, dynamic>> cancelJob({
     required String requestId,
     required String userId,
@@ -555,6 +566,10 @@ class MobileBackendService {
       '/mobile/tracking/cancel',
       body: {'requestId': requestId, 'userId': userId},
     );
+  }
+
+  Future<Map<String, dynamic>> uploadRequestPhoto(String imageBase64) {
+    return _api.post('/mobile/requests/photos/upload', body: {'imageBase64': imageBase64});
   }
 
   // Worker descarta su oferta pendiente → vuelve al estado sin oferta
@@ -657,11 +672,13 @@ class MobileBackendService {
 
   // --- History ---
 
-  Future<Map<String, dynamic>> getWorkerHistory({required String workerUserId}) {
+  Future<Map<String, dynamic>> getWorkerHistory(
+      {required String workerUserId}) {
     return _api.get('/mobile/worker/history?workerUserId=$workerUserId');
   }
 
-  Future<Map<String, dynamic>> getClientHistory({required String clientUserId}) {
+  Future<Map<String, dynamic>> getClientHistory(
+      {required String clientUserId}) {
     return _api.get('/mobile/client/history?clientUserId=$clientUserId');
   }
 

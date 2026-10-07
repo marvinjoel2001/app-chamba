@@ -57,6 +57,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   void initState() {
     super.initState();
     _realtime.on('job.client_confirmed', _onClientConfirmed);
+    _realtime.on('job.clock.updated', _onClientConfirmed);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
     _realtime.reconnectCount.addListener(_onReconnect);
@@ -78,6 +79,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   void dispose() {
     _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('job.client_confirmed', _onClientConfirmed);
+    _realtime.off('job.clock.updated', _onClientConfirmed);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
     _pollTimer?.cancel();
@@ -232,17 +234,26 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           return;
         }
 
-        final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
-        final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
-        final destLat = (_tracking?['destination']?['latitude'] as num?)?.toDouble();
-        final destLng = (_tracking?['destination']?['longitude'] as num?)?.toDouble();
+        final workerLat =
+            (_tracking?['worker']?['latitude'] as num?)?.toDouble();
+        final workerLng =
+            (_tracking?['worker']?['longitude'] as num?)?.toDouble();
+        final destLat =
+            (_tracking?['destination']?['latitude'] as num?)?.toDouble();
+        final destLng =
+            (_tracking?['destination']?['longitude'] as num?)?.toDouble();
 
-        final workerPos = _deviceLocation ?? (workerLat != null && workerLng != null ? LatLng(workerLat, workerLng) : null);
+        final workerPos = _deviceLocation ??
+            (workerLat != null && workerLng != null
+                ? LatLng(workerLat, workerLng)
+                : null);
         if (workerPos != null && destLat != null && destLng != null) {
           final destPos = LatLng(destLat, destLng);
           if (_lastRouteFetchPos == null ||
-              (workerPos.latitude - _lastRouteFetchPos!.latitude).abs() > 0.0005 ||
-              (workerPos.longitude - _lastRouteFetchPos!.longitude).abs() > 0.0005) {
+              (workerPos.latitude - _lastRouteFetchPos!.latitude).abs() >
+                  0.0005 ||
+              (workerPos.longitude - _lastRouteFetchPos!.longitude).abs() >
+                  0.0005) {
             _lastRouteFetchPos = workerPos;
             _fetchRoute(workerPos, destPos);
           }
@@ -264,12 +275,14 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     try {
       final url = Uri.parse(
           'https://api.mapbox.com/directions/v5/mapbox/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?geometries=geojson&access_token=$token');
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
           final coords = data['routes'][0]['geometry']['coordinates'] as List;
-          final points = coords.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
+          final points = coords
+              .map((c) => LatLng(c[1] as double, c[0] as double))
+              .toList();
           if (mounted) {
             setState(() {
               _routePoints = points;
@@ -505,7 +518,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final user = SessionStore.currentUser;
     if (user == null) return;
 
-    String? threadId = widget.requestId == SessionStore.activeRequestId ? SessionStore.activeThreadId : null;
+    String? threadId = widget.requestId == SessionStore.activeRequestId
+        ? SessionStore.activeThreadId
+        : null;
     final client = _tracking?['client'] as Map<String, dynamic>?;
 
     if (threadId == null) {
@@ -522,7 +537,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           final map = t as Map<String, dynamic>;
           if (map['requestId']?.toString() == widget.requestId) {
             threadId = map['id']?.toString();
-            if (SessionStore.activeRequestId == widget.requestId) SessionStore.activeThreadId = threadId;
+            if (SessionStore.activeRequestId == widget.requestId)
+              SessionStore.activeThreadId = threadId;
             break;
           }
         }
@@ -604,10 +620,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   /// disputa formal y chat con soporte. Antes era un popup aparte sin chat.
   Future<void> _openReport() async {
     final isWorker = SessionStore.currentUser?.type == 'worker';
-    final targetUser = (isWorker
-            ? _tracking?['client']?['id']
-            : _tracking?['worker']?['id'])
-        ?.toString();
+    final targetUser =
+        (isWorker ? _tracking?['client']?['id'] : _tracking?['worker']?['id'])
+            ?.toString();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SupportScreen(
@@ -691,643 +706,684 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
-      body: Stack(
-        children: [
-          // ── MAPA ──────────────────────────────────────────────────────
-          Positioned.fill(
-            child: AppConfig.mapboxAccessToken.trim().isEmpty
-                ? Container(
-                    color: AppTheme.colorBackgroundAccent,
-                    child: const Center(
-                      child: Icon(
-                        Icons.map,
-                        color: AppTheme.colorMuted,
-                        size: 64,
-                      ),
-                    ),
-                  )
-                : FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: mapCenter,
-                      initialZoom: destPos != null ? 13 : 15,
-                      onMapEvent: (event) {
-                        // Cualquier gesto del usuario (arrastrar, pellizcar,
-                        // doble tap) apaga el auto-centrado; los movimientos
-                        // programáticos (mapController/fitCamera) no.
-                        final isUserGesture = event.source !=
-                                MapEventSource.mapController &&
-                            event.source != MapEventSource.fitCamera &&
-                            event.source !=
-                                MapEventSource.nonRotatedSizeChange;
-                        if (isUserGesture && _followWorker) {
-                          setState(() => _followWorker = false);
-                        }
-                      },
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
-                        userAgentPackageName: 'com.chambatrabajo.app',
-                        additionalOptions: {
-                          'accessToken': AppConfig.mapboxAccessToken,
-                        },
-                      ),
-                      // Línea de ruta entre worker y destino
-                      if (_routePoints.isNotEmpty)
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: _routePoints,
-                              color: AppTheme.colorPrimary.withValues(
-                                alpha: 0.8,
-                              ),
-                              strokeWidth: 4,
-                            ),
-                          ],
-                        )
-                      else if (destPos != null)
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: [workerPos, destPos],
-                              color: AppTheme.colorPrimary.withValues(
-                                alpha: 0.8,
-                              ),
-                              strokeWidth: 4,
-                            ),
-                          ],
-                        ),
-                      MarkerLayer(
-                        markers: [
-                          // Marcador del worker (punto azul con navegación)
-                          Marker(
-                            point: workerPos,
-                            width: 52,
-                            height: 52,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.blue.shade600,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 3,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.blue.withValues(alpha: 0.5),
-                                    blurRadius: 14,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.navigation,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
+      body: SafeArea(
+          top: false,
+          child: Stack(
+            children: [
+              // ── MAPA ──────────────────────────────────────────────────────
+              Positioned.fill(
+                child: AppConfig.mapboxAccessToken.trim().isEmpty
+                    ? Container(
+                        color: AppTheme.colorBackgroundAccent,
+                        child: const Center(
+                          child: Icon(
+                            Icons.map,
+                            color: AppTheme.colorMuted,
+                            size: 64,
                           ),
-                          // Marcador del destino (pin morado)
-                          if (destPos != null)
-                            Marker(
-                              point: destPos,
-                              width: 48,
-                              height: 48,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppTheme.colorPrimary,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.colorPrimary.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                      blurRadius: 12,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.location_on,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-          ),
-
-          // ── ETA BADGE ─────────────────────────────────────────────────
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A2A1A),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: AppTheme.colorSuccess.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.navigation,
-                        color: AppTheme.colorSuccess,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            etaMinutes != null ? '$etaMinutes min' : '--',
-                            style: const TextStyle(
-                              color: AppTheme.colorText,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const Text(
-                            'LLEGADA\nESTIMADA',
-                            style: TextStyle(
-                              color: AppTheme.colorSuccess,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── BACK BUTTON ───────────────────────────────────────────────
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.colorGlassDarkSoft,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── CONTROLES DE MAPA ─────────────────────────────────────────
-          Positioned(
-            right: 12,
-            top: MediaQuery.of(context).padding.top + 12,
-            child: Column(
-              children: [
-                _MapBtn(
-                  icon: Icons.add,
-                  onTap: () {
-                    final z = (_mapController.camera.zoom + 1).clamp(3.0, 20.0);
-                    _mapController.move(_mapController.camera.center, z);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _MapBtn(
-                  icon: Icons.remove,
-                  onTap: () {
-                    final z = (_mapController.camera.zoom - 1).clamp(3.0, 20.0);
-                    _mapController.move(_mapController.camera.center, z);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _MapBtn(
-                  icon: Icons.my_location,
-                  // Iluminado solo cuando el mapa sigue al worker, para que
-                  // se note el estado del seguimiento.
-                  highlighted: _followWorker,
-                  onTap: () {
-                    setState(() => _followWorker = true);
-                    final center = _deviceLocation ?? mapCenter;
-                    _mapController.move(center, 15);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _MapBtn(
-                  icon: Icons.route,
-                  onTap: () {
-                    // Ver la ruta completa es explorar: pausar el
-                    // auto-centrado para que no se pierda el encuadre.
-                    setState(() => _followWorker = false);
-                    if (destPos != null) {
-                      _mapController.fitCamera(
-                        CameraFit.bounds(
-                          bounds: LatLngBounds.fromPoints([workerPos, destPos]),
-                          padding: const EdgeInsets.only(top: 100, left: 50, right: 50, bottom: 300),
-                        ),
-                      );
-                    } else {
-                      final center = _deviceLocation ?? mapCenter;
-                      _mapController.move(center, 15);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // ── BOTTOM CARD ───────────────────────────────────────────────
-          DraggableScrollableSheet(
-            initialChildSize: 0.35,
-            minChildSize: 0.10,
-            maxChildSize: 0.55,
-            snap: true,
-            snapSizes: const [0.10, 0.35, 0.55],
-            builder: (context, scrollController) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0D1728),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 10,
-                      offset: Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.colorMuted.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    if (_loading)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (_error != null && _tracking == null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 36),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Error de conexión',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            ChambaSecondaryButton(
-                              label: 'Reintentar',
-                              icon: Icons.refresh,
-                              onPressed: _load,
-                            ),
-                          ],
                         ),
                       )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                    : FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: mapCenter,
+                          initialZoom: destPos != null ? 13 : 15,
+                          onMapEvent: (event) {
+                            // Cualquier gesto del usuario (arrastrar, pellizcar,
+                            // doble tap) apaga el auto-centrado; los movimientos
+                            // programáticos (mapController/fitCamera) no.
+                            final isUserGesture =
+                                event.source != MapEventSource.mapController &&
+                                    event.source != MapEventSource.fitCamera &&
+                                    event.source !=
+                                        MapEventSource.nonRotatedSizeChange;
+                            if (isUserGesture && _followWorker) {
+                              setState(() => _followWorker = false);
+                            }
+                          },
+                        ),
                         children: [
-                          if (_error != null)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _error!,
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                                    ),
+                          TileLayer(
+                            urlTemplate:
+                                'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                            userAgentPackageName: 'com.chambatrabajo.app',
+                            additionalOptions: {
+                              'accessToken': AppConfig.mapboxAccessToken,
+                            },
+                          ),
+                          // Línea de ruta entre worker y destino
+                          if (_routePoints.isNotEmpty)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: _routePoints,
+                                  color: AppTheme.colorPrimary.withValues(
+                                    alpha: 0.8,
                                   ),
-                                  TextButton(
-                                    onPressed: _load,
-                                    child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.colorSuccessSoft,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    workerArrived
-                                        ? clientConfirmed
-                                            ? 'EN TRABAJO'
-                                            : 'LLEGASTE'
-                                        : 'EN CAMINO',
-                                    style: const TextStyle(
-                                      color: AppTheme.colorSuccess,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
+                                  strokeWidth: 4,
                                 ),
-                                const Spacer(),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      amount != null ? 'Bs $amount' : '',
-                                      style: const TextStyle(
-                                        color: AppTheme.colorText,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    if (modalityLabel != null)
-                                      Text(
-                                        modalityLabel,
-                                        style: const TextStyle(
-                                          color: AppTheme.colorMuted,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                  ],
+                              ],
+                            )
+                          else if (destPos != null)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: [workerPos, destPos],
+                                  color: AppTheme.colorPrimary.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  strokeWidth: 4,
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                color: AppTheme.colorText,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: AppTheme.colorSurfaceSoft,
-                                  backgroundImage: client?['profilePhotoUrl'] !=
-                                          null
-                                      ? NetworkImage(
-                                          client!['profilePhotoUrl'] as String,
-                                        )
-                                      : null,
-                                  child: client?['profilePhotoUrl'] == null
-                                      ? Text(
-                                          chambaInitial(client?['firstName'],
-                                              fallback: 'C'),
-                                          style: const TextStyle(
-                                            color: AppTheme.colorText,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      : null,
+                          MarkerLayer(
+                            markers: [
+                              // Marcador del worker (punto azul con navegación)
+                              Marker(
+                                point: workerPos,
+                                width: 52,
+                                height: 52,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.blue.shade600,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            Colors.blue.withValues(alpha: 0.5),
+                                        blurRadius: 14,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.navigation,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                              ),
+                              // Marcador del destino (pin morado)
+                              if (destPos != null)
+                                Marker(
+                                  point: destPos,
+                                  width: 48,
+                                  height: 48,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppTheme.colorPrimary,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 3,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color:
+                                              AppTheme.colorPrimary.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                          blurRadius: 12,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+              ),
+
+              // ── ETA BADGE ─────────────────────────────────────────────────
+              if (!workerArrived)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2A1A),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: AppTheme.colorSuccess.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.navigation,
+                              color: AppTheme.colorSuccess,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  etaMinutes != null ? '$etaMinutes min' : '--',
+                                  style: const TextStyle(
+                                    color: AppTheme.colorText,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const Text(
+                                  'LLEGADA\nESTIMADA',
+                                  style: TextStyle(
+                                    color: AppTheme.colorSuccess,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ── BACK BUTTON ───────────────────────────────────────────────
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTheme.colorGlassDarkSoft,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── CONTROLES DE MAPA ─────────────────────────────────────────
+              Positioned(
+                right: 12,
+                top: MediaQuery.of(context).padding.top + 12,
+                child: Column(
+                  children: [
+                    _MapBtn(
+                      icon: Icons.add,
+                      onTap: () {
+                        final z =
+                            (_mapController.camera.zoom + 1).clamp(3.0, 20.0);
+                        _mapController.move(_mapController.camera.center, z);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _MapBtn(
+                      icon: Icons.remove,
+                      onTap: () {
+                        final z =
+                            (_mapController.camera.zoom - 1).clamp(3.0, 20.0);
+                        _mapController.move(_mapController.camera.center, z);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _MapBtn(
+                      icon: Icons.my_location,
+                      // Iluminado solo cuando el mapa sigue al worker, para que
+                      // se note el estado del seguimiento.
+                      highlighted: _followWorker,
+                      onTap: () {
+                        setState(() => _followWorker = true);
+                        final center = _deviceLocation ?? mapCenter;
+                        _mapController.move(center, 15);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _MapBtn(
+                      icon: Icons.route,
+                      onTap: () {
+                        // Ver la ruta completa es explorar: pausar el
+                        // auto-centrado para que no se pierda el encuadre.
+                        setState(() => _followWorker = false);
+                        if (destPos != null) {
+                          _mapController.fitCamera(
+                            CameraFit.bounds(
+                              bounds:
+                                  LatLngBounds.fromPoints([workerPos, destPos]),
+                              padding: const EdgeInsets.only(
+                                  top: 100, left: 50, right: 50, bottom: 300),
+                            ),
+                          );
+                        } else {
+                          final center = _deviceLocation ?? mapCenter;
+                          _mapController.move(center, 15);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── BOTTOM CARD ───────────────────────────────────────────────
+              DraggableScrollableSheet(
+                initialChildSize: 0.45,
+                minChildSize: 0.10,
+                maxChildSize: 0.75,
+                snap: true,
+                snapSizes: const [0.10, 0.45, 0.75],
+                builder: (context, scrollController) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0D1728),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(28)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black54,
+                          blurRadius: 10,
+                          offset: Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: ListView(
+                      controller: scrollController,
+                      padding: EdgeInsets.fromLTRB(
+                          20, 0, 20, 32 + MediaQuery.paddingOf(context).bottom),
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.colorMuted.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_error != null && _tracking == null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 24, horizontal: 16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.cloud_off_rounded,
+                                      color: Colors.redAccent, size: 36),
+                                ),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Error de conexión',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                ChambaSecondaryButton(
+                                  label: 'Reintentar',
+                                  icon: Icons.refresh,
+                                  onPressed: _load,
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_error != null)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color:
+                                            Colors.red.withValues(alpha: 0.35)),
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'
-                                            .trim(),
-                                        style: const TextStyle(
-                                          color: AppTheme.colorText,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 16,
+                                      const Icon(Icons.warning_amber_rounded,
+                                          color: Colors.orangeAccent, size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _error!,
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13),
                                         ),
                                       ),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.location_on,
-                                            color: AppTheme.colorMuted,
-                                            size: 13,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              address,
-                                              style: const TextStyle(
-                                                color: AppTheme.colorMuted,
-                                                fontSize: 12,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
+                                      TextButton(
+                                        onPressed: _load,
+                                        child: const Text('Reintentar',
+                                            style: TextStyle(
+                                                color: AppTheme.colorPrimary,
+                                                fontWeight: FontWeight.bold)),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            if (distanceKm != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorSurfaceSoft,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.straighten,
-                                      color: AppTheme.colorMuted,
-                                      size: 16,
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
                                     ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.colorSuccessSoft,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      workerArrived
+                                          ? clientConfirmed
+                                              ? 'EN TRABAJO'
+                                              : 'LLEGASTE'
+                                          : 'EN CAMINO',
                                       style: const TextStyle(
-                                        color: AppTheme.colorMuted,
-                                        fontSize: 13,
+                                        color: AppTheme.colorSuccess,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                  const Spacer(),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        amount != null ? 'Bs $amount' : '',
+                                        style: const TextStyle(
+                                          color: AppTheme.colorText,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      if (modalityLabel != null)
+                                        Text(
+                                          modalityLabel,
+                                          style: const TextStyle(
+                                            color: AppTheme.colorMuted,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: AppTheme.colorText,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                // Botón real solo cuando hay acción posible;
-                                // los estados de espera se muestran como
-                                // indicadores (un botón deshabilitado parece
-                                // que la app está fallando).
-                                Expanded(
-                                  flex: 3,
-                                  child: clientConfirmed
-                                      ? ChambaPrimaryButton(
-                                          label: 'TRABAJO TERMINADO',
-                                          icon: Icons.check_circle,
-                                          isYellow: true,
-                                          onPressed: _completeJob,
-                                        )
-                                      : workerArrived
-                                          ? const _JobStatusBanner(
-                                              icon: Icons.hourglass_top,
-                                              text:
-                                                  'Esperando confirmación del cliente…',
-                                            )
-                                          : ChambaPrimaryButton(
-                                              label: 'LLEGUÉ AL SITIO',
-                                              icon: _isWithinArrivalZone
-                                                  ? Icons.location_on
-                                                  : Icons.location_searching,
-                                              onPressed: _markArrived,
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: AppTheme.colorSurfaceSoft,
+                                    backgroundImage:
+                                        client?['profilePhotoUrl'] != null
+                                            ? NetworkImage(
+                                                client!['profilePhotoUrl']
+                                                    as String,
+                                              )
+                                            : null,
+                                    child: client?['profilePhotoUrl'] == null
+                                        ? Text(
+                                            chambaInitial(client?['firstName'],
+                                                fallback: 'C'),
+                                            style: const TextStyle(
+                                              color: AppTheme.colorText,
+                                              fontWeight: FontWeight.w700,
                                             ),
-                                ),
-                                const SizedBox(width: 10),
-                                // Chat directo con el cliente + badge de no leídos
-                                ValueListenableBuilder<int>(
-                                  valueListenable:
-                                      UnreadMessagesNotifier.instance,
-                                  builder: (context, unread, _) {
-                                    return Stack(
-                                      clipBehavior: Clip.none,
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        _ActionIconButton(
-                                          icon: Icons.chat_bubble_outline,
-                                          color: AppTheme.colorPrimary,
-                                          onTap: () {
-                                            UnreadMessagesNotifier.instance
-                                                .reset();
-                                            _openChat();
-                                          },
+                                        Text(
+                                          '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}'
+                                              .trim(),
+                                          style: const TextStyle(
+                                            color: AppTheme.colorText,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
                                         ),
-                                        if (unread > 0)
-                                          Positioned(
-                                            top: -4,
-                                            right: -4,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(3),
-                                              constraints: const BoxConstraints(
-                                                minWidth: 18,
-                                                minHeight: 18,
-                                              ),
-                                              decoration: const BoxDecoration(
-                                                color: AppTheme.colorError,
-                                                shape: BoxShape.circle,
-                                              ),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.location_on,
+                                              color: AppTheme.colorMuted,
+                                              size: 13,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
                                               child: Text(
-                                                unread > 99 ? '99+' : '$unread',
+                                                address,
                                                 style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w800,
+                                                  color: AppTheme.colorMuted,
+                                                  fontSize: 12,
                                                 ),
-                                                textAlign: TextAlign.center,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                          ),
+                                          ],
+                                        ),
                                       ],
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                TextButton(
-                                  onPressed: _cancelJob,
-                                  child: const Text(
-                                    'Cancelar trabajo',
-                                    style: TextStyle(color: AppTheme.colorError),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (distanceKm != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorSurfaceSoft,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.straighten,
+                                        color: AppTheme.colorMuted,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${(distanceKm as num).toStringAsFixed(1)} km de distancia',
+                                        style: const TextStyle(
+                                          color: AppTheme.colorMuted,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                TextButton(
-                                  onPressed: _openReport,
-                                  child: const Text(
-                                    'Reportar Problema',
-                                    style: TextStyle(color: AppTheme.colorError, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
+                              if (clientConfirmed && modality == 'hourly') ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                    '${_tracking?['workPaused'] == true ? 'En pausa' : 'Tiempo trabajado'} · '
+                                    '${Duration(seconds: workElapsedSeconds ?? 0).toString().split('.').first}',
+                                    style: const TextStyle(
+                                        color: AppTheme.colorPrimary)),
+                                Text(
+                                    'Acumulado: Bs ${((_tracking?['currentAmount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                        color: AppTheme.colorSuccess)),
                               ],
-                            ),
-                        ],
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  // Botón real solo cuando hay acción posible;
+                                  // los estados de espera se muestran como
+                                  // indicadores (un botón deshabilitado parece
+                                  // que la app está fallando).
+                                  Expanded(
+                                    flex: 3,
+                                    child: clientConfirmed
+                                        ? ChambaPrimaryButton(
+                                            label: 'TRABAJO TERMINADO',
+                                            icon: Icons.check_circle,
+                                            isYellow: true,
+                                            onPressed: _completeJob,
+                                          )
+                                        : workerArrived
+                                            ? const _JobStatusBanner(
+                                                icon: Icons.hourglass_top,
+                                                text:
+                                                    'Esperando confirmación del cliente…',
+                                              )
+                                            : ChambaPrimaryButton(
+                                                label: 'LLEGUÉ AL SITIO',
+                                                icon: _isWithinArrivalZone
+                                                    ? Icons.location_on
+                                                    : Icons.location_searching,
+                                                onPressed: _markArrived,
+                                              ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // Chat directo con el cliente + badge de no leídos
+                                  ValueListenableBuilder<int>(
+                                    valueListenable:
+                                        UnreadMessagesNotifier.instance,
+                                    builder: (context, unread, _) {
+                                      return Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          _ActionIconButton(
+                                            icon: Icons.chat_bubble_outline,
+                                            color: AppTheme.colorPrimary,
+                                            onTap: () {
+                                              UnreadMessagesNotifier.instance
+                                                  .reset();
+                                              _openChat();
+                                            },
+                                          ),
+                                          if (unread > 0)
+                                            Positioned(
+                                              top: -4,
+                                              right: -4,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.all(3),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                  minWidth: 18,
+                                                  minHeight: 18,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: AppTheme.colorError,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Text(
+                                                  unread > 99
+                                                      ? '99+'
+                                                      : '$unread',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  TextButton(
+                                    onPressed: _cancelJob,
+                                    child: const Text(
+                                      'Cancelar trabajo',
+                                      style:
+                                          TextStyle(color: AppTheme.colorError),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextButton(
+                                    onPressed: _openReport,
+                                    child: const Text(
+                                      'Reportar Problema',
+                                      style: TextStyle(
+                                          color: AppTheme.colorError,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          )),
     );
   }
 }

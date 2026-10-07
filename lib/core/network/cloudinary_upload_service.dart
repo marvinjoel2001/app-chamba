@@ -48,13 +48,14 @@ class CloudinaryUploadService {
     );
     final request = http.MultipartRequest('POST', endpoint)
       ..fields['upload_preset'] = uploadPreset
+      ..fields['api_key'] = AppConfig.cloudinaryApiKey
       ..fields['folder'] = folder
       ..files.add(
         http.MultipartFile.fromBytes('file', bytes, filename: fileName),
       );
 
-    final streamed = await _client.send(request);
-    final response = await http.Response.fromStream(streamed);
+    final streamed = await _client.send(request).timeout(const Duration(seconds: 45));
+    final response = await http.Response.fromStream(streamed).timeout(const Duration(seconds: 30));
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final secureUrl = payload['secure_url'] as String?;
     final publicId = payload['public_id'] as String?;

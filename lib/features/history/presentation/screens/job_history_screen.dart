@@ -37,8 +37,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       });
 
       final result = _isClient
-          ? await MobileBackendService.instance.getClientHistory(clientUserId: user.id)
-          : await MobileBackendService.instance.getWorkerHistory(workerUserId: user.id);
+          ? await MobileBackendService.instance
+              .getClientHistory(clientUserId: user.id)
+          : await MobileBackendService.instance
+              .getWorkerHistory(workerUserId: user.id);
 
       if (mounted) {
         setState(() {
@@ -70,9 +72,11 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: AppTheme.colorError),
+                        const Icon(Icons.error_outline,
+                            size: 48, color: AppTheme.colorError),
                         const SizedBox(height: 16),
-                        Text(_error!, style: const TextStyle(color: Colors.white)),
+                        Text(_error!,
+                            style: const TextStyle(color: Colors.white)),
                         const SizedBox(height: 16),
                         ChambaPrimaryButton(
                           label: 'Reintentar',
@@ -85,9 +89,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                     ? Center(
                         child: Text(
                           'Aún no tienes historial de trabajos.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.colorMuted,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.colorMuted,
+                                  ),
                         ),
                       )
                     : RefreshIndicator(
@@ -109,8 +114,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     final photoUrl = job['photoUrl'] as String?;
     final title = job['title'] as String? ?? 'Trabajo';
     final requestStatus = job['requestStatus'] as String? ?? '';
-    final amount = job['amount'] != null ? NumberFormat.currency(symbol: '\$').format(job['amount']) : 'N/A';
-    
+    final amount = job['amount'] != null
+        ? NumberFormat.currency(symbol: 'Bs ').format(job['amount'])
+        : 'N/A';
+
     // Parse date
     final rawDate = _isClient ? job['createdAt'] : job['acceptedAt'];
     String formattedDate = '';
@@ -123,7 +130,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
 
     final isCompleted = requestStatus == 'completed';
     final isCancelled = requestStatus == 'cancelled';
-    
+
     Color statusColor = AppTheme.colorPrimary;
     String statusText = 'Asignado';
     if (isCompleted) {
@@ -135,7 +142,9 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     }
 
     final otherUser = _isClient ? job['worker'] : job['client'];
-    final otherName = otherUser != null ? '${otherUser['firstName']} ${otherUser['lastName']}'.trim() : 'Sin asignar';
+    final otherName = otherUser != null
+        ? '${otherUser['firstName']} ${otherUser['lastName']}'.trim()
+        : 'Sin asignar';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -164,7 +173,8 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                   color: AppTheme.colorPrimary.withOpacity(0.1),
                   child: photoUrl != null
                       ? Image.network(photoUrl, fit: BoxFit.cover)
-                      : const Icon(Icons.work_outline, color: AppTheme.colorPrimary, size: 36),
+                      : const Icon(Icons.work_outline,
+                          color: AppTheme.colorPrimary, size: 36),
                 ),
               ),
               const SizedBox(width: 16),
@@ -218,11 +228,13 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
+                            border:
+                                Border.all(color: statusColor.withOpacity(0.5)),
                           ),
                           child: Text(
                             statusText,

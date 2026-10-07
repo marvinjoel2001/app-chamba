@@ -6,6 +6,7 @@ import '../../app.dart';
 enum ToastType { info, success, error }
 
 class ToastService {
+  static final ValueNotifier<bool> isVisible = ValueNotifier(false);
   static OverlayEntry? _overlayEntry;
   static Timer? _timer;
 
@@ -49,6 +50,7 @@ class ToastService {
     );
 
     overlayState.insert(_overlayEntry!);
+    isVisible.value = true;
 
     _timer = Timer(duration, () {
       _hide();
@@ -68,6 +70,7 @@ class ToastService {
       _overlayEntry?.remove();
     } catch (_) {}
     _overlayEntry = null;
+    isVisible.value = false;
   }
 
   static Widget _buildToastWidget(

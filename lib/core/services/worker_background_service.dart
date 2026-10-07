@@ -26,7 +26,6 @@ class WorkerBackgroundService {
       FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
-
     if (Platform.isAndroid) {
       const channel = AndroidNotificationChannel(
         _channelId,
@@ -73,6 +72,15 @@ class WorkerBackgroundService {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    final rawUser = prefs.getString('session_user');
+    final user = rawUser == null ? null : jsonDecode(rawUser);
+    if (user is! Map ||
+        user['type'] != 'worker' ||
+        prefs.getString('session_access_token') == null) {
+      await prefs.setBool(_enabledKey, false);
+      await stop();
+      return;
+    }
     final enabled = prefs.getBool(_enabledKey) ?? false;
     if (enabled) {
       await start();
@@ -83,6 +91,16 @@ class WorkerBackgroundService {
     if (!Platform.isAndroid) {
       return;
     }
+    final prefs = await SharedPreferences.getInstance();
+    final rawUser = prefs.getString('session_user');
+    final user = rawUser == null ? null : jsonDecode(rawUser);
+    if (user is! Map ||
+        user['type'] != 'worker' ||
+        prefs.getString('session_access_token') == null) {
+      await prefs.setBool(_enabledKey, false);
+      await stop();
+      return;
+    }
     final running = await _service.isRunning();
     if (!running) {
       await _service.startService();
@@ -90,6 +108,7 @@ class WorkerBackgroundService {
   }
 
   static Future<void> stop() async {
+    if (!Platform.isAndroid) return;
     final running = await _service.isRunning();
     if (!running) {
       return;
@@ -114,6 +133,7 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
       await prefs.reload();
       final enabled = prefs.getBool('worker_bg_enabled') ?? false;
       if (!enabled) {
+        service.stopSelf();
         return;
       }
 
@@ -132,6 +152,7 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
       final userId = decoded['id']?.toString();
       final userType = decoded['type']?.toString().toLowerCase();
       if (userId == null || userId.isEmpty || userType != 'worker') {
+        service.stopSelf();
         return;
       }
 
@@ -154,21 +175,26 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
 
       final base = AppConfig.apiBaseUrl;
       final uri = Uri.parse('$base/mobile/worker/location');
-      await client.post(
-        uri,
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $accessToken'},
-        body: jsonEncode({
-          'workerUserId': userId,
-          'latitude': pos.latitude,
-          'longitude': pos.longitude,
-        }),
-      );
+      final response = await client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $accessToken'
+            },
+            body: jsonEncode({
+              'workerUserId': userId,
+              'latitude': pos.latitude,
+              'longitude': pos.longitude,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode >= 400) return;
 
       if (service is AndroidServiceInstance) {
         await service.setForegroundNotificationInfo(
           title: 'Chamba Worker activo',
-          content:
-              'Disponible en segundo plano (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})',
+          content: 'Seguimiento de ubicación activo en segundo plano',
         );
       }
     } catch (_) {

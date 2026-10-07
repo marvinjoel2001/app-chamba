@@ -273,11 +273,13 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   List<Marker> get _workerMarkers {
-    return _workers.map((raw) {
+    return _workers.expand<Marker>((raw) {
       final worker = raw as Map<String, dynamic>;
-      final lat = (worker['latitude'] as num?)?.toDouble() ?? -16.5002;
-      final lng = (worker['longitude'] as num?)?.toDouble() ?? -68.1342;
-      return Marker(
+      final lat = (worker['latitude'] as num?)?.toDouble();
+      final lng = (worker['longitude'] as num?)?.toDouble();
+      // Sin ubicación real no se dibuja: antes aparecían todos en La Paz.
+      if (lat == null || lng == null) return const <Marker>[];
+      return [Marker(
         point: LatLng(lat, lng),
         width: 54,
         height: 54,
@@ -286,7 +288,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.82),
           child: const Icon(Icons.handyman, color: Colors.white, size: 22),
         ),
-      );
+      )];
     }).toList();
   }
 

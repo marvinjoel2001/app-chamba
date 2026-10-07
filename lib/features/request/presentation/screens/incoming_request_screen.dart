@@ -14,7 +14,6 @@ import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/start_date_label.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../../core/widgets/confetti_celebration.dart';
 import '../../../../core/widgets/new_request_pulse.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
@@ -24,7 +23,8 @@ import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
 class IncomingRequestScreen extends StatefulWidget {
-  const IncomingRequestScreen({this.isActive = true, this.focusRequestId, super.key});
+  const IncomingRequestScreen(
+      {this.isActive = true, this.focusRequestId, super.key});
 
   final String? focusRequestId;
 
@@ -50,6 +50,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   bool _available = SessionStore.currentUser?.isAvailable ?? true;
   bool _togglingAvailability = false;
   bool _isMapInitialized = false;
+  bool _mapReady = false;
   bool _locatingMe = false;
 
   // El cliente hizo una contraoferta al worker
@@ -78,6 +79,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
     return false;
   }
+
   final List<String> _categories = [
     'Limpieza',
     'Jardinería',
@@ -228,6 +230,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         return;
       }
 
+      final initial = await Geolocator.getLastKnownPosition();
+      if (!mounted) return;
+      if (initial != null)
+        setState(() =>
+            _workerLocation = LatLng(initial.latitude, initial.longitude));
+      _centerMapOnce();
       await _locationStreamSubscription?.cancel();
 
       _locationStreamSubscription = Geolocator.getPositionStream(
@@ -241,12 +249,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         final loc = LatLng(pos.latitude, pos.longitude);
         setState(() => _workerLocation = loc);
 
-        if (!_isMapInitialized) {
-          _isMapInitialized = true;
-          try {
-            _mapController.move(loc, 14);
-          } catch (_) {}
-        }
+        _centerMapOnce();
 
         final user = SessionStore.currentUser;
         if (user != null) {
@@ -502,7 +505,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     );
   }
 
-  void _onReconnect() { if (mounted) _load(silent: true); }
+  void _onReconnect() {
+    if (mounted) _load(silent: true);
+  }
 
   void _onNewRequest(dynamic payload) {
     // El banner lo muestra el shell (el worker puede estar en otra pestaña) y
@@ -529,7 +534,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onJobCompleted(dynamic payload) {
-    SessionStore.clearActiveJob(requestId: payload is Map ? payload['requestId']?.toString() : null);
+    SessionStore.clearActiveJob(
+        requestId: payload is Map ? payload['requestId']?.toString() : null);
     if (mounted) {
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'completed');
@@ -547,13 +553,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _onJobCancelled(dynamic payload) {
-    SessionStore.clearActiveJob(requestId: payload is Map ? payload['requestId']?.toString() : null);
+    SessionStore.clearActiveJob(
+        requestId: payload is Map ? payload['requestId']?.toString() : null);
     if (mounted) {
       setState(() {
         _requests.removeWhere((r) => r['status'] == 'cancelled');
       });
-
-
     }
   }
 
@@ -580,7 +585,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (mounted) {
       setState(() {
         _clientCountered = true;
-        final currentIdx = _requests.indexWhere((r) => r['id']?.toString() == eventRequestId);
+        final currentIdx =
+            _requests.indexWhere((r) => r['id']?.toString() == eventRequestId);
         if (currentIdx != -1) {
           if (newBudget != null) {
             _requests[currentIdx]['budget'] = newBudget;
@@ -588,7 +594,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           _requests[currentIdx]['workerOffer'] = null;
         }
       });
-
     }
     _load(silent: true);
   }
@@ -600,18 +605,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         map['workerUserId'].toString() != userId) {
       return;
     }
-    if (mounted) {
-      ConfettiCelebration.show(
-        context,
-        title: '🎉 ¡OFERTA ACEPTADA!',
-        subtitle: '¡El cliente ha seleccionado tu oferta para este trabajo!',
-      );
-      setState(() => _showAcceptedBanner = true);
-      _acceptedAnimCtrl.forward(from: 0);
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) setState(() => _showAcceptedBanner = false);
-      });
-    }
+    // The shared notification presenter owns the acceptance alert. This listener only refreshes state.
     _load(silent: true);
   }
 
@@ -636,26 +630,26 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   void _tickOfferCountdown() {
     if (!mounted || !_available || _requests.isEmpty) return;
-    
+
     bool changed = false;
     for (var request in _requests) {
       final offer = request['workerOffer'];
       if (offer is! Map<String, dynamic>) continue;
       if (offer['status']?.toString() != 'pending') continue;
-      
+
       final remaining = (offer['secondsRemaining'] as num?)?.toInt();
       if (remaining == null) continue;
-      
+
       if (remaining <= 1) {
         // Al menos una oferta expiró, recargamos.
         _load();
         return;
       }
-      
+
       offer['secondsRemaining'] = remaining - 1;
       changed = true;
     }
-    
+
     if (changed) {
       setState(() {});
     }
@@ -723,23 +717,23 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         }
         return;
       }
-              
+
       final rawRequests = response['requests'] as List<dynamic>? ?? [];
       final List<Map<String, dynamic>> fetchedRequests = [];
-      
+
       for (final req in rawRequests) {
         final mutableReq = _toMutableRequest(req);
         if (mutableReq != null) {
           fetchedRequests.add(mutableReq);
         }
       }
-      
+
       // Filtrar completados o cancelados
       fetchedRequests.removeWhere((r) {
         final st = r['status']?.toString();
         return st == 'completed' || st == 'cancelled';
       });
-      
+
       // Chequear si alguna oferta fue aceptada
       bool newlyAccepted = false;
       for (final req in fetchedRequests) {
@@ -754,22 +748,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           break;
         }
       }
-      
-      if (newlyAccepted && mounted) {
-        if (!_showAcceptedBanner) {
-          ConfettiCelebration.show(
-            context,
-            title: '🎉 ¡OFERTA ACEPTADA!',
-            subtitle: '¡El cliente ha seleccionado tu oferta para este trabajo!',
-          );
-          setState(() => _showAcceptedBanner = true);
-          _acceptedAnimCtrl.forward(from: 0);
-          Future.delayed(const Duration(seconds: 5), () {
-            if (mounted) setState(() => _showAcceptedBanner = false);
-          });
-        }
-      }
-      
+
+      // Polling never repeats the acceptance alert when reopening the app.
+
       if (newlyAccepted && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _sheetCtrl.isAttached) {
@@ -781,15 +762,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           }
         });
       }
-      
+
       if (mounted) {
         setState(() {
           _requests = fetchedRequests;
-          if (widget.focusRequestId != null) _requests.sort((a, b) => (b['id'] == widget.focusRequestId ? 1 : 0) - (a['id'] == widget.focusRequestId ? 1 : 0));
+          if (widget.focusRequestId != null)
+            _requests.sort((a, b) =>
+                (b['id'] == widget.focusRequestId ? 1 : 0) -
+                (a['id'] == widget.focusRequestId ? 1 : 0));
           _offerLifetimeSeconds =
               (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
           // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
-          _clientCountered = false; 
+          _clientCountered = false;
           _loading = false;
         });
       }
@@ -801,6 +785,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         });
       }
     }
+  }
+
+  void _centerMapOnce() {
+    if (!_mapReady || _isMapInitialized || _workerLocation == null) return;
+    _mapController.move(_workerLocation!, 14);
+    _isMapInitialized = true;
   }
 
   void _openJobInProgress(String requestId) {
@@ -837,6 +827,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     options: MapOptions(
                       initialCenter: mapCenter,
                       initialZoom: 14,
+                      onMapReady: () {
+                        _mapReady = true;
+                        _centerMapOnce();
+                      },
                     ),
                     children: [
                       TileLayer(
@@ -891,7 +885,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     // Toggle centrado con pulso y tooltip cuando está ocupado
                     _PulsingAvailabilityToggle(
                       available: _available,
-                      toggling: _togglingAvailability,
+                      busy: hasAcceptedRequest,
+                      toggling: _togglingAvailability || hasAcceptedRequest,
                       onToggle: () => _toggleAvailability(!_available),
                     ),
                     // Botón filtros pegado a la derecha
@@ -972,7 +967,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       )
                     else if (_error != null && _requests.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 32),
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -983,7 +979,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   color: Colors.red.withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 40),
+                                child: const Icon(Icons.cloud_off_rounded,
+                                    color: Colors.redAccent, size: 40),
                               ),
                               const SizedBox(height: 14),
                               const Text(
@@ -1023,33 +1020,42 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                           children: [
                             if (_error != null)
                               Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.red.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                                  border: Border.all(
+                                      color:
+                                          Colors.red.withValues(alpha: 0.35)),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                    const Icon(Icons.warning_amber_rounded,
+                                        color: Colors.orangeAccent, size: 20),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         _error!,
-                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                        style: const TextStyle(
+                                            color: Colors.white, fontSize: 13),
                                       ),
                                     ),
                                     TextButton(
                                       onPressed: () => _load(),
-                                      child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                      child: const Text('Reintentar',
+                                          style: TextStyle(
+                                              color: AppTheme.colorPrimary,
+                                              fontWeight: FontWeight.bold)),
                                     ),
                                   ],
                                 ),
                               ),
                             if (!hasAcceptedRequest)
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 child: Row(
                                   children: [
                                     const Text(
@@ -1063,23 +1069,32 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     const SizedBox(width: 8),
                                     Builder(builder: (context) {
                                       final filtered = _requests.where((req) {
-                                        if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
-                                          if (req['category']?.toString() != _selectedCategory) return false;
+                                        if (_selectedCategory != null &&
+                                            _selectedCategory!.isNotEmpty) {
+                                          if (req['category']?.toString() !=
+                                              _selectedCategory) return false;
                                         }
-                                        if (_selectedModality != null && _selectedModality!.isNotEmpty) {
-                                          final mod = req['modality']?.toString();
-                                          if (_selectedModality == 'hourly' && mod != 'hourly') return false;
-                                          if (_selectedModality == 'daily' && mod != 'daily') return false;
-                                          if (_selectedModality == 'full' && mod != 'fixed') return false;
+                                        if (_selectedModality != null &&
+                                            _selectedModality!.isNotEmpty) {
+                                          final mod =
+                                              req['modality']?.toString();
+                                          if (_selectedModality == 'hourly' &&
+                                              mod != 'hourly') return false;
+                                          if (_selectedModality == 'daily' &&
+                                              mod != 'daily') return false;
+                                          if (_selectedModality == 'full' &&
+                                              mod != 'fixed') return false;
                                         }
                                         return true;
                                       }).toList();
-                                      
+
                                       return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: AppTheme.colorPrimary,
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Text(
                                           '${filtered.length}',
@@ -1097,40 +1112,57 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             Builder(builder: (context) {
                               if (hasAcceptedRequest) {
                                 final acceptedReq = _requests.firstWhere((req) {
-                                  final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+                                  final workerOffer = req['workerOffer']
+                                      as Map<String, dynamic>?;
                                   return workerOffer?['status'] == 'accepted';
                                 });
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  child: _buildFloatingAcceptedCard(acceptedReq),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  child:
+                                      _buildFloatingAcceptedCard(acceptedReq),
                                 );
                               }
 
                               final filtered = _requests.where((req) {
-                                if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
-                                  if (req['category']?.toString() != _selectedCategory) return false;
+                                if (_selectedCategory != null &&
+                                    _selectedCategory!.isNotEmpty) {
+                                  if (req['category']?.toString() !=
+                                      _selectedCategory) return false;
                                 }
-                                if (_selectedModality != null && _selectedModality!.isNotEmpty) {
+                                if (_selectedModality != null &&
+                                    _selectedModality!.isNotEmpty) {
                                   final mod = req['modality']?.toString();
-                                  if (_selectedModality == 'hourly' && mod != 'hourly') return false;
-                                  if (_selectedModality == 'daily' && mod != 'daily') return false;
-                                  if (_selectedModality == 'full' && mod != 'fixed') return false;
+                                  if (_selectedModality == 'hourly' &&
+                                      mod != 'hourly') return false;
+                                  if (_selectedModality == 'daily' &&
+                                      mod != 'daily') return false;
+                                  if (_selectedModality == 'full' &&
+                                      mod != 'fixed') return false;
                                 }
                                 return true;
                               }).toList();
                               return ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 16),
                                 itemBuilder: (context, index) {
                                   final req = filtered[index];
-                                  final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
-                                  final offerStatus = workerOffer?['status']?.toString();
-                                  final secondsRemaining = (workerOffer?['secondsRemaining'] as num?)?.toInt();
-                                  final hasPendingOffer = offerStatus == 'pending';
-                                  final isAcceptedOffer = offerStatus == 'accepted';
+                                  final workerOffer = req['workerOffer']
+                                      as Map<String, dynamic>?;
+                                  final offerStatus =
+                                      workerOffer?['status']?.toString();
+                                  final secondsRemaining =
+                                      (workerOffer?['secondsRemaining'] as num?)
+                                          ?.toInt();
+                                  final hasPendingOffer =
+                                      offerStatus == 'pending';
+                                  final isAcceptedOffer =
+                                      offerStatus == 'accepted';
                                   final card = _buildRequestCard(
                                     req: req,
                                     workerOffer: workerOffer,
@@ -1138,15 +1170,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     secondsRemaining: secondsRemaining,
                                     hasPendingOffer: hasPendingOffer,
                                     isAcceptedOffer: isAcceptedOffer,
-                                    clientCountered: false, // You can enhance this if needed
+                                    clientCountered:
+                                        false, // You can enhance this if needed
                                   );
                                   // Destella solo la solicitud que acaba de
                                   // anunciarse, para que se distinga del resto
                                   // de la lista sin abrir nada.
                                   return ValueListenableBuilder<int>(
-                                    valueListenable:
-                                        NewRequestAlert.instance.highlightRevision,
-                                    builder: (context, _, child) => NewRequestPulse(
+                                    valueListenable: NewRequestAlert
+                                        .instance.highlightRevision,
+                                    builder: (context, _, child) =>
+                                        NewRequestPulse(
                                       active: NewRequestAlert.instance
                                           .isHighlighted(req['id']?.toString()),
                                       child: child!,
@@ -1181,30 +1215,30 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             right: 16,
                             bottom: constraints.maxHeight * sheetFraction + 12,
                             child: Material(
-                        color: AppTheme.colorPrimary,
-                        shape: const CircleBorder(),
-                        elevation: 4,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _centerOnMyLocation,
-                          child: SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: _locatingMe
-                                ? const Padding(
-                                    padding: EdgeInsets.all(14),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.my_location,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                      ),
+                              color: AppTheme.colorPrimary,
+                              shape: const CircleBorder(),
+                              elevation: 4,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _centerOnMyLocation,
+                                child: SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: _locatingMe
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(14),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.my_location,
+                                          color: Colors.white,
+                                        ),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       );
@@ -1399,8 +1433,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   SizedBox(height: 2),
                   Text(
                     'Toca para ir al seguimiento',
-                    style: TextStyle(
-                        color: AppTheme.colorMuted, fontSize: 13),
+                    style: TextStyle(color: AppTheme.colorMuted, fontSize: 13),
                   ),
                 ],
               ),
@@ -1440,7 +1473,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         !isDeclinedOffer &&
         myOfferAmount != null &&
         currentBudget > myOfferAmount;
-    
+
     final client = req['client'] as Map<String, dynamic>? ?? {};
     final clientName = client['name']?.toString() ?? 'Cliente';
     final clientPhoto = client['profilePhotoUrl']?.toString();
@@ -1448,15 +1481,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final clientReviews = (client['reviews'] as num?)?.toInt() ?? 0;
     final isVerified = client['isVerified'] == true;
     final createdAt = req['createdAt']?.toString();
-    final parsedDate = createdAt != null ? DateTime.tryParse(createdAt)?.toLocal() : null;
-    final isNew = parsedDate != null && DateTime.now().difference(parsedDate).inMinutes < 2;
+    final parsedDate =
+        createdAt != null ? DateTime.tryParse(createdAt)?.toLocal() : null;
+    final isNew = parsedDate != null &&
+        DateTime.now().difference(parsedDate).inMinutes < 2;
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isNew ? AppTheme.colorSuccess.withOpacity(0.5) : AppTheme.colorGlassBorderSoft,
+          color: isNew
+              ? AppTheme.colorSuccess.withOpacity(0.5)
+              : AppTheme.colorGlassBorderSoft,
         ),
         gradient: isNew
             ? LinearGradient(
@@ -1479,7 +1516,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               CircleAvatar(
                 radius: 24,
                 backgroundColor: AppTheme.colorBackgroundAccent,
-                backgroundImage: clientPhoto != null ? NetworkImage(clientPhoto) : null,
+                backgroundImage:
+                    clientPhoto != null ? NetworkImage(clientPhoto) : null,
                 child: clientPhoto == null
                     ? const Icon(Icons.person, color: AppTheme.colorMuted)
                     : null,
@@ -1505,7 +1543,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ),
                         if (isVerified) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: AppTheme.colorPrimary, size: 16),
+                          const Icon(Icons.verified,
+                              color: AppTheme.colorPrimary, size: 16),
                         ],
                       ],
                     ),
@@ -1516,12 +1555,16 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         const SizedBox(width: 4),
                         Text(
                           '$clientRating ($clientReviews)',
-                          style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                          style: const TextStyle(
+                              color: AppTheme.colorMuted, fontSize: 12),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          isVerified ? '| Cliente verificado' : '| Nuevo cliente',
-                          style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                          isVerified
+                              ? '| Cliente verificado'
+                              : '| Nuevo cliente',
+                          style: const TextStyle(
+                              color: AppTheme.colorMuted, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1537,14 +1580,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       child: Text(
                         _timeAgo(createdAt),
                         style: TextStyle(
-                          color: isNew ? AppTheme.colorSuccess : AppTheme.colorMuted,
+                          color: isNew
+                              ? AppTheme.colorSuccess
+                              : AppTheme.colorMuted,
                           fontSize: 10,
-                          fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isNew ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                     ),
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: AppTheme.colorMuted),
+                    icon:
+                        const Icon(Icons.more_vert, color: AppTheme.colorMuted),
                     color: AppTheme.colorSurfaceSoft,
                     onSelected: (val) {
                       final reqId = req['id'].toString();
@@ -1560,15 +1607,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     itemBuilder: (context) => [
                       const PopupMenuItem(
                         value: 'dismiss',
-                        child: Text('No me interesa', style: TextStyle(color: AppTheme.colorText)),
+                        child: Text('No me interesa',
+                            style: TextStyle(color: AppTheme.colorText)),
                       ),
                       const PopupMenuItem(
                         value: 'block',
-                        child: Text('Bloquear cliente', style: TextStyle(color: AppTheme.colorText)),
+                        child: Text('Bloquear cliente',
+                            style: TextStyle(color: AppTheme.colorText)),
                       ),
                       const PopupMenuItem(
                         value: 'report',
-                        child: Text('Reportar publicación', style: TextStyle(color: Colors.redAccent)),
+                        child: Text('Reportar publicación',
+                            style: TextStyle(color: Colors.redAccent)),
                       ),
                     ],
                   ),
@@ -1585,7 +1635,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      req['category']?.toString() ?? req['title']?.toString() ?? 'Sin categoría',
+                      req['category']?.toString() ??
+                          req['title']?.toString() ??
+                          'Sin categoría',
                       style: const TextStyle(
                         color: AppTheme.colorText,
                         fontSize: 18,
@@ -1654,12 +1706,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   if (req['modality'] != 'fixed' && req['modality'] != null)
                     Text(
                       'Total: Bs. $currentBudget',
-                      style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11),
+                      style: const TextStyle(
+                          color: AppTheme.colorMuted, fontSize: 11),
                     )
                   else
                     Text(
                       req['priceType']?.toString() ?? 'Presupuesto',
-                      style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                      style: const TextStyle(
+                          color: AppTheme.colorMuted, fontSize: 12),
                     ),
                 ],
               ),
@@ -1668,31 +1722,36 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.location_on, color: AppTheme.colorMuted, size: 16),
+              const Icon(Icons.location_on,
+                  color: AppTheme.colorMuted, size: 16),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   req['address']?.toString() ?? 'Dirección no disponible',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.colorText, fontSize: 14),
+                  style:
+                      const TextStyle(color: AppTheme.colorText, fontSize: 14),
                 ),
               ),
               if (distanceText != null) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppTheme.colorBackgroundAccent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.directions_walk, color: AppTheme.colorPrimary, size: 14),
+                      const Icon(Icons.directions_walk,
+                          color: AppTheme.colorPrimary, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         distanceText,
-                        style: const TextStyle(color: AppTheme.colorText, fontSize: 12),
+                        style: const TextStyle(
+                            color: AppTheme.colorText, fontSize: 12),
                       ),
                     ],
                   ),
@@ -1746,8 +1805,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Tu oferta', style: TextStyle(color: AppTheme.colorMuted)),
-                        Text('Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorText, fontWeight: FontWeight.bold)),
+                        const Text('Tu oferta',
+                            style: TextStyle(color: AppTheme.colorMuted)),
+                        Text('Bs. $myOfferAmount',
+                            style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1756,7 +1819,9 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         value: offerProgress,
                         backgroundColor: AppTheme.colorSurfaceSoft,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          offerProgress < 0.2 ? Colors.red : AppTheme.colorPrimary,
+                          offerProgress < 0.2
+                              ? Colors.red
+                              : AppTheme.colorPrimary,
                         ),
                       ),
                   ],
@@ -1778,14 +1843,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Oferta declinada', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                          Text('El cliente declinó tu oferta de Bs. $myOfferAmount', style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12)),
+                          const Text('Oferta declinada',
+                              style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold)),
+                          Text(
+                              'El cliente declinó tu oferta de Bs. $myOfferAmount',
+                              style: const TextStyle(
+                                  color: AppTheme.colorMuted, fontSize: 12)),
                         ],
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _showCounterOfferSheet(req['id'].toString()),
-                      child: const Text('Reofertar', style: TextStyle(color: AppTheme.colorPrimary)),
+                      onPressed: () =>
+                          _showCounterOfferSheet(req['id'].toString()),
+                      child: const Text('Reofertar',
+                          style: TextStyle(color: AppTheme.colorPrimary)),
                     ),
                   ],
                 ),
@@ -1802,12 +1875,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.trending_up, color: AppTheme.colorPrimary),
+                      const Icon(Icons.trending_up,
+                          color: AppTheme.colorPrimary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '¡El cliente subió el presupuesto a Bs. $currentBudget!',
-                          style: const TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: AppTheme.colorPrimary,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -1828,7 +1904,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () => _acceptBudget(req['id'].toString(), currentBudget),
+                      onPressed: () =>
+                          _acceptBudget(req['id'].toString(), currentBudget),
                       child: const Text('Aceptar trabajo'),
                     ),
                   ),
@@ -1892,7 +1969,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         clientUserId: clientUserId,
       );
       setState(() {
-        _requests.removeWhere((r) => (r['client'] as Map?)?['id'].toString() == clientUserId);
+        _requests.removeWhere(
+            (r) => (r['client'] as Map?)?['id'].toString() == clientUserId);
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1914,7 +1992,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.colorSurfaceSoft,
-        title: const Text('Reportar publicación', style: TextStyle(color: AppTheme.colorText)),
+        title: const Text('Reportar publicación',
+            style: TextStyle(color: AppTheme.colorText)),
         content: TextField(
           controller: reasonCtrl,
           decoration: const InputDecoration(
@@ -1927,7 +2006,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppTheme.colorMuted)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
@@ -2026,22 +2106,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     if (user == null) return;
     final result = await MessagesDependencies.getActiveThreads(userId: user.id);
     if (!mounted) return;
-    result.fold(onSuccess: (threads) {
-      final matches = threads.where((thread) => thread.jobId == requestId && thread.canSend);
-      if (matches.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El chat se habilita al aceptar una oferta.')));
-        return;
-      }
-      final thread = matches.first;
-      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ChatScreen(
-        threadId: thread.id, jobId: thread.jobId, jobTitle: thread.jobTitle,
-        counterpartName: thread.counterpartName,
-      )));
-    }, onFailure: (failure) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message))));
+    result.fold(
+        onSuccess: (threads) {
+          final matches = threads
+              .where((thread) => thread.jobId == requestId && thread.canSend);
+          if (matches.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('El chat se habilita al aceptar una oferta.')));
+            return;
+          }
+          final thread = matches.first;
+          Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => ChatScreen(
+                    threadId: thread.id,
+                    jobId: thread.jobId,
+                    jobTitle: thread.jobTitle,
+                    counterpartName: thread.counterpartName,
+                  )));
+        },
+        onFailure: (failure) => ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(failure.message))));
   }
-
 }
-
 
 class _AvailabilityLabel extends StatelessWidget {
   const _AvailabilityLabel({
@@ -2087,6 +2173,9 @@ class _JobDetailsSheet extends StatelessWidget {
     final category = requestData['category']?.toString() ?? '';
     final photos = requestData['photos'] as List<dynamic>? ?? const [];
     final client = requestData['client'] as Map<String, dynamic>?;
+    final detailClientName = (client?['name']?.toString() ??
+            '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}')
+        .trim();
     final priceType = requestData['priceType']?.toString() ?? 'Precio fijo';
 
     return DraggableScrollableSheet(
@@ -2153,9 +2242,11 @@ class _JobDetailsSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          requestData['modality'] == 'hourly' && requestData['hourlyRate'] != null
+                          requestData['modality'] == 'hourly' &&
+                                  requestData['hourlyRate'] != null
                               ? 'Bs. ${requestData['hourlyRate']} por hora'
-                              : requestData['modality'] == 'daily' && requestData['dailyRate'] != null
+                              : requestData['modality'] == 'daily' &&
+                                      requestData['dailyRate'] != null
                                   ? 'Bs. ${requestData['dailyRate']} por día'
                                   : 'Bs. $budget',
                           style: const TextStyle(
@@ -2164,15 +2255,19 @@ class _JobDetailsSheet extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        if (requestData['modality'] == 'hourly' && requestData['estimatedHours'] != null)
+                        if (requestData['modality'] == 'hourly' &&
+                            requestData['estimatedHours'] != null)
                           Text(
                             'Total: Bs. $budget (${requestData['estimatedHours']} hrs)',
-                            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                            style: const TextStyle(
+                                color: AppTheme.colorMuted, fontSize: 12),
                           )
-                        else if (requestData['modality'] == 'daily' && requestData['days'] != null)
+                        else if (requestData['modality'] == 'daily' &&
+                            requestData['days'] != null)
                           Text(
                             'Total: Bs. $budget (${requestData['days']} días)',
-                            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                            style: const TextStyle(
+                                color: AppTheme.colorMuted, fontSize: 12),
                           )
                         else
                           Text(
@@ -2293,15 +2388,13 @@ class _JobDetailsSheet extends StatelessWidget {
                           : null,
                       child: client['profilePhotoUrl'] == null
                           ? Text(
-                              chambaInitial(client['firstName'],
-                                  fallback: 'C'),
+                              chambaInitial(detailClientName, fallback: 'C'),
                             )
                           : null,
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      '${client['firstName'] ?? ''} ${client['lastName'] ?? ''}'
-                          .trim(),
+                      detailClientName.isEmpty ? 'Cliente' : detailClientName,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -2398,11 +2491,13 @@ class _PulsingAvailabilityToggle extends StatefulWidget {
     required this.available,
     required this.toggling,
     required this.onToggle,
+    this.busy = false,
   });
 
   final bool available;
   final bool toggling;
   final VoidCallback onToggle;
+  final bool busy;
 
   @override
   State<_PulsingAvailabilityToggle> createState() =>
@@ -2507,8 +2602,8 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _AvailabilityLabel(
-                  label: 'DISPONIBLE',
-                  active: widget.available,
+                  label: widget.busy ? 'EN TRABAJO' : 'DISPONIBLE',
+                  active: widget.available && !widget.busy,
                   activeColor: AppTheme.colorSuccess,
                 ),
                 const SizedBox(width: 4),

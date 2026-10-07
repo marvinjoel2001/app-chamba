@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'session_credentials.dart';
+import '../services/worker_background_service.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,9 +72,8 @@ class SessionUser {
       lastName: lastName ?? this.lastName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
-      profilePhotoUrl: clearProfilePhotoUrl
-          ? null
-          : profilePhotoUrl ?? this.profilePhotoUrl,
+      profilePhotoUrl:
+          clearProfilePhotoUrl ? null : profilePhotoUrl ?? this.profilePhotoUrl,
       verificationStatus: verificationStatus ?? this.verificationStatus,
       idPhotoUrl: idPhotoUrl ?? this.idPhotoUrl,
       facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
@@ -121,7 +121,8 @@ class SessionUser {
       facePhotoVerified: json['facePhotoVerified'] as bool?,
       isBlocked: json['isBlocked'] as bool? ?? false,
       isAgencyWorker: json['isAgencyWorker'] as bool? ?? false,
-      isAvailable: json['isAvailable'] as bool? ?? json['is_available'] as bool? ?? true,
+      isAvailable:
+          json['isAvailable'] as bool? ?? json['is_available'] as bool? ?? true,
     );
   }
 }
@@ -147,7 +148,10 @@ class SessionStore {
   static Future<void> hydrate() async {
     final prefs = await SharedPreferences.getInstance();
     SessionCredentials.accessToken = prefs.getString('session_access_token');
-    if (SessionCredentials.accessToken == null) { await prefs.remove(_keySessionUser); return; }
+    if (SessionCredentials.accessToken == null) {
+      await prefs.remove(_keySessionUser);
+      return;
+    }
     final raw = prefs.getString(_keySessionUser);
     if (raw == null || raw.isEmpty) {
       return;
@@ -190,6 +194,7 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
+    await WorkerBackgroundService.setEnabled(false);
     SessionCredentials.accessToken = null;
     SessionCredentials.pushToken = null;
     SessionCredentials.visibleThreadId = null;

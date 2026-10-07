@@ -1698,8 +1698,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     final name = '${worker['firstName'] ?? ''} ${(worker['lastName']?.toString().isNotEmpty == true) ? worker['lastName'].toString()[0] + '.' : ''}'.trim();
     final avatar = worker['profilePhotoUrl']?.toString();
     final amount = offer['amount']?.toString() ?? '0';
-    final rating = (worker['averageRating'] as num?)?.toDouble() ?? 5.0;
+    final rating = (worker['averageRating'] as num?)?.toDouble() ?? 0;
     final ratingCount = (worker['completedJobs'] as num?)?.toInt() ?? 0;
+    final isVerified = worker['verificationStatus'] == 'verified';
+    final distanceKm = (worker['distanceKm'] as num?)?.toDouble();
+    final ratingLabel = rating > 0
+        ? '${rating.toStringAsFixed(1)} ($ratingCount)'
+        : 'Nuevo en Chamba';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1735,8 +1740,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.verified, color: Color(0xFF8A2BE2), size: 16),
+                    if (isVerified) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified,
+                          color: Color(0xFF8A2BE2), size: 16),
+                    ],
                   ],
                 ),
                 if (offer['agencyName'] != null) ...[
@@ -1768,23 +1776,29 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.star, color: Colors.orange, size: 14),
-                    const SizedBox(width: 4),
+                    if (rating > 0) ...[
+                      const Icon(Icons.star, color: Colors.orange, size: 14),
+                      const SizedBox(width: 4),
+                    ],
                     Text(
-                      '${rating.toStringAsFixed(1)} ($ratingCount)',
+                      ratingLabel,
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Puede comenzar hoy',
-                  style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500),
-                ),
+                if (distanceKm != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    distanceKm < 1
+                        ? 'A menos de 1 km de ti'
+                        : 'A ${distanceKm.toStringAsFixed(1)} km de ti',
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
               ],
             ),
           ),

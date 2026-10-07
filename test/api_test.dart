@@ -110,6 +110,11 @@ Future<void> setupTestData() async {
 }
 
 void main() {
+  if (AppConfig.apiBaseUrl.isEmpty) {
+    test('integration requires an explicitly configured API_BASE_URL', () {},
+      skip: 'Live integration tests require a running isolated backend and dart defines.');
+    return;
+  }
   setUpAll(() async {
     await setupTestData();
   });

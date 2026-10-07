@@ -145,7 +145,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
 
     return completed
         .where(
-          (job) => job.completedAt != null && !job.completedAt!.isBefore(cutoff),
+          (job) =>
+              job.completedAt != null && !job.completedAt!.isBefore(cutoff),
         )
         .toList();
   }
@@ -192,7 +193,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
     if (c.contains('limpie')) return Icons.cleaning_services;
     if (c.contains('carp')) return Icons.carpenter;
     if (c.contains('jard')) return Icons.yard;
-    if (c.contains('transport') || c.contains('entrega')) return Icons.local_shipping;
+    if (c.contains('transport') || c.contains('entrega'))
+      return Icons.local_shipping;
     if (c.contains('mecán') || c.contains('mecan')) return Icons.build;
     if (c.contains('construc')) return Icons.construction;
     return Icons.handyman;
@@ -201,7 +203,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
   Color _categoryColor(String? category) {
     final c = (category ?? '').toLowerCase();
     if (c.contains('limpie')) return const Color(0xFFB388FF); // Purple Accent
-    if (c.contains('entrega') || c.contains('transport')) return const Color(0xFFFFB74D); // Orange
+    if (c.contains('entrega') || c.contains('transport'))
+      return const Color(0xFFFFB74D); // Orange
     if (c.contains('elec')) return const Color(0xFF64B5F6); // Blue
     return const Color(0xFF4DB6AC); // Teal
   }
@@ -222,11 +225,15 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                 title: Text(
                   f.label,
                   style: TextStyle(
-                    color: _filter == f ? const Color(0xFF651FFF) : Colors.white,
-                    fontWeight: _filter == f ? FontWeight.bold : FontWeight.normal,
+                    color:
+                        _filter == f ? const Color(0xFF651FFF) : Colors.white,
+                    fontWeight:
+                        _filter == f ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                trailing: _filter == f ? const Icon(Icons.check, color: Color(0xFF651FFF)) : null,
+                trailing: _filter == f
+                    ? const Icon(Icons.check, color: Color(0xFF651FFF))
+                    : null,
                 onTap: () {
                   setState(() => _filter = f);
                   Navigator.pop(context);
@@ -295,7 +302,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                             ],
                           ),
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.05)),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF5E35B1).withOpacity(0.2),
@@ -331,17 +339,21 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                       ),
                                     ),
                                     const Spacer(),
-                                    Icon(Icons.remove_red_eye_outlined, color: Colors.white.withOpacity(0.7), size: 20),
+                                    Icon(Icons.remove_red_eye_outlined,
+                                        color: Colors.white.withOpacity(0.7),
+                                        size: 20),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
                                 _loading
                                     ? const SizedBox(
                                         height: 40,
-                                        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                                        child: Center(
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white)),
                                       )
                                     : Text(
-                                        'Bs ${total.toStringAsFixed(0)}',
+                                        'Bs ${total.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 40,
@@ -366,21 +378,29 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                 Row(
                                   children: [
                                     Icon(
-                                      total > 0 ? Icons.trending_up : Icons.remove,
-                                      color: total > 0 ? const Color(0xFF00E676) : Colors.white.withOpacity(0.5),
+                                      total > 0
+                                          ? Icons.trending_up
+                                          : Icons.remove,
+                                      color: total > 0
+                                          ? const Color(0xFF00E676)
+                                          : Colors.white.withOpacity(0.5),
                                       size: 16,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Los importes no confirman el cobro',
                                       style: TextStyle(
-                                        color: total > 0 ? const Color(0xFF00E676) : Colors.white.withOpacity(0.5),
+                                        color: total > 0
+                                            ? const Color(0xFF00E676)
+                                            : Colors.white.withOpacity(0.5),
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     const Spacer(),
-                                    Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.5), size: 18),
+                                    Icon(Icons.chevron_right,
+                                        color: Colors.white.withOpacity(0.5),
+                                        size: 18),
                                   ],
                                 ),
                               ],
@@ -402,7 +422,11 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                   label: 'Información',
                                   color: const Color(0xFF651FFF),
                                   textColor: Colors.white,
-                                  onTap: () => ToastService.show(title: 'Importes de trabajos', body: 'Estos importes no son un saldo retirable. Consulta el estado del pago con tu cliente.', type: ToastType.info),
+                                  onTap: () => ToastService.show(
+                                      title: 'Importes de trabajos',
+                                      body:
+                                          'Estos importes no son un saldo retirable. Consulta el estado del pago con tu cliente.',
+                                      type: ToastType.info),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -437,22 +461,29 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                         child: GestureDetector(
                           onTap: _showFilterMenu,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
                               color: const Color(0xFF111C30),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.05)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_today_outlined, color: Colors.white70, size: 18),
+                                const Icon(Icons.calendar_today_outlined,
+                                    color: Colors.white70, size: 18),
                                 const SizedBox(width: 12),
                                 Text(
                                   _filter.label,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14),
                                 ),
                                 const Spacer(),
-                                const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
+                                const Icon(Icons.keyboard_arrow_down,
+                                    color: Colors.white70, size: 20),
                               ],
                             ),
                           ),
@@ -462,26 +493,33 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
 
                       if (_error != null && !_loading && total > 0)
                         Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.red.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                            border: Border.all(
+                                color: Colors.red.withValues(alpha: 0.35)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                              const Icon(Icons.warning_amber_rounded,
+                                  color: Colors.orangeAccent, size: 20),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _error!,
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 13),
                                 ),
                               ),
                               TextButton(
                                 onPressed: _load,
-                                child: const Text('Reintentar', style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
+                                child: const Text('Reintentar',
+                                    style: TextStyle(
+                                        color: AppTheme.colorPrimary,
+                                        fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
@@ -489,7 +527,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
 
                       if (_error != null && !_loading && total == 0)
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 32),
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -500,7 +539,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                     color: Colors.red.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 40),
+                                  child: const Icon(Icons.cloud_off_rounded,
+                                      color: Colors.redAccent, size: 40),
                                 ),
                                 const SizedBox(height: 14),
                                 const Text(
@@ -571,7 +611,10 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
               const SizedBox(height: 8),
               Text(
                 label,
-                style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: textColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -579,7 +622,6 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
       ),
     );
   }
-
 
   void _showHistoryModal() {
     showModalBottomSheet(
@@ -640,7 +682,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                               decoration: BoxDecoration(
                                 color: const Color(0xFF1E2336),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.05)),
                               ),
                               child: Row(
                                 children: [
@@ -648,15 +691,18 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: _categoryColor(job.category).withOpacity(0.15),
+                                      color: _categoryColor(job.category)
+                                          .withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Icon(_categoryIcon(job.category), color: _categoryColor(job.category)),
+                                    child: Icon(_categoryIcon(job.category),
+                                        color: _categoryColor(job.category)),
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           job.title,
@@ -672,22 +718,36 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                         Row(
                                           children: [
                                             Text(
-                                              _formatDate(job.acceptedAt),
-                                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                                              _formatDate(job.completedAt ??
+                                                  job.acceptedAt),
+                                              style: TextStyle(
+                                                  color: Colors.white
+                                                      .withOpacity(0.5),
+                                                  fontSize: 12),
                                             ),
                                             const SizedBox(width: 8),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: isNonCash
-                                                    ? Colors.purple.withOpacity(0.2)
-                                                    : Colors.green.withOpacity(0.2),
-                                                borderRadius: BorderRadius.circular(6),
+                                                    ? Colors.purple
+                                                        .withOpacity(0.2)
+                                                    : Colors.green
+                                                        .withOpacity(0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                isNonCash ? 'Tarjeta/Digital' : 'Efectivo',
+                                                isNonCash
+                                                    ? 'Tarjeta/Digital'
+                                                    : 'Efectivo',
                                                 style: TextStyle(
-                                                  color: isNonCash ? Colors.purpleAccent : const Color(0xFF00E676),
+                                                  color: isNonCash
+                                                      ? Colors.purpleAccent
+                                                      : const Color(0xFF00E676),
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -699,7 +759,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                                     ),
                                   ),
                                   Text(
-                                    'Bs ${job.amount.toStringAsFixed(0)}',
+                                    'Bs ${job.amount.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       color: Color(0xFF00E676),
                                       fontWeight: FontWeight.bold,
@@ -774,9 +834,15 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                         ),
                         child: Column(
                           children: [
-                            const Text('Trabajos', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                            const Text('Trabajos',
+                                style: TextStyle(
+                                    color: Colors.white60, fontSize: 13)),
                             const SizedBox(height: 8),
-                            Text('$totalJobs', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                            Text('$totalJobs',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -791,9 +857,15 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                         ),
                         child: Column(
                           children: [
-                            const Text('Promedio', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                            const Text('Promedio',
+                                style: TextStyle(
+                                    color: Colors.white60, fontSize: 13)),
                             const SizedBox(height: 8),
-                            Text('Bs ${avgPerJob.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFFB388FF), fontSize: 24, fontWeight: FontWeight.bold)),
+                            Text('Bs ${avgPerJob.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    color: Color(0xFFB388FF),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -803,7 +875,10 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                 const SizedBox(height: 20),
                 const Text(
                   'Desglose por método de pago',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -816,11 +891,18 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.money, color: Color(0xFF00E676), size: 20),
+                          const Icon(Icons.money,
+                              color: Color(0xFF00E676), size: 20),
                           const SizedBox(width: 10),
-                          const Text('Efectivo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          const Text('Efectivo',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500)),
                           const Spacer(),
-                          Text('Bs ${cashTotal.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text('Bs ${cashTotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const Padding(
@@ -829,11 +911,18 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.credit_card, color: Colors.purpleAccent, size: 20),
+                          const Icon(Icons.credit_card,
+                              color: Colors.purpleAccent, size: 20),
                           const SizedBox(width: 10),
-                          const Text('Tarjeta / Digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          const Text('Tarjeta / Digital',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500)),
                           const Spacer(),
-                          Text('Bs ${nonCashTotal.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text('Bs ${nonCashTotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ],
@@ -848,15 +937,28 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
   }
 
   Widget _buildSummary(List<WorkerJob> jobs) {
+    final knownTimes =
+        jobs.where((job) => job.workElapsedSeconds != null).toList();
+    final seconds =
+        knownTimes.fold<int>(0, (sum, job) => sum + job.workElapsedSeconds!);
+    final durationLabel = knownTimes.isEmpty
+        ? '—'
+        : '${seconds ~/ 3600}h ${(seconds % 3600) ~/ 60}m';
     int totalJobs = jobs.length;
-    double avg = totalJobs > 0 ? jobs.fold(0.0, (sum, j) => sum + j.amount) / totalJobs : 0;
-    
+    double avg = totalJobs > 0
+        ? jobs.fold(0.0, (sum, j) => sum + j.amount) / totalJobs
+        : 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Resumen', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('Resumen',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 20),
@@ -868,11 +970,19 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildSummaryItem(Icons.work, '$totalJobs', 'Trabajos', const Color(0xFFB388FF)),
-                Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
-                _buildSummaryItem(Icons.attach_money, 'Bs ${avg.toStringAsFixed(0)}', 'Promedio', const Color(0xFFB388FF)),
-                Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
-                _buildSummaryItem(Icons.access_time_filled, '23h 45m', 'Horas', const Color(0xFFB388FF)),
+                _buildSummaryItem(Icons.work, '$totalJobs', 'Trabajos',
+                    const Color(0xFFB388FF)),
+                Container(
+                    width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                _buildSummaryItem(
+                    Icons.attach_money,
+                    'Bs ${avg.toStringAsFixed(2)}',
+                    'Promedio',
+                    const Color(0xFFB388FF)),
+                Container(
+                    width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                _buildSummaryItem(Icons.access_time_filled, durationLabel,
+                    'Horas registradas', const Color(0xFFB388FF)),
               ],
             ),
           ),
@@ -881,14 +991,21 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
     );
   }
 
-  Widget _buildSummaryItem(IconData icon, String value, String label, Color color) {
+  Widget _buildSummaryItem(
+      IconData icon, String value, String label, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(height: 12),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+        Text(label,
+            style:
+                TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
       ],
     );
   }
@@ -902,8 +1019,16 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Actividad reciente', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              Text('Ver todo', style: TextStyle(color: const Color(0xFFB388FF), fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text('Actividad reciente',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
+              Text('Ver todo',
+                  style: TextStyle(
+                      color: const Color(0xFFB388FF),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 16),
@@ -919,7 +1044,8 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                 return Column(
                   children: [
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       leading: Container(
                         width: 48,
                         height: 48,
@@ -927,20 +1053,41 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                           color: _categoryColor(job.category).withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(_categoryIcon(job.category), color: _categoryColor(job.category)),
+                        child: Icon(_categoryIcon(job.category),
+                            color: _categoryColor(job.category)),
                       ),
-                      title: Text(job.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(_formatDate(job.acceptedAt), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                      title: Text(job.title,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                          _formatDate(job.completedAt ?? job.acceptedAt),
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 12)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Bs ${job.amount.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF00E676), fontWeight: FontWeight.w700, fontSize: 14)),
+                          Text('Bs ${job.amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: Color(0xFF00E676),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14)),
                           const SizedBox(width: 4),
-                          Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.3), size: 16),
+                          Icon(Icons.chevron_right,
+                              color: Colors.white.withOpacity(0.3), size: 16),
                         ],
                       ),
                     ),
-                    if (!isLast) Divider(height: 1, color: Colors.white.withOpacity(0.05), indent: 70, endIndent: 16),
+                    if (!isLast)
+                      Divider(
+                          height: 1,
+                          color: Colors.white.withOpacity(0.05),
+                          indent: 70,
+                          endIndent: 16),
                   ],
                 );
               }).toList(),
@@ -967,20 +1114,27 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
             Stack(
               alignment: Alignment.center,
               children: [
-                Icon(Icons.auto_awesome, color: const Color(0xFFB388FF).withOpacity(0.2), size: 100),
+                Icon(Icons.auto_awesome,
+                    color: const Color(0xFFB388FF).withOpacity(0.2), size: 100),
                 Image.asset('assets/images/icon/billetera.png', width: 80),
               ],
             ),
             const SizedBox(height: 24),
             const Text(
               'Todavía no tienes ganancias',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
               'Acepta tu primer trabajo y\ncomienza a generar ingresos.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14, height: 1.5),
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                  height: 1.5),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -992,9 +1146,14 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF651FFF),
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
-                child: const Text('Buscar trabajos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                child: const Text('Buscar trabajos',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
               ),
             ),
           ],

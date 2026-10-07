@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
@@ -73,6 +74,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     if (_startTime == null) return _startDate;
     return '${_startDate}T${_formatTimeOfDay(_startTime!)}:00';
   }
+
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PendingImage> _pendingImages = [];
   late final List<Map<String, dynamic>> _suggestedCategories;
@@ -111,9 +113,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     _loadPaymentMethods();
 
     _scrollController.addListener(() {
-      if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
+      if (_scrollController.hasClients &&
+          _scrollController.position.maxScrollExtent > 0) {
         setState(() {
-          _scrollProgress = (_scrollController.offset / _scrollController.position.maxScrollExtent).clamp(0.0, 1.0);
+          _scrollProgress = (_scrollController.offset /
+                  _scrollController.position.maxScrollExtent)
+              .clamp(0.0, 1.0);
         });
       }
     });
@@ -211,8 +216,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _locationBlockMessage = permission == LocationPermission.deniedForever
               ? 'El permiso de ubicacion esta bloqueado. Habilitalo en ajustes.'
               : 'Debes permitir ubicacion para continuar.';
-          _locationBlockType =
-              permission == LocationPermission.deniedForever ? 'deniedForever' : 'denied';
+          _locationBlockType = permission == LocationPermission.deniedForever
+              ? 'deniedForever'
+              : 'denied';
           _checkingLocation = false;
         });
         return;
@@ -262,7 +268,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         {'access_token': token, 'limit': '1', 'language': 'es'},
       );
 
-      final response = await _client.get(endpoint);
+      final response =
+          await _client.get(endpoint).timeout(const Duration(seconds: 8));
       if (response.statusCode >= 400) {
         return 'Ubicacion actual';
       }
@@ -346,7 +353,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                               initialCenter: LatLng(_latitude!, _longitude!),
                               initialZoom: 15,
                               interactionOptions: const InteractionOptions(
-                                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                                flags: InteractiveFlag.all &
+                                    ~InteractiveFlag.rotate,
                               ),
                             ),
                             children: [
@@ -571,7 +579,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     if (description.isEmpty || budget <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Completa la descripcion y verifica que los montos sean mayores a 0.'),
+          content: Text(
+              'Completa la descripcion y verifica que los montos sean mayores a 0.'),
         ),
       );
       return;
@@ -582,22 +591,33 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     try {
       final uploadedPhotos = <Map<String, String>>[];
       for (final image in _pendingImages) {
-        final uploaded = await CloudinaryUploadService.uploadImageBytes(
-          bytes: image.bytes,
-          fileName: image.fileName,
-          folder: 'chamba/requests',
-        );
-        uploadedPhotos.add({
-          'url': uploaded.secureUrl,
-          'publicId': uploaded.publicId,
-        });
+        try {
+          final uploaded = await CloudinaryUploadService.uploadImageBytes(
+              bytes: image.bytes,
+              fileName: image.fileName,
+              folder: 'chamba/requests');
+          uploadedPhotos
+              .add({'url': uploaded.secureUrl, 'publicId': uploaded.publicId});
+        } catch (_) {
+          // Signed presets are uploaded by the server. Its private key never enters the APK.
+          final mime =
+              lookupMimeType(image.fileName, headerBytes: image.bytes) ??
+                  'image/jpeg';
+          final uploaded = await MobileBackendService.instance
+              .uploadRequestPhoto(
+                  'data:$mime;base64,${base64Encode(image.bytes)}');
+          uploadedPhotos.add({
+            'url': uploaded['url'] as String,
+            'publicId': uploaded['publicId'] as String
+          });
+        }
       }
 
       final response = (await RequestDependencies.createRequest(
         clientUserId: user.id,
-        title: widget.initialTitle?.trim().isNotEmpty == true
-            ? widget.initialTitle!.trim()
-            : 'Solicitud de ${_primaryCategoryName.toLowerCase()}',
+        title: description.split('\n').first.length > 100
+            ? description.split('\n').first.substring(0, 100)
+            : description.split('\n').first,
         description: description,
         category: _primaryCategoryName,
         aiCategories: _suggestedCategories,
@@ -663,16 +683,15 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                )
-              ]
-            ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  )
+                ]),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -691,7 +710,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (_locationBlockType == 'disabled') {
-                      final isEnabled = await Geolocator.isLocationServiceEnabled();
+                      final isEnabled =
+                          await Geolocator.isLocationServiceEnabled();
                       if (isEnabled) {
                         _initializeLocation();
                       } else {
@@ -699,7 +719,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       }
                     } else if (_locationBlockType == 'deniedForever') {
                       final perm = await Geolocator.checkPermission();
-                      if (perm == LocationPermission.always || perm == LocationPermission.whileInUse) {
+                      if (perm == LocationPermission.always ||
+                          perm == LocationPermission.whileInUse) {
                         _initializeLocation();
                       } else {
                         await Geolocator.openAppSettings();
@@ -710,7 +731,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.colorPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     _locationBlockType == 'disabled'
@@ -744,7 +766,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         const SizedBox(height: 12),
         _DescriptionField(controller: _descriptionController),
         const SizedBox(height: 24),
-        
+
         // Categoría del servicio
         const Text(
           'Categoría del servicio',
@@ -761,7 +783,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           children: _suggestedCategories.isEmpty
               ? const [_CategoryPill(label: 'General', selected: true)]
               : _suggestedCategories.map((category) {
-                  final label = category['name']?.toString().trim().isNotEmpty == true
+                  final label =
+                      category['name']?.toString().trim().isNotEmpty == true
                           ? category['name'].toString().trim()
                           : 'General';
                   // Simulamos que todas están pre-seleccionadas si son sugeridas por la IA,
@@ -769,7 +792,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   // las mostraremos todas "activas" o la primera activa si se desea.
                   return _CategoryPill(
                     label: label,
-                    selected: true, // Mostrar todas sugeridas como activas según el pedido
+                    selected:
+                        true, // Mostrar todas sugeridas como activas según el pedido
                   );
                 }).toList(),
         ),
@@ -852,7 +876,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                             ),
                           ),
                           SizedBox(width: 4),
-                          Icon(Icons.chevron_right, size: 14, color: AppTheme.colorPrimary),
+                          Icon(Icons.chevron_right,
+                              size: 14, color: AppTheme.colorPrimary),
                         ],
                       ),
                     ),
@@ -879,17 +904,24 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         ] else if (widget.modality == 'hourly') ...[
           Row(
             children: [
-              Expanded(child: _buildNumberField('Horas estimadas', _estimatedHoursController)),
+              Expanded(
+                  child: _buildNumberField(
+                      'Horas estimadas', _estimatedHoursController)),
               const SizedBox(width: 12),
-              Expanded(child: _buildAmountField('Pago por hora', _hourlyRateController)),
+              Expanded(
+                  child: _buildAmountField(
+                      'Pago por hora', _hourlyRateController)),
             ],
           ),
         ] else if (widget.modality == 'daily') ...[
           Row(
             children: [
-              Expanded(child: _buildNumberField('Días de trabajo', _daysController)),
+              Expanded(
+                  child: _buildNumberField('Días de trabajo', _daysController)),
               const SizedBox(width: 12),
-              Expanded(child: _buildAmountField('Pago por día', _dailyRateController)),
+              Expanded(
+                  child:
+                      _buildAmountField('Pago por día', _dailyRateController)),
             ],
           ),
           const SizedBox(height: 12),
@@ -999,7 +1031,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline, color: AppTheme.colorPrimary, size: 16),
+              const Icon(Icons.info_outline,
+                  color: AppTheme.colorPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1038,14 +1071,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     builder: (_) => SafeArea(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: _paymentMethods.map((m) => ListTile(
-                          title: Text(m.name),
-                          subtitle: Text(m.description ?? ''),
-                          onTap: () {
-                            setState(() => _selectedPaymentMethod = m);
-                            Navigator.pop(context);
-                          },
-                        )).toList(),
+                        children: _paymentMethods
+                            .map((m) => ListTile(
+                                  title: Text(m.name),
+                                  subtitle: Text(m.description ?? ''),
+                                  onTap: () {
+                                    setState(() => _selectedPaymentMethod = m);
+                                    Navigator.pop(context);
+                                  },
+                                ))
+                            .toList(),
                       ),
                     ),
                   );
@@ -1086,7 +1121,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _selectedPaymentMethod?.description ?? 'Pagarás al finalizar el trabajo',
+                        _selectedPaymentMethod?.description ??
+                            'Pagarás al finalizar el trabajo',
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],
@@ -1125,7 +1161,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: AppTheme.colorPrimary.withOpacity(0.3), style: BorderStyle.none),
+              border: Border.all(
+                  color: AppTheme.colorPrimary.withOpacity(0.3),
+                  style: BorderStyle.none),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -1137,10 +1175,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.colorPrimary.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.colorPrimary.withOpacity(0.3)),
+                    border: Border.all(
+                        color: AppTheme.colorPrimary.withOpacity(0.3)),
                   ),
                   child: const Center(
-                    child: Icon(Icons.camera_alt, color: AppTheme.colorPrimary, size: 28),
+                    child: Icon(Icons.camera_alt,
+                        color: AppTheme.colorPrimary, size: 28),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1193,11 +1233,13 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       top: 4,
                       right: 4,
                       child: GestureDetector(
-                        onTap: _loading ? null : () {
-                          setState(() {
-                            _pendingImages.removeAt(index);
-                          });
-                        },
+                        onTap: _loading
+                            ? null
+                            : () {
+                                setState(() {
+                                  _pendingImages.removeAt(index);
+                                });
+                              },
                         child: Container(
                           decoration: const BoxDecoration(
                             color: Colors.black54,
@@ -1219,7 +1261,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           ),
         ],
         const SizedBox(height: 32),
-        
+
         // Botón Publicar
         ElevatedButton(
           onPressed: _loading ? null : _submit,
@@ -1238,7 +1280,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2),
                 )
               else
                 const Icon(Icons.send_rounded, color: Colors.white, size: 20),
@@ -1324,7 +1367,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 ],
               ),
             ),
-            
+
             // Progress Bar
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1336,43 +1379,59 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     height: _scrollProgress < 0.1 ? 6 : 8,
                     decoration: BoxDecoration(
                       color: AppTheme.colorPrimary,
-                      borderRadius: BorderRadius.circular(_scrollProgress < 0.1 ? 3 : 4),
+                      borderRadius:
+                          BorderRadius.circular(_scrollProgress < 0.1 ? 3 : 4),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Container(
                     width: 24,
                     height: 2,
-                    color: _scrollProgress >= 0.1 ? AppTheme.colorPrimary.withOpacity(0.5) : Colors.grey[200],
+                    color: _scrollProgress >= 0.1
+                        ? AppTheme.colorPrimary.withOpacity(0.5)
+                        : Colors.grey[200],
                   ),
                   const SizedBox(width: 4),
                   Container(
-                    width: _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 32 : 8,
-                    height: _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 6 : 8,
+                    width: _scrollProgress >= 0.1 && _scrollProgress < 0.8
+                        ? 32
+                        : 8,
+                    height:
+                        _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 6 : 8,
                     decoration: BoxDecoration(
-                      color: _scrollProgress >= 0.1 ? AppTheme.colorPrimary : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(_scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 3 : 4),
+                      color: _scrollProgress >= 0.1
+                          ? AppTheme.colorPrimary
+                          : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(
+                          _scrollProgress >= 0.1 && _scrollProgress < 0.8
+                              ? 3
+                              : 4),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Container(
                     width: 24,
                     height: 2,
-                    color: _scrollProgress >= 0.8 ? AppTheme.colorPrimary.withOpacity(0.5) : Colors.grey[200],
+                    color: _scrollProgress >= 0.8
+                        ? AppTheme.colorPrimary.withOpacity(0.5)
+                        : Colors.grey[200],
                   ),
                   const SizedBox(width: 4),
                   Container(
                     width: _scrollProgress >= 0.8 ? 32 : 8,
                     height: _scrollProgress >= 0.8 ? 6 : 8,
                     decoration: BoxDecoration(
-                      color: _scrollProgress >= 0.8 ? AppTheme.colorPrimary : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(_scrollProgress >= 0.8 ? 3 : 4),
+                      color: _scrollProgress >= 0.8
+                          ? AppTheme.colorPrimary
+                          : Colors.grey[200],
+                      borderRadius:
+                          BorderRadius.circular(_scrollProgress >= 0.8 ? 3 : 4),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // Body
             Expanded(child: _buildLocationState(context)),
           ],
@@ -1592,7 +1651,9 @@ class _PriceTypeOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.colorPrimary.withOpacity(0.05) : Colors.white,
+          color: isSelected
+              ? AppTheme.colorPrimary.withOpacity(0.05)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppTheme.colorPrimary : Colors.grey[200]!,
@@ -1614,7 +1675,9 @@ class _PriceTypeOption extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: isSelected ? AppTheme.colorPrimary.withOpacity(0.6) : Colors.grey[500],
+                color: isSelected
+                    ? AppTheme.colorPrimary.withOpacity(0.6)
+                    : Colors.grey[500],
                 fontSize: 9,
               ),
               textAlign: TextAlign.center,
@@ -1668,16 +1731,26 @@ class _AmountFieldState extends State<_AmountField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.label, style: TextStyle(fontSize: 12, color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
+          Text(widget.label,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
           Row(
             children: [
-              const Text('Bs ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+              const Text('Bs ',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87)),
               Expanded(
                 child: TextField(
                   controller: widget.controller,
                   focusNode: _focusNode,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -1741,12 +1814,18 @@ class _NumberFieldState extends State<_NumberField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.label, style: TextStyle(fontSize: 12, color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
+          Text(widget.label,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
           TextField(
             controller: widget.controller,
             focusNode: _focusNode,
             keyboardType: TextInputType.number,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.black87),
             decoration: const InputDecoration(
               border: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -1833,7 +1912,8 @@ class _DescriptionFieldState extends State<_DescriptionField> {
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(fontSize: 14, color: Colors.black87),
                   decoration: const InputDecoration(
-                    hintText: 'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
+                    hintText:
+                        'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
                     border: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     enabledBorder: InputBorder.none,

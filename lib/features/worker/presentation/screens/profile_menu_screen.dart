@@ -310,8 +310,15 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
     final user = SessionStore.currentUser;
     final roleLabel = _isWorker ? 'Trabajador' : 'Empleador';
 
-    return Scaffold(
-      body: ChambaBackground(
+    // Perfil en modo claro (cliente y trabajador), también al abrirse desde
+    // una notificación fuera del shell.
+    final lightTheme = AppTheme.light();
+    return Theme(
+      data: lightTheme,
+      child: Scaffold(
+      backgroundColor: lightTheme.scaffoldBackgroundColor,
+      body: ColoredBox(
+        color: lightTheme.scaffoldBackgroundColor,
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
@@ -330,7 +337,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                 ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
-              GlassCard(
+              _ProfileCard(
                 child: Column(
                   children: [
                     Row(
@@ -420,9 +427,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 user?.email ?? 'Sin correo',
-                                style: const TextStyle(
-                                  color: AppTheme.colorMuted,
-                                ),
+                                style: const TextStyle(color: _profileMuted),
                               ),
                             ],
                           ),
@@ -580,9 +585,40 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 }
+
+/// Tarjeta blanca con borde suave para el perfil en modo claro.
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _profileBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F0F172A),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+const Color _profileBorder = Color(0xFFE2E8F0);
+const Color _profileMuted = Color(0xFF64748B);
 
 class _NavTile extends StatelessWidget {
   const _NavTile({
@@ -603,12 +639,25 @@ class _NavTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: GlassCard(
+      child: _ProfileCard(
         child: ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(child: Icon(icon)),
-          title: Text(title),
-          subtitle: Text(subtitle),
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.12),
+            foregroundColor: AppTheme.colorPrimary,
+            child: Icon(icon),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(color: _profileMuted),
+          ),
           trailing: badgeCount > 0
               ? Container(
                   padding: const EdgeInsets.all(6),
@@ -624,7 +673,7 @@ class _NavTile extends StatelessWidget {
                         fontWeight: FontWeight.bold),
                   ),
                 )
-              : const Icon(Icons.chevron_right),
+              : const Icon(Icons.chevron_right, color: _profileMuted),
           onTap: onTap,
         ),
       ),
@@ -645,7 +694,7 @@ class _SectionTitle extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppTheme.colorMuted,
+              color: _profileMuted,
             ),
       ),
     );

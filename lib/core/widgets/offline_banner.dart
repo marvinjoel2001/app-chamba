@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../network/realtime_service.dart';
 import '../services/connectivity_service.dart';
+import '../services/toast_service.dart';
 import '../theme/app_theme.dart';
 
 /// Estado de conexión que se muestra al usuario, de mayor a menor prioridad.
@@ -41,6 +42,7 @@ class _OfflineBannerHostState extends State<OfflineBannerHost> {
   void initState() {
     super.initState();
     _connectivity.isOffline.addListener(_recompute);
+    ToastService.isVisible.addListener(_onToastChanged);
     _connectivity.isSlow.addListener(_recompute);
     _realtime.isReconnecting.addListener(_onReconnectingChanged);
     _state = _computeState();
@@ -50,6 +52,7 @@ class _OfflineBannerHostState extends State<OfflineBannerHost> {
   @override
   void dispose() {
     _connectivity.isOffline.removeListener(_recompute);
+    ToastService.isVisible.removeListener(_onToastChanged);
     _connectivity.isSlow.removeListener(_recompute);
     _realtime.isReconnecting.removeListener(_onReconnectingChanged);
     _restoredTimer?.cancel();
@@ -69,6 +72,10 @@ class _OfflineBannerHostState extends State<OfflineBannerHost> {
       _reconnectGraceElapsed = false;
     }
     _recompute();
+  }
+
+  void _onToastChanged() {
+    if (mounted) setState(() {});
   }
 
   _BannerState _computeState() {
@@ -108,7 +115,8 @@ class _OfflineBannerHostState extends State<OfflineBannerHost> {
 
   @override
   Widget build(BuildContext context) {
-    final showBanner = _state != _BannerState.hidden;
+    final showBanner =
+        _state != _BannerState.hidden && !ToastService.isVisible.value;
     return Stack(
       textDirection: TextDirection.ltr,
       children: [

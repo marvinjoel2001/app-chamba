@@ -13,6 +13,7 @@ class WorkerJobModel extends WorkerJob {
     super.clientProfilePhotoUrl,
     super.acceptedAt,
     super.completedAt,
+    super.workElapsedSeconds,
     super.threadId,
     super.paymentMethod,
   });
@@ -31,8 +32,10 @@ class WorkerJobModel extends WorkerJob {
       clientProfilePhotoUrl: client['profilePhotoUrl']?.toString(),
       acceptedAt: _parseDate(json['acceptedAt']?.toString()),
       completedAt: _parseDate(json['completedAt']?.toString()),
+      workElapsedSeconds: (json['workElapsedSeconds'] as num?)?.toInt(),
       threadId: json['threadId']?.toString(),
-      paymentMethod: json['paymentMethod']?.toString() ?? json['payment_method']?.toString(),
+      paymentMethod: json['paymentMethod']?.toString() ??
+          json['payment_method']?.toString(),
     );
   }
 
@@ -46,6 +49,7 @@ class WorkerJobModel extends WorkerJob {
       'requestStatus': _statusToRaw(status),
       'acceptedAt': acceptedAt?.toUtc().toIso8601String(),
       'completedAt': completedAt?.toUtc().toIso8601String(),
+      'workElapsedSeconds': workElapsedSeconds,
       'threadId': threadId,
       'client': {
         'firstName': clientFirstName,

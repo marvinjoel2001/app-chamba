@@ -37,16 +37,16 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     _realtime.on('user.verification.updated', _onVerificationUpdated);
 
-
-
     // Iniciar servicio de background para workers automáticamente
     if (widget.role == 'worker') {
-      WorkerBackgroundService.setEnabled(SessionStore.currentUser?.isAvailable ?? false);
+      WorkerBackgroundService.setEnabled(
+          SessionStore.currentUser?.isAvailable ?? false);
       // El banner de solicitud nueva vive en el shell, no en la pestaña de
       // solicitudes: el worker puede estar en Mensajes o Perfil cuando entra.
-
+    } else {
+      WorkerBackgroundService.setEnabled(false);
     }
-    
+
     // Iniciar polling de notificaciones no leidas
     UnreadNotificationsNotifier.instance;
     UnreadMessagesNotifier.instance.refresh();
@@ -96,8 +96,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
     );
 
     await SessionStore.setCurrentUser(updatedUser);
-
-
   }
 
   @override
@@ -122,9 +120,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     // Detectar si está en la pestaña de mensajes
     final isOnMessagesTab = currentIndex == _messagesTabIndex;
+    final isOnProfileTab = currentIndex == pages.length - 1;
+    final isLightTab = isOnMessagesTab || isOnProfileTab;
 
-    // Tema claro para mensajes, oscuro para el resto
-    final theme = isOnMessagesTab ? AppTheme.light() : AppTheme.dark();
+    // Tema claro para mensajes y perfil, oscuro para el resto
+    final theme = isLightTab ? AppTheme.light() : AppTheme.dark();
 
     return Theme(
       data: theme,
@@ -147,7 +147,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
               currentIndex: currentIndex,
               unreadCount: unreadCount,
               messagesTabIndex: _messagesTabIndex,
-              isLightTheme: isOnMessagesTab,
+              isLightTheme: isLightTab,
               onTap: (index) {
                 if (index == _messagesTabIndex) {
                   UnreadMessagesNotifier.instance.refresh();

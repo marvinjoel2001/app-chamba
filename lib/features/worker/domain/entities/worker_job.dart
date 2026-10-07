@@ -20,6 +20,7 @@ class WorkerJob {
     this.clientProfilePhotoUrl,
     this.acceptedAt,
     this.completedAt,
+    this.workElapsedSeconds,
     this.threadId,
     this.paymentMethod,
   });
@@ -35,6 +36,7 @@ class WorkerJob {
   final String? clientProfilePhotoUrl;
   final DateTime? acceptedAt;
   final DateTime? completedAt;
+  final int? workElapsedSeconds;
   final String? threadId;
   final String? paymentMethod;
 
@@ -66,21 +68,25 @@ class WorkerJob {
         other.clientLastName == clientLastName &&
         other.clientProfilePhotoUrl == clientProfilePhotoUrl &&
         other.acceptedAt == acceptedAt &&
+        other.completedAt == completedAt &&
+        other.workElapsedSeconds == workElapsedSeconds &&
         other.threadId == threadId;
   }
 
   @override
   int get hashCode => Object.hash(
-    id,
-    title,
-    category,
-    address,
-    amount,
-    status,
-    clientFirstName,
-    clientLastName,
-    clientProfilePhotoUrl,
-    acceptedAt,
-    threadId,
-  );
+        id,
+        title,
+        category,
+        address,
+        amount,
+        status,
+        clientFirstName,
+        clientLastName,
+        clientProfilePhotoUrl,
+        acceptedAt,
+        completedAt,
+        workElapsedSeconds,
+        threadId,
+      );
 }

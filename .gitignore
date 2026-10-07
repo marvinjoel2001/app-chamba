@@ -48,6 +48,7 @@ app.*.map.json
 /env/*.local.json
 /env/*.prod.json
 /env/*.secret.json
+/env/qa-private/
 .env.local.json
 .env.production.json
 .env.*.json
