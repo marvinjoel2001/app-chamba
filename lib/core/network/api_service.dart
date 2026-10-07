@@ -87,7 +87,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
   }) async {
-    for (var attempt = 0; ; attempt++) {
+    for (var attempt = 0;; attempt++) {
       try {
         return await _send(
           (candidate) => client.get(
@@ -102,9 +102,8 @@ class ApiService {
         if (e.isTimeout || attempt >= _getRetryBackoff.length) rethrow;
       } on ApiException catch (e) {
         // 502/503/504: el servidor/proxy está despertando o saturado.
-        final transient = e.statusCode == 502 ||
-            e.statusCode == 503 ||
-            e.statusCode == 504;
+        final transient =
+            e.statusCode == 502 || e.statusCode == 503 || e.statusCode == 504;
         if (!transient || attempt >= _getRetryBackoff.length) rethrow;
       }
       await Future<void>.delayed(_getRetryBackoff[attempt]);
@@ -115,6 +114,7 @@ class ApiService {
     String path, {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
+    Duration timeout = _requestTimeout,
   }) {
     return _send(
       (candidate) => client.post(
@@ -123,19 +123,21 @@ class ApiService {
         body: jsonEncode(body ?? {}),
       ),
       timeoutMessage: _timeoutPostMessage,
+      timeout: timeout,
     );
   }
 
   Future<Map<String, dynamic>> _send(
     Future<http.Response> Function(String candidateBaseUrl) request, {
     required String timeoutMessage,
+    Duration timeout = _requestTimeout,
   }) async {
     NetworkException? lastNetworkError;
 
     for (final candidate in _candidateBaseUrls()) {
       final stopwatch = Stopwatch()..start();
       try {
-        final response = await request(candidate).timeout(_requestTimeout);
+        final response = await request(candidate).timeout(timeout);
         ConnectivityService.instance.reportRequest(
           stopwatch.elapsed,
           failed: false,

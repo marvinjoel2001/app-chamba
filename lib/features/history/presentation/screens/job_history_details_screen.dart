@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import 'package:intl/intl.dart';
+import '../../../messages/domain/entities/chat_thread.dart';
+import '../../../messages/presentation/screens/chat_screen.dart';
 
 class JobHistoryDetailsScreen extends StatelessWidget {
   const JobHistoryDetailsScreen({
@@ -21,11 +23,13 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     final address = job['address'] as String? ?? 'Ubicación no especificada';
     final category = job['category'] as String? ?? 'General';
     final requestStatus = job['requestStatus'] as String? ?? '';
-    final amount = job['amount'] != null ? NumberFormat.currency(symbol: 'Bs ').format(job['amount']) : 'N/A';
+    final amount = job['amount'] != null
+        ? NumberFormat.currency(symbol: 'Bs ').format(job['amount'])
+        : 'N/A';
 
     final isCompleted = requestStatus == 'completed';
     final isCancelled = requestStatus == 'cancelled';
-    
+
     Color statusColor = AppTheme.colorPrimary;
     String statusText = 'Asignado';
     if (isCompleted) {
@@ -36,7 +40,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
       statusText = 'Cancelado';
     }
 
-    final rawDate = job['completedAt'] ?? (isClient ? job['createdAt'] : job['acceptedAt']);
+    final rawDate =
+        job['completedAt'] ?? (isClient ? job['createdAt'] : job['acceptedAt']);
     String formattedDate = '';
     if (rawDate != null) {
       try {
@@ -46,7 +51,9 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     }
 
     final otherUser = isClient ? job['worker'] : job['client'];
-    final otherName = otherUser != null ? '${otherUser['firstName']} ${otherUser['lastName']}'.trim() : 'Sin asignar';
+    final otherName = otherUser != null
+        ? '${otherUser['firstName']} ${otherUser['lastName']}'.trim()
+        : 'Sin asignar';
     final otherPhoto = otherUser?['profilePhotoUrl'] as String?;
 
     return Scaffold(
@@ -78,7 +85,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Center(
-                    child: Icon(Icons.work_outline, size: 64, color: AppTheme.colorPrimary),
+                    child: Icon(Icons.work_outline,
+                        size: 64, color: AppTheme.colorPrimary),
                   ),
                 ),
               const SizedBox(height: 24),
@@ -87,7 +95,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -136,7 +145,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
               // Date
               Row(
                 children: [
-                  const Icon(Icons.calendar_today, size: 16, color: AppTheme.colorMuted),
+                  const Icon(Icons.calendar_today,
+                      size: 16, color: AppTheme.colorMuted),
                   const SizedBox(width: 8),
                   Text(
                     formattedDate,
@@ -153,12 +163,17 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundImage: otherPhoto != null ? NetworkImage(otherPhoto) : null,
+                      backgroundImage:
+                          otherPhoto != null ? NetworkImage(otherPhoto) : null,
                       backgroundColor: AppTheme.colorPrimary.withOpacity(0.2),
                       child: otherPhoto == null
                           ? Text(
-                              otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              otherName.isNotEmpty
+                                  ? otherName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             )
                           : null,
                     ),
@@ -169,7 +184,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                         children: [
                           Text(
                             isClient ? 'Trabajador' : 'Cliente',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.colorMuted),
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.colorMuted),
                           ),
                           Text(
                             otherName,
@@ -221,12 +237,39 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     _buildDetailRow(Icons.category, 'Categoría', category),
-                    const Divider(color: AppTheme.colorGlassBorderSoft, height: 24),
+                    const Divider(
+                        color: AppTheme.colorGlassBorderSoft, height: 24),
                     _buildDetailRow(Icons.location_on, 'Ubicación', address),
                   ],
                 ),
               ),
               const SizedBox(height: 40),
+              if (job['threadId'] != null &&
+                  job['offerStatus'] == 'accepted' &&
+                  ['assigned', 'in_progress', 'completed', 'cancelled']
+                      .contains(requestStatus))
+                ChambaSecondaryButton(
+                  label: isCompleted || isCancelled
+                      ? 'Ver conversación del trabajo'
+                      : 'Coordinar trabajo',
+                  icon: isCompleted || isCancelled
+                      ? Icons.history_rounded
+                      : Icons.chat_bubble_outline_rounded,
+                  onPressed: () =>
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => ChatScreen(
+                                threadId: job['threadId'].toString(),
+                                jobId: job['requestId']?.toString() ?? '',
+                                jobTitle: title,
+                                counterpartName: otherName,
+                                isArchived: isCompleted || isCancelled,
+                                jobStatus: isCompleted
+                                    ? ChatThreadStatus.completed
+                                    : isCancelled
+                                        ? ChatThreadStatus.cancelled
+                                        : ChatThreadStatus.active,
+                              ))),
+                ),
             ],
           ),
         ),
@@ -246,7 +289,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: AppTheme.colorMuted),
+                style:
+                    const TextStyle(fontSize: 12, color: AppTheme.colorMuted),
               ),
               const SizedBox(height: 2),
               Text(

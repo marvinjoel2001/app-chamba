@@ -2,7 +2,8 @@ import '../../../../core/services/mobile_backend_service.dart';
 
 abstract class MessagesRemoteDataSource {
   Future<Map<String, dynamic>> messages({required String userId});
-  Future<Map<String, dynamic>> threadMessages({required String threadId});
+  Future<Map<String, dynamic>> threadMessages(
+      {required String threadId, String? before});
   Future<Map<String, dynamic>> sendMessage({
     required String threadId,
     required String senderUserId,
@@ -29,8 +30,9 @@ class MessagesRemoteDataSourceImpl implements MessagesRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>> threadMessages({required String threadId}) {
-    return _backendService.threadMessages(threadId: threadId);
+  Future<Map<String, dynamic>> threadMessages(
+      {required String threadId, String? before}) {
+    return _backendService.threadMessages(threadId: threadId, before: before);
   }
 
   @override

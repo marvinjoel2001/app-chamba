@@ -2,6 +2,8 @@ import '../../../../core/errors/failure_mapper.dart';
 import '../../../../core/errors/result.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_thread.dart';
+import '../../domain/entities/job_conversation.dart';
+import '../../../../core/errors/failure.dart';
 import '../../domain/repositories/messages_repository.dart';
 import '../datasources/messages_remote_datasource.dart';
 import '../models/chat_message_model.dart';
@@ -23,6 +25,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
       final threads = rawThreads
           .whereType<Map<String, dynamic>>()
           .map(ChatThreadModel.fromJson)
+          .where((thread) => thread.chatEnabled && thread.jobId.isNotEmpty)
           .where((thread) => type == null || thread.type == type)
           .toList(growable: false);
       return Success(threads);
@@ -32,17 +35,34 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
-  Future<Result<List<ChatMessage>>> getThreadMessages({
+  Future<Result<JobConversation>> getThreadMessages({
     required String threadId,
+    String? before,
   }) async {
     try {
-      final response = await _remote.threadMessages(threadId: threadId);
+      final response =
+          await _remote.threadMessages(threadId: threadId, before: before);
+      final context = response['context'] as Map<String, dynamic>?;
+      if (context == null) {
+        return const Error(
+            ValidationFailure('El chat del trabajo aún no está habilitado.'));
+      }
+      final thread = ChatThreadModel.fromJson(context);
+      if (!thread.chatEnabled ||
+          thread.id != threadId ||
+          thread.jobId.isEmpty) {
+        return const Error(
+            ValidationFailure('El chat se habilita al aceptar una oferta.'));
+      }
       final rawMessages = (response['messages'] as List<dynamic>? ?? const []);
       final messages = rawMessages
           .whereType<Map<String, dynamic>>()
           .map(ChatMessageModel.fromJson)
           .toList(growable: false);
-      return Success(messages);
+      return Success(JobConversation(
+          thread: thread,
+          messages: messages,
+          hasMore: response['hasMore'] == true));
     } catch (error) {
       return Error(mapToFailure(error));
     }

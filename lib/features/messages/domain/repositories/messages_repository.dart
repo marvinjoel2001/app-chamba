@@ -1,14 +1,16 @@
 import '../../../../core/errors/result.dart';
 import '../entities/chat_message.dart';
 import '../entities/chat_thread.dart';
+import '../entities/job_conversation.dart';
 
 abstract class MessagesRepository {
   Future<Result<List<ChatThread>>> getThreads({
     required String userId,
     ChatThreadType? type,
   });
-  Future<Result<List<ChatMessage>>> getThreadMessages({
+  Future<Result<JobConversation>> getThreadMessages({
     required String threadId,
+    String? before,
   });
   Future<Result<ChatMessage>> sendMessage({
     required String threadId,

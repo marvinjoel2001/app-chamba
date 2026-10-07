@@ -1,6 +1,7 @@
 import '../../../../core/errors/result.dart';
 import '../entities/chat_message.dart';
 import '../entities/chat_thread.dart';
+import '../entities/job_conversation.dart';
 import '../repositories/messages_repository.dart';
 
 class GetThreadsUseCase {
@@ -21,8 +22,9 @@ class GetThreadMessagesUseCase {
 
   final MessagesRepository _repository;
 
-  Future<Result<List<ChatMessage>>> call({required String threadId}) {
-    return _repository.getThreadMessages(threadId: threadId);
+  Future<Result<JobConversation>> call(
+      {required String threadId, String? before}) {
+    return _repository.getThreadMessages(threadId: threadId, before: before);
   }
 }
 

@@ -289,8 +289,8 @@ class MobileBackendService {
     return _api.get('/mobile/messages', queryParameters: {'userId': userId});
   }
 
-  Future<Map<String, dynamic>> threadMessages({required String threadId}) {
-    return _api.get('/mobile/messages/$threadId');
+  Future<Map<String, dynamic>> threadMessages({required String threadId, String? before}) {
+    return _api.get('/mobile/messages/$threadId', queryParameters: _cleanQuery({'before': before}));
   }
 
   Future<Map<String, dynamic>> sendMessage({
@@ -332,6 +332,16 @@ class MobileBackendService {
       '/mobile/messages/$threadId/read',
       body: {'userId': userId},
     );
+  }
+
+  Future<Map<String, dynamic>> sendChatPhoto({
+    required String threadId,
+    required String imageBase64,
+    required String caption,
+  }) {
+    return _api.post('/mobile/messages/$threadId/photo',
+      timeout: const Duration(seconds: 60),
+      body: {'imageBase64': imageBase64, 'caption': caption});
   }
 
   Future<Map<String, dynamic>> incomingRequest({required String workerUserId}) {

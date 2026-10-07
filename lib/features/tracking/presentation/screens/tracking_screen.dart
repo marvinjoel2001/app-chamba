@@ -977,6 +977,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                           MaterialPageRoute<void>(
                                             builder: (_) => ChatScreen(
                                               threadId: threadId,
+                                              jobId: _requestId ?? '',
+                                              jobTitle: title,
                                               counterpartName:
                                                   '${worker?['firstName'] ?? ''} ${worker?['lastName'] ?? ''}'
                                                       .trim(),

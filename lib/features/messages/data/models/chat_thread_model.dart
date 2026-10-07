@@ -22,11 +22,14 @@ class ChatThreadModel extends ChatThread {
     super.hasUnreadMessages,
     super.unreadCount,
     super.type,
+    super.chatEnabled,
   });
 
   factory ChatThreadModel.fromJson(Map<String, dynamic> json) {
     final request = json['request'] as Map<String, dynamic>? ?? {};
     final counterpart = json['counterpart'] as Map<String, dynamic>? ?? {};
+    final status = _parseStatus(
+        request['status']?.toString() ?? json['requestStatus']?.toString());
 
     return ChatThreadModel(
       id: json['id']?.toString() ?? '',
@@ -37,8 +40,9 @@ class ChatThreadModel extends ChatThread {
               ? request['description'].toString().trim()
               : 'Trabajo General'),
       jobDescription: request['description']?.toString() ?? '',
-      jobStatus: _parseStatus(
-          request['status']?.toString() ?? json['requestStatus']?.toString()),
+      jobStatus: status,
+      chatEnabled:
+          json['chatEnabled'] == true && status != ChatThreadStatus.pending,
       agreedPrice: _parseDouble(request['budget']) ??
           _parseDouble(json['agreedPrice']) ??
           0.0,
@@ -56,14 +60,17 @@ class ChatThreadModel extends ChatThread {
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
       hasUnreadMessages: json['hasUnreadMessages'] as bool? ??
           (((json['unreadCount'] as num?)?.toInt() ?? 0) > 0),
-      type: _parseType(
-          json['type']?.toString() ?? json['archived']),
+      type: status == ChatThreadStatus.completed ||
+              status == ChatThreadStatus.cancelled
+          ? ChatThreadType.archived
+          : _parseType(json['type']?.toString() ?? json['archived']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'chatEnabled': chatEnabled,
       'requestId': jobId,
       'request': {
         'id': jobId,
@@ -96,6 +103,7 @@ class ChatThreadModel extends ChatThread {
     switch ((raw ?? '').toLowerCase()) {
       case 'active':
       case 'in_progress':
+      case 'assigned':
       case 'accepted':
         return ChatThreadStatus.active;
       case 'completed':
@@ -106,12 +114,14 @@ class ChatThreadModel extends ChatThread {
       case 'cancel':
         return ChatThreadStatus.cancelled;
       default:
-        return ChatThreadStatus.active;
+        return ChatThreadStatus.pending;
     }
   }
 
   static String _statusToString(ChatThreadStatus status) {
     switch (status) {
+      case ChatThreadStatus.pending:
+        return 'pending';
       case ChatThreadStatus.active:
         return 'active';
       case ChatThreadStatus.completed:

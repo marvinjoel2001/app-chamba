@@ -2,10 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Chamba (with env)",
+      "name": "Chamba (Local)",
       "request": "launch",
       "type": "dart",
       "args": ["--dart-define-from-file=env/dart_define.local.json"]
+    },
+    {
+      "name": "Chamba (Railway Prod)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=env/dart_define.prod.json"]
     }
   ]
 }

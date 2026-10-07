@@ -1,4 +1,5 @@
 enum ChatThreadStatus {
+  pending,
   active,
   completed,
   cancelled,
@@ -31,6 +32,7 @@ class ChatThread {
     this.hasUnreadMessages = false,
     this.unreadCount = 0,
     this.type = ChatThreadType.active,
+    this.chatEnabled = false,
   });
 
   final String id;
@@ -53,14 +55,19 @@ class ChatThread {
   final bool hasUnreadMessages;
   final int unreadCount;
   final ChatThreadType type;
+  final bool chatEnabled;
 
   bool get isActive => jobStatus == ChatThreadStatus.active;
   bool get isCompleted => jobStatus == ChatThreadStatus.completed;
   bool get isCancelled => jobStatus == ChatThreadStatus.cancelled;
   bool get isArchived => type == ChatThreadType.archived;
+  bool get canSend =>
+      chatEnabled && isActive && !isArchived && jobId.isNotEmpty;
 
   String get statusLabel {
     switch (jobStatus) {
+      case ChatThreadStatus.pending:
+        return 'Por confirmar';
       case ChatThreadStatus.active:
         return 'Activo';
       case ChatThreadStatus.completed:

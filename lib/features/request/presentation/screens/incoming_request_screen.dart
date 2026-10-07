@@ -16,7 +16,8 @@ import '../../../../core/utils/start_date_label.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/widgets/confetti_celebration.dart';
 import '../../../../core/widgets/new_request_pulse.dart';
-import '../../../messages/presentation/screens/messages_screen.dart';
+import '../../../messages/presentation/screens/chat_screen.dart';
+import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
 import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../state/request_dependencies.dart';
@@ -1938,12 +1939,23 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
   }
 
-  void _openChat(String requestId) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const MessagesScreen(),
-      ),
-    );
+  Future<void> _openChat(String requestId) async {
+    final user = SessionStore.currentUser;
+    if (user == null) return;
+    final result = await MessagesDependencies.getActiveThreads(userId: user.id);
+    if (!mounted) return;
+    result.fold(onSuccess: (threads) {
+      final matches = threads.where((thread) => thread.jobId == requestId && thread.canSend);
+      if (matches.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El chat se habilita al aceptar una oferta.')));
+        return;
+      }
+      final thread = matches.first;
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ChatScreen(
+        threadId: thread.id, jobId: thread.jobId, jobTitle: thread.jobTitle,
+        counterpartName: thread.counterpartName,
+      )));
+    }, onFailure: (failure) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message))));
   }
 
 }

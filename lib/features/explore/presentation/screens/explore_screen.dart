@@ -38,6 +38,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   bool _refreshing = false;
+  bool _locating = false;
   bool _analyzingPrompt = false;
   String? _error;
   String? _locationBlockMessage;
@@ -287,6 +288,30 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
       );
     }).toList();
+  }
+
+  Future<void> _centerOnMyLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final location = await _resolveCurrentLocationRequired();
+      if (!mounted) return;
+      if (location == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _locationBlockMessage ??
+                  'No se pudo obtener tu ubicacion actual.',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _currentUserLocation = location);
+      _mapController.move(location, _currentZoom < 15 ? 15 : _currentZoom);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   void _zoomIn() {
@@ -1398,12 +1423,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                   _MapControl(icon: Icons.remove, onTap: _zoomOut),
                   const SizedBox(height: 12),
                   _MapControl(
-                    icon: Icons.navigation,
+                    icon: _locating ? Icons.hourglass_top : Icons.my_location,
                     highlighted: true,
-                    onTap: () {
-                      _mapController.move(_mapCenter, _currentZoom);
-                      _load();
-                    },
+                    onTap: _locating ? null : _centerOnMyLocation,
                   ),
                 ],
               ),

@@ -515,6 +515,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
         MaterialPageRoute<void>(
           builder: (_) => ChatScreen(
             threadId: threadId!,
+            jobId: widget.requestId,
+            jobTitle: _tracking?['title']?.toString() ?? 'Trabajo confirmado',
             counterpartName: clientName.isEmpty ? 'Cliente' : clientName,
             counterpartId: client?['id']?.toString(),
             counterpartAvatarUrl: client?['profilePhotoUrl'] as String?,

@@ -1,632 +1,609 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-
-import '../../../../core/errors/failure.dart';
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/push/notification_router.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
-import '../../domain/entities/chat_thread.dart';
 import '../../../../core/session/unread_notifications_notifier.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../history/presentation/screens/job_history_details_screen.dart';
 import '../../../notifications/data/notifications_service.dart';
+import '../../../notifications/domain/models/app_notification.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../request/presentation/screens/job_in_progress_screen.dart';
+import '../../../tracking/presentation/screens/tracking_screen.dart';
+import '../../domain/entities/chat_thread.dart';
 import '../state/messages_dependencies.dart';
-import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
-
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> {
-  final RealtimeService _realtime = RealtimeService.instance;
-
-  bool _loading = true;
-  bool _isOffline = false;
-  bool _shouldRedirectToLogin = false;
-  String? _error;
-  List<ChatThread> _threads = const [];
-
+class _MessagesScreenState extends State<MessagesScreen>
+    with WidgetsBindingObserver {
+  final _realtime = RealtimeService.instance;
+  List<ChatThread> _threads = [];
+  List<AppNotification> _notifications = [];
+  bool _loading = true, _fetching = false, _again = false;
+  String? _error, _notificationError;
   @override
   void initState() {
     super.initState();
-    UnreadMessagesNotifier.instance.refresh();
-    final userId = SessionStore.currentUser?.id;
-    _realtime.connect(userId: userId);
-    _realtime.on('message.new', _onMessageEvent);
-    _realtime.reconnectCount.addListener(_onReconnect);
-    _load();
+    WidgetsBinding.instance.addObserver(this);
+    _realtime.connect(userId: SessionStore.currentUser?.id);
+    for (final event in [
+      'message.new',
+      'notification.new',
+      'offer.accepted',
+      'job.completed',
+      'job.cancelled'
+    ]) {
+      _realtime.on(event, _onEvent);
+    }
+    _realtime.reconnectCount.addListener(_reload);
+    UnreadNotificationsNotifier.instance.addListener(_reload);
+    _reload();
   }
 
   @override
   void dispose() {
-    _realtime.reconnectCount.removeListener(_onReconnect);
-    _realtime.off('message.new', _onMessageEvent);
+    WidgetsBinding.instance.removeObserver(this);
+    for (final event in [
+      'message.new',
+      'notification.new',
+      'offer.accepted',
+      'job.completed',
+      'job.cancelled'
+    ]) {
+      _realtime.off(event, _onEvent);
+    }
+    _realtime.reconnectCount.removeListener(_reload);
+    UnreadNotificationsNotifier.instance.removeListener(_reload);
     super.dispose();
   }
 
-  void _onReconnect() { if (mounted) _load(silent: true); }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reload();
+  }
 
-  void _onMessageEvent(dynamic payload) {
-    // Refresco silencioso: no mostrar spinner cuando llega un mensaje nuevo.
-    _load(silent: true);
+  void _onEvent(dynamic _) => _reload();
+  void _reload() => unawaited(_load());
+  Future<void> _load() async {
+    if (_fetching) {
+      _again = true;
+      return;
+    }
+    final user = SessionStore.currentUser;
+    if (user == null) {
+      if (mounted)
+        setState(() {
+          _loading = false;
+          _error = 'Inicia sesión para ver tus mensajes.';
+        });
+      return;
+    }
+    _fetching = true;
+    await Future.wait([
+      _loadThreads(user.id),
+      _loadNotifications(),
+    ]);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    _fetching = false;
+    if (_again) {
+      _again = false;
+      _reload();
+    }
+  }
+
+  Future<void> _loadThreads(String userId) async {
+    final result = await MessagesDependencies.getActiveThreads(userId: userId);
+    if (!mounted) return;
+    result.fold(
+        onSuccess: (threads) {
+          setState(() {
+            _threads = threads.toList()
+              ..sort((a, b) => (b.lastMessageAt ?? b.createdAt ?? DateTime(0))
+                  .compareTo(a.lastMessageAt ?? a.createdAt ?? DateTime(0)));
+            _error = null;
+          });
+          UnreadMessagesNotifier.instance.refresh();
+        },
+        onFailure: (failure) => setState(() => _error = failure.message));
   }
 
   Future<void> _loadNotifications() async {
-    // Ya no cargamos localmente la lista de notificaciones para contar las no leídas,
-    // el UnreadNotificationsNotifier se encarga de esto.
-  }
-
-  String _formatDate(DateTime? value) {
-    if (value == null) return '--';
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final messageDay = DateTime(value.year, value.month, value.day);
-    final diff = today.difference(messageDay).inDays;
-    final timeStr =
-        '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-    if (diff == 0) return timeStr;
-    if (diff == 1) return 'Ayer';
-    return '${value.day}/${value.month}';
-  }
-
-  Future<void> _load({bool silent = false}) async {
-    final user = SessionStore.currentUser;
-    if (user == null) {
-      setState(() {
-        _error = 'Sesion expirada';
-        _loading = false;
-      });
-      return;
-    }
-    // Solo spinner en la carga inicial; los refrescos son silenciosos.
-    if (!silent || _threads.isEmpty) {
-      setState(() {
-        _loading = _threads.isEmpty;
-        _error = null;
-      });
-    }
-
-    _loadNotifications();
-
-    // Cargar threads activos y archivados en paralelo
-    final results = await Future.wait([
-      MessagesDependencies.getActiveThreads(
-        userId: user.id,
-        type: ChatThreadType.active,
-      ),
-      MessagesDependencies.getArchivedThreads(
-        userId: user.id,
-        type: ChatThreadType.archived,
-      ),
-    ]);
-    final activeResult = results[0];
-    final archivedResult = results[1];
-
-    if (!mounted) return;
-
-    final List<ChatThread> allThreads = [];
-
-    activeResult.fold(
-      onSuccess: (threads) {
-        allThreads.addAll(threads);
-        _isOffline = false;
-        _shouldRedirectToLogin = false;
-      },
-      onFailure: (failure) {
-        _isOffline = failure is NetworkFailure;
-        _shouldRedirectToLogin = failure is UnauthorizedFailure;
-        _error ??= failure.message;
-      },
-    );
-
-    archivedResult.fold(
-      onSuccess: (threads) {
-        allThreads.addAll(threads);
-      },
-      onFailure: (failure) {
-        if (_error == null) _error = failure.message;
-      },
-    );
-
-    // Ordenar por fecha del último mensaje (más reciente primero)
-    allThreads.sort((a, b) {
-      final aDate = a.lastMessageAt ?? a.createdAt;
-      final bDate = b.lastMessageAt ?? b.createdAt;
-      if (aDate == null && bDate == null) return 0;
-      if (aDate == null) return 1;
-      if (bDate == null) return -1;
-      return bDate.compareTo(aDate);
-    });
-
-    setState(() {
-      _threads = allThreads;
-      _loading = false;
-    });
-  }
-
-  Future<void> _deleteThread(ChatThread thread) async {
-    final user = SessionStore.currentUser;
-    if (user == null) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar chat'),
-        content: const Text(
-            '¿Deseas eliminar esta conversación? Solo se eliminará de tu bandeja de entrada.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppTheme.colorMuted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Eliminar',
-                style: TextStyle(color: AppTheme.colorError)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final result = await MessagesDependencies.deleteThread(
-      threadId: thread.id,
-      userId: user.id,
-    );
-
-    result.fold(
-      onSuccess: (_) {
+    try {
+      final result = await NotificationsService.getNotifications(limit: 8);
+      if (mounted)
         setState(() {
-          _threads.removeWhere((t) => t.id == thread.id);
+          _notifications = result.items;
+          _notificationError = null;
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chat eliminado')),
-          );
-        }
-      },
-      onFailure: (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al eliminar chat: ${failure.message}')),
-          );
-        }
-      },
-    );
+    } catch (_) {
+      if (mounted)
+        setState(() =>
+            _notificationError = 'No pudimos actualizar las notificaciones.');
+    }
   }
 
-  Color _statusColor(ChatThreadStatus status) {
-    switch (status) {
-      case ChatThreadStatus.active:
-        return AppTheme.colorSuccess;
-      case ChatThreadStatus.completed:
-        return AppTheme.colorPrimary;
-      case ChatThreadStatus.cancelled:
-        return AppTheme.colorError;
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()));
+    if (mounted) _reload();
+  }
+
+  Future<void> _openNotification(AppNotification notification) async {
+    try {
+      await NotificationsService.markAsRead(ids: [notification.id]);
+      await UnreadNotificationsNotifier.instance.refresh();
+    } catch (_) {/* Keep navigation available when marking read fails. */}
+    if (!mounted) return;
+    NotificationRouter.openFromData(
+        {'type': notification.type, ...?notification.data},
+        fromNotificationCenter: true);
+  }
+
+  Future<void> _openThread(ChatThread thread) async {
+    if (!thread.chatEnabled) return;
+    final isWorker = SessionStore.currentUser?.type == 'worker';
+    final Widget screen;
+    if (thread.isActive) {
+      screen = isWorker
+          ? JobInProgressScreen(requestId: thread.jobId)
+          : TrackingScreen(requestId: thread.jobId);
+    } else {
+      screen = JobHistoryDetailsScreen(isClient: !isWorker, job: {
+        'requestId': thread.jobId,
+        'threadId': thread.id,
+        'title': thread.jobTitle,
+        'description': thread.jobDescription,
+        'category': thread.category,
+        'amount': thread.agreedPrice,
+        'requestStatus': thread.isCompleted ? 'completed' : 'cancelled',
+        'offerStatus': 'accepted',
+        isWorker ? 'client' : 'worker': {
+          'firstName': thread.counterpartFirstName ?? thread.counterpartName,
+          'lastName': thread.counterpartLastName ?? '',
+          'profilePhotoUrl': thread.counterpartProfilePhotoUrl
+        },
+      });
     }
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => screen));
+    if (mounted) _reload();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isLight = theme.brightness == Brightness.light;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFD),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFBFBFD),
-        elevation: 0,
-        title: const Text(
-          'Mensajes',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        actions: [
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_isOffline)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  'Sin conexion. Mostrando datos locales.',
-                  style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6)),
-                ),
-              ),
-            if (_shouldRedirectToLogin)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  'Sesion expirada. Inicia sesion nuevamente.',
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-              ),
-            Expanded(
-              child: _buildThreadList(_threads, isLight),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildThreadList(List<ChatThread> threads, bool isLight) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null && threads.isEmpty) {
-      return Center(
-        child: Padding(padding: const EdgeInsets.all(16), child: Text(_error!)),
-      );
-    }
-    if (threads.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: () => _load(silent: true),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(48),
-              child: Center(
-                child: Text(
-                  'No tienes conversaciones aun.',
-                  style: TextStyle(
-                      color: isLight ? Colors.grey[600] : AppTheme.colorMuted),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: () => _load(silent: true),
-      child: ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      children: [
-        _buildNotificationsItem(isLight),
-        const SizedBox(height: 32),
-        _buildDivider(),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: threads.length,
-            separatorBuilder: (context, index) => const Divider(
-              height: 1,
-              color: Color(0xFFF3F4F6),
-              indent: 76,
-            ),
-            itemBuilder: (context, index) {
-              return _buildWhatsAppThreadItem(threads[index], isLight);
-            },
-          ),
-        ),
-      ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        Expanded(child: Container(height: 1, color: const Color(0xFFE5E7EB))),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'CHATS',
-            style: TextStyle(
-              color: Color(0xFF9CA3AF),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        Expanded(child: Container(height: 1, color: const Color(0xFFE5E7EB))),
-      ],
-    );
-  }
-
-  Widget _buildNotificationsItem(bool isLight) {
-    return ValueListenableBuilder<int>(
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
       valueListenable: UnreadNotificationsNotifier.instance,
-      builder: (context, unreadCount, child) {
-        final hasUnread = unreadCount > 0;
-        const Color unreadColor = Colors.redAccent;
+      builder: (context, unread, _) => MessagesInbox(
+          threads: _threads,
+          notifications: _notifications,
+          unreadNotifications: unread,
+          loading: _loading,
+          error: _error,
+          notificationError: _notificationError,
+          onRefresh: _load,
+          onNotifications: _openNotifications,
+          onNotification: _openNotification,
+          onThread: _openThread));
+}
 
-        return InkWell(
-          onTap: () async {
-            UnreadNotificationsNotifier.instance.refresh();
-            await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            );
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.redAccent.withOpacity(0.1),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.notifications,
-                      color: Colors.redAccent,
-                      size: 28,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Notificaciones',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              hasUnread
-                                  ? 'Tienes $unreadCount notificaciones nuevas'
-                                  : 'No hay notificaciones nuevas',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: const Color(0xFF6B7280), // Gray 500
-                                fontWeight: hasUnread
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppTheme.colorPrimary,
-                  size: 24,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+class MessagesInbox extends StatelessWidget {
+  const MessagesInbox(
+      {required this.threads,
+      required this.notifications,
+      required this.unreadNotifications,
+      required this.onRefresh,
+      required this.onNotifications,
+      required this.onNotification,
+      required this.onThread,
+      this.loading = false,
+      this.error,
+      this.notificationError,
+      super.key});
+  final List<ChatThread> threads;
+  final List<AppNotification> notifications;
+  final int unreadNotifications;
+  final bool loading;
+  final String? error, notificationError;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onNotifications;
+  final ValueChanged<AppNotification> onNotification;
+  final ValueChanged<ChatThread> onThread;
+  static const _ink = Color(0xFF17132D), _muted = Color(0xFF878099);
+
+  @override
+  Widget build(BuildContext context) {
+    final confirmed = threads
+        .where((thread) => thread.chatEnabled && thread.jobId.isNotEmpty)
+        .toList();
+    final active = confirmed.where((thread) => thread.isActive).toList();
+    final archived = confirmed.where((thread) => !thread.isActive).toList();
+    return Theme(
+        data: Theme.of(context).copyWith(
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+                seedColor: AppTheme.colorPrimary,
+                brightness: Brightness.light)),
+        child: Scaffold(
+            backgroundColor: const Color(0xFFF7F6FC),
+            body: SafeArea(
+                child: RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverToBoxAdapter(
+                              child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                                  child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Expanded(
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                              Text('Mensajes',
+                                                  style: TextStyle(
+                                                      fontSize: 28,
+                                                      color: _ink,
+                                                      fontWeight:
+                                                          FontWeight.w800)),
+                                              SizedBox(height: 5),
+                                              Text(
+                                                  'Tus trabajos, ofertas y novedades\nen un solo lugar.',
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: _muted,
+                                                      height: 1.5))
+                                            ])),
+                                        const SizedBox(width: 12),
+                                        NotificationBell(
+                                            unread: unreadNotifications,
+                                            onPressed: onNotifications),
+                                      ]))),
+                          SliverToBoxAdapter(
+                              child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: _notificationSummary())),
+                          if (error != null || notificationError != null)
+                            SliverToBoxAdapter(
+                                child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 12, 20, 0),
+                                    child: Text(
+                                        [
+                                          if (error != null) error!,
+                                          if (notificationError != null)
+                                            notificationError!
+                                        ].join('\n'),
+                                        style: const TextStyle(
+                                            color: _muted, fontSize: 12)))),
+                          if (loading)
+                            const SliverToBoxAdapter(
+                                child: Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: Center(
+                                        child: CircularProgressIndicator()))),
+                          if (active.isNotEmpty) ...[
+                            const SliverToBoxAdapter(
+                                child: _SectionLabel('Trabajos confirmados')),
+                            SliverList.builder(
+                                itemCount: active.length,
+                                itemBuilder: (context, index) =>
+                                    _threadTile(active[index])),
+                          ],
+                          if (notifications.isNotEmpty) ...[
+                            const SliverToBoxAdapter(
+                                child: _SectionLabel('Actividad reciente')),
+                            SliverList.builder(
+                                itemCount: notifications.length,
+                                itemBuilder: (context, index) =>
+                                    _notificationTile(notifications[index])),
+                            SliverToBoxAdapter(
+                                child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: TextButton(
+                                        onPressed: onNotifications,
+                                        child: const Text(
+                                            'Ver todas las notificaciones')))),
+                          ],
+                          if (!loading && notifications.isEmpty)
+                            SliverToBoxAdapter(
+                                child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 28, vertical: 30),
+                                    child: Column(children: [
+                                      const Icon(
+                                          Icons.notifications_none_rounded,
+                                          color: AppTheme.colorPrimaryLight,
+                                          size: 40),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                          notificationError == null
+                                              ? 'Estás al día'
+                                              : 'Tu actividad sigue aquí',
+                                          style: const TextStyle(
+                                              color: _ink,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                          'Las novedades de tus trabajos aparecerán aquí.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              color: _muted,
+                                              fontSize: 12,
+                                              height: 1.5))
+                                    ]))),
+                          if (archived.isNotEmpty)
+                            SliverToBoxAdapter(
+                                child: ExpansionTile(
+                                    title: const Text('Historial de trabajos',
+                                        style: TextStyle(
+                                            color: _ink,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600)),
+                                    subtitle: Text(
+                                        '${archived.length} conversaciones conservadas',
+                                        style: const TextStyle(
+                                            color: _muted, fontSize: 12)),
+                                    iconColor: AppTheme.colorPrimary,
+                                    collapsedIconColor: _muted,
+                                    children:
+                                        archived.map(_threadTile).toList())),
+                          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                        ])))));
   }
 
-  Widget _buildWhatsAppThreadItem(ChatThread thread, bool isLight) {
-    // Foto del trabajo por defecto
-    const AssetImage jobAvatar = AssetImage('assets/images/chat/default_job.png');
-
-    // Conteo real de mensajes no leídos que envía el backend.
-    final int unreadCount = thread.unreadCount;
-    final bool hasUnread = unreadCount > 0;
-    final String unreadLabel = unreadCount > 99 ? '99+' : '$unreadCount';
-
-    final highlightBg = const Color(0xFFF8F7FA); // Light purple/grey on hover/unread
-    final textC = const Color(0xFF090D16); // Dark text
-    final mutedC = const Color(0xFF6B7280); // Gray text
-
-    return InkWell(
-      onTap: () => _openChat(thread),
-      onLongPress: () => _deleteThread(thread),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: hasUnread ? highlightBg : Colors.transparent,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Avatar circular del trabajo
-            Stack(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    image: DecorationImage(
-                      image: jobAvatar,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                // Indicador de conexión (Punto verde)
-                Positioned(
-                  bottom: 2,
-                  right: 2,
+  Widget _notificationSummary() => ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Material(
+              color: const Color(0xFFEFEAFF).withValues(alpha: 0.82),
+              child: InkWell(
+                  onTap: onNotifications,
                   child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppTheme.colorSuccess,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 16),
-
-            // Contenido
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Primera fila: Nombre del trabajo y fecha
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          thread.jobTitle.isNotEmpty ? thread.jobTitle : thread.counterpartName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: textC,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(thread.lastMessageAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: hasUnread ? AppTheme.colorPrimary : mutedC,
-                          fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Segunda fila: Categoría
-                  if (thread.category != null && thread.category!.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppTheme.colorPrimary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        thread.category!,
-                        style: const TextStyle(
-                          color: AppTheme.colorPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-
-                  // Tercera fila: Ultimo mensaje + badge no leídos
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          thread.lastMessage ?? 'Sin mensajes',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: hasUnread ? textC : mutedC,
-                            fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (hasUnread) ...[
-                        const SizedBox(width: 6),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.85)),
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Row(children: [
                         Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.colorPrimary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            unreadLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+                            width: 48,
+                            height: 48,
+                            decoration: const BoxDecoration(
+                                color: Color(0xFFE5DBFF),
+                                shape: BoxShape.circle),
+                            child: const Icon(
+                                Icons.notifications_active_rounded,
+                                color: AppTheme.colorPrimary,
+                                size: 27)),
+                        const SizedBox(width: 14),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              const Text('Notificaciones',
+                                  style: TextStyle(
+                                      color: _ink,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 5),
+                              Text(
+                                  unreadNotifications == 0
+                                      ? 'No hay notificaciones nuevas'
+                                      : '$unreadNotifications ${unreadNotifications == 1 ? 'notificación nueva' : 'notificaciones nuevas'}',
+                                  style: const TextStyle(
+                                      color: _muted, fontSize: 12),
+                                  maxLines: 2)
+                            ])),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: AppTheme.colorPrimary, size: 24),
+                      ]))))));
+
+  Widget _notificationTile(AppNotification notification) {
+    final (icon, color) = _notificationStyle(notification.type);
+    return _tile(
+        onTap: () => onNotification(notification),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _activityIcon(icon, color, unread: !notification.isRead),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                      child: Text(notification.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: _ink,
+                              fontSize: 13,
+                              height: 1.3,
+                              fontWeight: notification.isRead
+                                  ? FontWeight.w600
+                                  : FontWeight.w700))),
+                  const SizedBox(width: 8),
+                  Text(_time(notification.createdAt),
+                      style: const TextStyle(color: _muted, fontSize: 10))
+                ]),
+                const SizedBox(height: 5),
+                Text(notification.body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: _muted, fontSize: 11, height: 1.5))
+              ])),
+          const SizedBox(width: 6),
+          const Padding(
+              padding: EdgeInsets.only(top: 14),
+              child: Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppTheme.colorPrimaryLight)),
+        ]));
   }
 
-  void _openChat(ChatThread thread) {
-    SessionStore.activeThreadId = thread.id;
-    Navigator.of(context)
-        .push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatScreen(
-          threadId: thread.id,
-          jobId: thread.jobId,
-          jobTitle: thread.jobTitle,
-          jobStatus: thread.jobStatus,
-          agreedPrice: thread.agreedPrice,
-          counterpartName: thread.counterpartName,
-          counterpartId: SessionStore.currentUser?.type == 'worker'
-              ? thread.clientId
-              : thread.workerId,
-          counterpartAvatarUrl: thread.counterpartProfilePhotoUrl,
-          counterpartPhone: thread.counterpartPhone,
-          category: thread.category,
-          workerId: thread.workerId,
-          isArchived: thread.isArchived,
-        ),
-      ),
-    )
-        .then((_) {
-      // Al volver del chat, refresca para reflejar los mensajes ya leídos.
-      if (mounted) _load(silent: true);
-    });
+  Widget _threadTile(ChatThread thread) => _tile(
+      onTap: () => onThread(thread),
+      child: Row(children: [
+        ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset('assets/images/chat/default_job.png',
+                width: 46, height: 46, fit: BoxFit.cover)),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(thread.jobTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: _ink, fontSize: 13, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('${thread.counterpartName} · ${thread.statusLabel}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _muted, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(
+              (thread.lastMessage ?? '').contains('[Foto]')
+                  ? 'Foto del trabajo'
+                  : thread.lastMessage ?? 'Listo para coordinar',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _muted, fontSize: 11))
+        ])),
+        if (thread.unreadCount > 0)
+          Badge(
+              label: Text(
+                  thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}'),
+              backgroundColor: AppTheme.colorPrimary),
+        const SizedBox(width: 6),
+        Icon(
+            thread.isActive
+                ? Icons.chevron_right_rounded
+                : Icons.lock_outline_rounded,
+            size: 18,
+            color: AppTheme.colorPrimaryLight),
+      ]));
+  Widget _tile({required VoidCallback onTap, required Widget child}) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child:
+                  Padding(padding: const EdgeInsets.all(14), child: child))));
+  Widget _activityIcon(IconData icon, Color color, {bool unread = false}) =>
+      Stack(clipBehavior: Clip.none, children: [
+        Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 23)),
+        if (unread)
+          Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5)))),
+      ]);
+  (IconData, Color) _notificationStyle(String type) => switch (type) {
+        'offer_new' || 'counter_offer' || 'offer_client_counter' => (
+            Icons.receipt_long_rounded,
+            AppTheme.colorPrimary
+          ),
+        'offer_accepted' || 'arrival_confirmed' => (
+            Icons.check_circle_rounded,
+            const Color(0xFF42B68E)
+          ),
+        'job_starting_soon' || 'worker_arrived' => (
+            Icons.calendar_month_rounded,
+            const Color(0xFF6096F5)
+          ),
+        'job_cancelled' || 'request_timeout' || 'offer_rejected' => (
+            Icons.warning_rounded,
+            const Color(0xFFEE6B82)
+          ),
+        'request_new' => (Icons.person_pin_rounded, AppTheme.colorPrimary),
+        'message_new' || 'chat_message' || 'support_message' => (
+            Icons.chat_bubble_outline_rounded,
+            const Color(0xFF6096F5)
+          ),
+        _ => (Icons.stars_rounded, const Color(0xFFF4B84D)),
+      };
+  String _time(DateTime value) {
+    final date = value.toLocal();
+    final days = DateUtils.dateOnly(DateTime.now())
+        .difference(DateUtils.dateOnly(date))
+        .inDays;
+    if (days == 0)
+      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    if (days == 1) return 'Ayer';
+    return '${date.day}/${date.month}';
   }
+}
+
+class NotificationBell extends StatelessWidget {
+  const NotificationBell(
+      {required this.unread, required this.onPressed, super.key});
+  final int unread;
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) => Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFECE5FF)),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0D8B5CF6), blurRadius: 12, offset: Offset(0, 4))
+          ]),
+      child: IconButton(
+          tooltip: unread == 0
+              ? 'Notificaciones'
+              : '$unread notificaciones sin leer',
+          onPressed: onPressed,
+          icon: Badge(
+              isLabelVisible: unread > 0,
+              backgroundColor: AppTheme.colorPrimary,
+              child: const Icon(Icons.notifications_none_rounded,
+                  color: AppTheme.colorPrimary, size: 24))));
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+  @override
+  Widget build(BuildContext context) => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+      child: Text(label,
+          style: const TextStyle(
+              color: Color(0xFF878099),
+              fontSize: 12,
+              fontWeight: FontWeight.w600)));
 }
