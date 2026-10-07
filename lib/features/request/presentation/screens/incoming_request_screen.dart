@@ -50,6 +50,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   bool _available = SessionStore.currentUser?.isAvailable ?? true;
   bool _togglingAvailability = false;
   bool _isMapInitialized = false;
+  bool _locatingMe = false;
 
   // El cliente hizo una contraoferta al worker
   bool _clientCountered = false;
@@ -261,6 +262,38 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         }
       });
     } catch (_) {}
+  }
+
+  Future<void> _centerOnMyLocation() async {
+    if (_locatingMe) return;
+    setState(() => _locatingMe = true);
+    try {
+      LatLng? target = _workerLocation;
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+        target = LatLng(pos.latitude, pos.longitude);
+      } catch (_) {
+        // Sin GPS fresco: se usa la última posición conocida del stream.
+      }
+      if (!mounted) return;
+      if (target == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activa el GPS para centrar tu ubicación'),
+          ),
+        );
+        return;
+      }
+      setState(() => _workerLocation = target);
+      _mapController.move(target, 15);
+    } finally {
+      if (mounted) setState(() => _locatingMe = false);
+    }
   }
 
   Future<void> _toggleAvailability(bool value) async {
@@ -1131,6 +1164,55 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               );
             },
           ),
+
+          // ── BOTÓN CENTRAR MI UBICACIÓN (sigue el borde de la hoja) ─────
+          if (AppConfig.mapboxAccessToken.trim().isNotEmpty)
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return ListenableBuilder(
+                    listenable: _sheetCtrl,
+                    builder: (context, _) {
+                      final sheetFraction =
+                          _sheetCtrl.isAttached ? _sheetCtrl.size : 0.32;
+                      return Stack(
+                        children: [
+                          Positioned(
+                            right: 16,
+                            bottom: constraints.maxHeight * sheetFraction + 12,
+                            child: Material(
+                        color: AppTheme.colorPrimary,
+                        shape: const CircleBorder(),
+                        elevation: 4,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _centerOnMyLocation,
+                          child: SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: _locatingMe
+                                ? const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.my_location,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
 
           // ── BANNER OFERTA ACEPTADA ─────────────────────────────────────
           if (_showAcceptedBanner)

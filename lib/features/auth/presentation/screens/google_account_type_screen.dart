@@ -5,7 +5,10 @@ import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/app_permissions_service.dart';
+import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import '../../../worker/presentation/screens/skills_selection_screen.dart';
 
 class GoogleAccountTypeScreen extends StatefulWidget {
   const GoogleAccountTypeScreen({
@@ -42,17 +45,23 @@ class _GoogleAccountTypeScreenState extends State<GoogleAccountTypeScreen> {
       RealtimeService.instance.connect(userId: SessionStore.currentUser?.id);
       AppFlows.initialRouteResolved = true;
       
+      // Mismo flujo que el registro/login por correo: el worker nuevo elige
+      // sus habilidades y, si faltan permisos (GPS, notificaciones), se piden
+      // antes de entrar al inicio.
+      Widget nextScreen = MainShellScreen(role: type);
       if (type == 'worker') {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShellScreen(role: 'worker')),
-          (r) => false,
-        );
-      } else {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShellScreen(role: 'client')),
-          (r) => false,
-        );
+        nextScreen = const SkillsSelectionScreen(forceToHomeAfterSave: true);
       }
+      final allPermissionsGranted =
+          await AppPermissionsService.areAllRequiredPermissionsGranted(type);
+      if (!mounted) return;
+      final destination = allPermissionsGranted
+          ? nextScreen
+          : RequiredPermissionsScreen(role: type, nextScreen: nextScreen);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => destination),
+        (r) => false,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

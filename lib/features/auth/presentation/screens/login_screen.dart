@@ -137,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await googleSignIn.signOut();
       final account = await googleSignIn.signIn();
       if (account == null) {
-        setState(() => _checkingIdentifier = false);
+        // El usuario cerró el selector de cuentas; el finally apaga el loader.
         return;
       }
 
@@ -171,11 +171,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        SnackBar(content: Text(_googleErrorMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _checkingIdentifier = false);
     }
+  }
+
+  /// Traduce los errores nativos de Google Sign-In a un mensaje entendible.
+  /// El código 10 (DEVELOPER_ERROR) significa que el paquete + SHA-1 de esta
+  /// build no están registrados como cliente OAuth Android en Firebase.
+  String _googleErrorMessage(Object error) {
+    final raw = error.toString();
+    if (raw.contains('ApiException: 10') || raw.contains('DEVELOPER_ERROR')) {
+      return 'Google Sign-In no está configurado para esta versión de la app '
+          '(falta registrar el SHA-1 en Firebase). Usa correo y contraseña por ahora.';
+    }
+    if (raw.contains('network_error') || raw.contains('ApiException: 7')) {
+      return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
+    }
+    if (raw.contains('ApiException: 12501') || raw.contains('sign_in_canceled')) {
+      return 'Inicio de sesión con Google cancelado.';
+    }
+    if (raw.contains('sign_in_failed')) {
+      return 'No se pudo iniciar sesión con Google. Intenta de nuevo.';
+    }
+    return raw.replaceAll('Exception: ', '');
   }
 
   @override

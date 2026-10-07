@@ -45,6 +45,11 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   /// el botón de "mi ubicación".
   bool _followWorker = true;
 
+  /// El cierre del trabajo (completado/cancelado) se procesa una sola vez:
+  /// llega por 3 vías (respuesta HTTP, evento de socket y polling) y sin este
+  /// guard se apilaban diálogos duplicados.
+  bool _endHandled = false;
+
   List<LatLng> _routePoints = [];
   LatLng? _lastRouteFetchPos;
 
@@ -141,7 +146,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
   void _onJobCompleted(dynamic payload) {
     if (payload is Map && payload['requestId'] != (widget.requestId)) return;
-    if (mounted) {
+    if (mounted && !_endHandled) {
+      _endHandled = true;
       // Limpiar sesión del trabajo activo
       SessionStore.clearActiveJob(requestId: widget.requestId);
 
@@ -184,7 +190,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
   void _onJobCancelled(dynamic payload) {
     if (payload is Map && payload['requestId'] != (widget.requestId)) return;
-    if (mounted) {
+    if (mounted && !_endHandled) {
+      _endHandled = true;
       SessionStore.clearActiveJob(requestId: widget.requestId);
       // El aviso visual lo muestra IncomingRequestScreen (siempre montada en
       // el shell del worker); aquí solo volvemos al inicio para no duplicar.
@@ -212,7 +219,19 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
           _tracking = res;
           _loading = false;
         });
-        
+
+        // Respaldo del socket: si el cierre llegó mientras estaba caído,
+        // el polling lo detecta y cierra la pantalla (el cliente ya lo hace).
+        final status = res['status']?.toString();
+        if (status == 'cancelled') {
+          _onJobCancelled(null);
+          return;
+        }
+        if (status == 'completed') {
+          _onJobCompleted(null);
+          return;
+        }
+
         final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
         final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
         final destLat = (_tracking?['destination']?['latitude'] as num?)?.toDouble();
@@ -434,6 +453,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
       // Limpiar sesión del trabajo activo
       SessionStore.clearActiveJob(requestId: widget.requestId);
+
+      // Si el evento de socket ya mostró el diálogo, no duplicarlo.
+      if (_endHandled) return;
+      _endHandled = true;
 
       showDialog<void>(
         context: context,
