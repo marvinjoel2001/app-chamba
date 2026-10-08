@@ -665,7 +665,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     return mapped;
   }
 
+  bool _loadInFlight = false;
+
+  /// Evita peticiones duplicadas: el polling, los eventos de socket y la
+  /// reconexión llaman a _load casi a la vez; si ya hay una en curso, las
+  /// recargas silenciosas se descartan.
   Future<void> _load({bool silent = false}) async {
+    if (silent && _loadInFlight) return;
+    _loadInFlight = true;
+    try {
+      await _loadImpl(silent: silent);
+    } finally {
+      _loadInFlight = false;
+    }
+  }
+
+  Future<void> _loadImpl({bool silent = false}) async {
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {

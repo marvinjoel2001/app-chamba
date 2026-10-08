@@ -92,10 +92,11 @@ class RealtimeService with WidgetsBindingObserver {
       isConnectedNotifier.value = true;
       isReconnecting.value = false;
       updatePresence();
-      UnreadMessagesNotifier.instance.refresh();
-      UnreadNotificationsNotifier.instance.refresh();
       if (_hasConnectedOnce) {
-        reconnectCount.value++;
+        _bumpReconnect();
+      } else {
+        UnreadMessagesNotifier.instance.refresh();
+        UnreadNotificationsNotifier.instance.refresh();
       }
       _hasConnectedOnce = true;
       if (userId != null && userId.isNotEmpty) {
@@ -215,10 +216,25 @@ class RealtimeService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     updatePresence();
     if (state == AppLifecycleState.resumed) {
-      reconnectCount.value++;
-      UnreadMessagesNotifier.instance.refresh();
-      UnreadNotificationsNotifier.instance.refresh();
+      _bumpReconnect();
     }
+  }
+
+  static const Duration _reconnectBumpMinGap = Duration(seconds: 10);
+  DateTime? _lastReconnectBump;
+
+  /// Avisa a las pantallas que deben re-consultar al backend. Con una red
+  /// inestable el socket cae y vuelve cada pocos segundos; sin este límite cada
+  /// reconexión disparaba a la vez mensajes, notificaciones y solicitudes
+  /// (ráfagas de peticiones duplicadas). Como máximo una vez cada 10 s.
+  void _bumpReconnect() {
+    final now = DateTime.now();
+    final last = _lastReconnectBump;
+    if (last != null && now.difference(last) < _reconnectBumpMinGap) return;
+    _lastReconnectBump = now;
+    reconnectCount.value++;
+    UnreadMessagesNotifier.instance.refresh();
+    UnreadNotificationsNotifier.instance.refresh();
   }
 
   void leaveThread(String id) {

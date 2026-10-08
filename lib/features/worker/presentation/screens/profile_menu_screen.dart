@@ -17,6 +17,7 @@ import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
 import 'work_modalities_screen.dart';
+import 'worker_portfolio_screen.dart';
 import '../../../history/presentation/screens/job_history_screen.dart';
 import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
@@ -473,6 +474,18 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                     _isWorker ? 'Herramientas de trabajo' : 'Gestión de cuenta',
               ),
               if (_isWorker) ...[
+                _NavTile(
+                  title: 'Mis trabajos',
+                  subtitle: 'Fotos de trabajos realizados',
+                  icon: Icons.photo_library_outlined,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const WorkerPortfolioScreen(),
+                      ),
+                    );
+                  },
+                ),
                 _NavTile(
                   title: 'Historial y pagos',
                   subtitle: 'Revisa trabajos cerrados y montos',

@@ -288,6 +288,25 @@ class MobileBackendService {
     return _api.get('/mobile/workers/$workerId/profile');
   }
 
+  Future<Map<String, dynamic>> workerPortfolio() {
+    return _api.get('/mobile/worker/portfolio');
+  }
+
+  Future<Map<String, dynamic>> addWorkerPortfolioPhoto({
+    required String imageBase64,
+    required String caption,
+  }) {
+    return _api.post(
+      '/mobile/worker/portfolio',
+      body: {'imageBase64': imageBase64, 'caption': caption},
+      timeout: const Duration(seconds: 60),
+    );
+  }
+
+  Future<Map<String, dynamic>> removeWorkerPortfolioPhoto(String photoId) {
+    return _api.post('/mobile/worker/portfolio/$photoId/delete');
+  }
+
   Future<Map<String, dynamic>> messages({required String userId}) {
     return _api.get('/mobile/messages', queryParameters: {'userId': userId});
   }

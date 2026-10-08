@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../worker/domain/entities/worker_portfolio_photo.dart';
+import '../../../worker/presentation/widgets/worker_portfolio_gallery.dart';
+import '../../domain/usecases/offers_usecases.dart';
 import '../state/offers_dependencies.dart';
 
 /// Perfil público del trabajador que ve el cliente al revisar una oferta.
 /// Muestra solo datos reales del backend, con estados vacíos claros cuando
 /// el trabajador todavía no tiene historial.
 class WorkerProfileScreen extends StatefulWidget {
-  const WorkerProfileScreen({this.workerId, super.key});
+  const WorkerProfileScreen(
+      {this.workerId, this.getWorkerProfileUseCase, super.key});
 
   final String? workerId;
+  final GetWorkerProfileUseCase? getWorkerProfileUseCase;
 
   @override
   State<WorkerProfileScreen> createState() => _WorkerProfileScreenState();
@@ -42,18 +47,20 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     });
 
     try {
-      final response =
-          (await OffersDependencies.getWorkerProfile(widget.workerId!))
-              .fold(
-                onSuccess: (value) => value,
-                onFailure: (failure) => throw Exception(failure.message),
-              )
-              .payload;
+      final response = (await (widget.getWorkerProfileUseCase ??
+              OffersDependencies.getWorkerProfile)(widget.workerId!))
+          .fold(
+            onSuccess: (value) => value,
+            onFailure: (failure) => throw Exception(failure.message),
+          )
+          .payload;
+      if (!mounted) return;
       setState(() {
         _profile = response;
         _loading = false;
       });
     } catch (error) {
+      if (!mounted) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;
@@ -71,7 +78,10 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Widget build(BuildContext context) {
     final worker = _profile?['worker'] as Map<String, dynamic>?;
     final skills = worker?['skills'] as List<dynamic>? ?? const [];
-    final gallery = worker?['gallery'] as List<dynamic>? ?? const [];
+    final gallery = (worker?['portfolio'] as List<dynamic>? ?? const [])
+        .map((photo) =>
+            WorkerPortfolioPhoto.fromJson(photo as Map<String, dynamic>))
+        .toList();
     final reviews = _profile?['reviews'] as List<dynamic>? ?? const [];
     final bio = worker?['bio']?.toString().trim() ?? '';
     final completedJobs = (worker?['completedJobs'] as num?)?.toInt() ?? 0;
@@ -109,8 +119,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           : RefreshIndicator(
                               onRefresh: _load,
                               child: SingleChildScrollView(
-                                physics:
-                                    const AlwaysScrollableScrollPhysics(),
+                                physics: const AlwaysScrollableScrollPhysics(),
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -128,19 +137,18 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                                         worker!['profilePhotoUrl']
                                                             as String,
                                                       ),
-                                            child:
-                                                worker?['profilePhotoUrl'] ==
-                                                        null
-                                                    ? Text(
-                                                        chambaInitial(
-                                                          worker?['firstName'],
-                                                          fallback: 'W',
-                                                        ),
-                                                        style: const TextStyle(
-                                                          fontSize: 32,
-                                                        ),
-                                                      )
-                                                    : null,
+                                            child: worker?['profilePhotoUrl'] ==
+                                                    null
+                                                ? Text(
+                                                    chambaInitial(
+                                                      worker?['firstName'],
+                                                      fallback: 'W',
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 32,
+                                                    ),
+                                                  )
+                                                : null,
                                           ),
                                           const SizedBox(height: 14),
                                           Row(
@@ -188,8 +196,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                                   averageRating
                                                       .toStringAsFixed(1),
                                                   style: const TextStyle(
-                                                    fontWeight:
-                                                        FontWeight.w700,
+                                                    fontWeight: FontWeight.w700,
                                                     fontSize: 16,
                                                   ),
                                                 ),
@@ -301,7 +308,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                         ],
                                       ),
                                     ),
-                                    if (gallery.isNotEmpty) ...[
+                                    ...[
                                       const SizedBox(height: 14),
                                       GlassCard(
                                         child: Column(
@@ -314,24 +321,20 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                                   .textTheme
                                                   .titleLarge
                                                   ?.copyWith(
-                                                    fontWeight:
-                                                        FontWeight.w700,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                             ),
                                             const SizedBox(height: 10),
-                                            Row(
-                                              children: [
-                                                for (final imageUrl
-                                                    in gallery.take(3)) ...[
-                                                  Expanded(
-                                                    child: _GalleryItem(
-                                                      url: imageUrl.toString(),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                ],
-                                              ],
-                                            ),
+                                            if (gallery.isEmpty)
+                                              const Text(
+                                                'Aún no tiene fotos de trabajos publicadas.',
+                                                style: TextStyle(
+                                                    color: AppTheme.colorMuted,
+                                                    fontSize: 13),
+                                              )
+                                            else
+                                              WorkerPortfolioGallery(
+                                                  photos: gallery),
                                           ],
                                         ),
                                       ),
@@ -366,8 +369,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                                 review: review
                                                         is Map<String, dynamic>
                                                     ? review
-                                                    : Map<String,
-                                                            dynamic>.from(
+                                                    : Map<String, dynamic>.from(
                                                         review as Map),
                                                 formatDate: _formatDate,
                                               ),
@@ -448,9 +450,8 @@ class _ReviewItem extends StatelessWidget {
                 Icon(
                   i < stars ? Icons.star_rounded : Icons.star_outline_rounded,
                   size: 16,
-                  color: i < stars
-                      ? AppTheme.colorHighlight
-                      : AppTheme.colorMuted,
+                  color:
+                      i < stars ? AppTheme.colorHighlight : AppTheme.colorMuted,
                 ),
               const Spacer(),
               Text(
@@ -481,33 +482,6 @@ class _ReviewItem extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _GalleryItem extends StatelessWidget {
-  const _GalleryItem({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: AppTheme.colorSurfaceSoft,
-            child: const Icon(
-              Icons.broken_image_outlined,
-              color: AppTheme.colorMuted,
-            ),
-          ),
-        ),
       ),
     );
   }
