@@ -45,12 +45,15 @@ class ChatMessage {
 
   String _formatSystemMessage() {
     final price = systemData?['price'];
-    final workerName = systemData?['workerName'] ?? systemData?['workerFirstName'];
-    
+    final formattedPrice =
+        num.tryParse(price?.toString() ?? '')?.toStringAsFixed(2);
+    final workerName =
+        systemData?['workerName'] ?? systemData?['workerFirstName'];
+
     switch (systemEvent) {
       case SystemMessageEvent.dealConfirmed:
-        if (price != null) {
-          return 'Trato confirmado — Bs $price';
+        if (formattedPrice != null) {
+          return 'Trato confirmado — Bs $formattedPrice';
         }
         return 'Trato confirmado';
       case SystemMessageEvent.workerOnTheWay:
@@ -61,6 +64,9 @@ class ChatMessage {
       case SystemMessageEvent.workStarted:
         return 'Trabajo iniciado';
       case SystemMessageEvent.workCompleted:
+        if (formattedPrice != null) {
+          return 'Trabajo completado — Bs $formattedPrice';
+        }
         return 'Trabajo completado';
       case SystemMessageEvent.paymentConfirmed:
         return 'Pago confirmado';

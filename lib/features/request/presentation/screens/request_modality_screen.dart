@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import 'request_form_screen.dart';
 
 class RequestModalityScreen extends StatelessWidget {
@@ -51,120 +48,153 @@ class RequestModalityScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(
+            Icons.chevron_left_rounded,
+            color: Color(0xFF0F172A),
+            size: 28,
+          ),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        centerTitle: true,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 24,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              width: 18,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              width: 18,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Nueva solicitud',
-                style: TextStyle(
-                  color: AppTheme.colorPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              // Badge pill: Nueva solicitud
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3E8FF),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '¿Cómo quieres contratar?',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF090D16),
-                  height: 1.2,
+                child: const Text(
+                  'Nueva solicitud',
+                  style: TextStyle(
+                    color: Color(0xFF7C3AED),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
+
+              // Title
               const Text(
-                'Elige la modalidad que mejor se adapte\na tu necesidad.',
+                '¿Cómo quieres contratar?',
                 style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.black54,
-                  height: 1.4,
+                  fontSize: 27,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  height: 1.18,
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 32),
-              
+              const SizedBox(height: 8),
+
+              // Subtitle
+              const Text(
+                'Elige la modalidad que mejor se adapte a tu necesidad.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 1. Tarjeta: Por trabajo
               _ModalityCard(
-                icon: Icons.work_outline,
-                iconColor: AppTheme.colorPrimary,
-                iconBgColor: AppTheme.colorPrimary.withOpacity(0.1),
+                imagePath: 'assets/images/modalities/modality_job.png',
+                cardBgColor: const Color(0xFFFAFAFE),
+                borderColor: const Color(0xFFE9D5FF),
                 title: 'Por trabajo',
-                subtitle: 'Precio cerrado',
-                subtitleColor: AppTheme.colorPrimary,
+                badgeText: 'Precio cerrado',
+                badgeBgColor: const Color(0xFF7C3AED),
                 description: 'Acuerda un precio fijo por el trabajo completo.',
+                tagBgColor: const Color(0xFFEDE9FE),
+                tagTextColor: const Color(0xFF7C3AED),
                 tags: const ['Tareas específicas', 'Proyectos puntuales'],
+                arrowBgColor: const Color(0xFFF3E8FF),
+                arrowColor: const Color(0xFF7C3AED),
                 onTap: () => _selectModality(context, 'fixed'),
               ),
               const SizedBox(height: 16),
-              
+
+              // 2. Tarjeta: Por hora
               _ModalityCard(
-                icon: Icons.access_time,
-                iconColor: Colors.blue,
-                iconBgColor: Colors.blue.withOpacity(0.1),
+                imagePath: 'assets/images/modalities/modality_hour.png',
+                cardBgColor: const Color(0xFFF0F9FF),
+                borderColor: const Color(0xFFBAE6FD),
                 title: 'Por hora',
-                subtitle: 'Pagas por horas trabajadas',
-                subtitleColor: Colors.blue,
-                description: 'El tiempo se registra en la app y pagas solo por las horas trabajadas.',
+                badgeText: 'Pagas por horas trabajadas',
+                badgeBgColor: const Color(0xFF0284C7),
+                description:
+                    'El tiempo se registra en la app y pagas solo por las horas trabajadas.',
+                tagBgColor: const Color(0xFFE0F2FE),
+                tagTextColor: const Color(0xFF0284C7),
                 tags: const ['Trabajos flexibles', 'Sin alcance definido'],
+                arrowBgColor: const Color(0xFFE0F2FE),
+                arrowColor: const Color(0xFF0284C7),
                 onTap: () => _selectModality(context, 'hourly'),
               ),
               const SizedBox(height: 16),
-              
+
+              // 3. Tarjeta: Por día
               _ModalityCard(
-                icon: Icons.calendar_today_outlined,
-                iconColor: Colors.green,
-                iconBgColor: Colors.green.withOpacity(0.1),
+                imagePath: 'assets/images/modalities/modality_day.png',
+                cardBgColor: const Color(0xFFF0FDF4),
+                borderColor: const Color(0xFFBBF7D0),
                 title: 'Por día',
-                subtitle: 'Pagas una jornada completa',
-                subtitleColor: Colors.green,
-                description: 'Contrata por día completo de trabajo\n(jornada de 8 horas).',
-                tags: const ['Jornadas completas', 'Proyectos de varios días'],
+                badgeText: 'Pagas una jornada completa',
+                badgeBgColor: const Color(0xFF16A34A),
+                description:
+                    'Contrata por día completo de trabajo (jornada de 8 horas).',
+                tagBgColor: const Color(0xFFDCFCE7),
+                tagTextColor: const Color(0xFF16A34A),
+                tags: const ['Jornada de 8 horas', 'Trabajo continuo'],
+                arrowBgColor: const Color(0xFFDCFCE7),
+                arrowColor: const Color(0xFF16A34A),
                 onTap: () => _selectModality(context, 'daily'),
               ),
-              
-              const SizedBox(height: 32),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.colorPrimary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.shield_outlined, color: AppTheme.colorPrimary, size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Todos los pagos están protegidos por Chamba.',
-                            style: TextStyle(
-                              color: AppTheme.colorPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                          Text(
-                            'Solo pagas cuando el trabajo esté completo.',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -175,132 +205,166 @@ class RequestModalityScreen extends StatelessWidget {
 
 class _ModalityCard extends StatelessWidget {
   const _ModalityCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBgColor,
+    required this.imagePath,
+    required this.cardBgColor,
+    required this.borderColor,
     required this.title,
-    required this.subtitle,
-    required this.subtitleColor,
+    required this.badgeText,
+    required this.badgeBgColor,
     required this.description,
+    required this.tagBgColor,
+    required this.tagTextColor,
     required this.tags,
+    required this.arrowBgColor,
+    required this.arrowColor,
     required this.onTap,
   });
 
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBgColor;
+  final String imagePath;
+  final Color cardBgColor;
+  final Color borderColor;
   final String title;
-  final String subtitle;
-  final Color subtitleColor;
+  final String badgeText;
+  final Color badgeBgColor;
   final String description;
+  final Color tagBgColor;
+  final Color tagTextColor;
   final List<String> tags;
+  final Color arrowBgColor;
+  final Color arrowColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey[200]!),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, color: iconColor, size: 32),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        splashColor: arrowColor.withValues(alpha: 0.08),
+        highlightColor: arrowColor.withValues(alpha: 0.04),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            border: Border.all(color: borderColor, width: 1.2),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: arrowColor.withValues(alpha: 0.04),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 3D Illustrated Icon
+              SizedBox(
+                width: 86,
+                height: 86,
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF090D16),
-                            ),
-                          ),
-                          Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-                        ],
+              ),
+              const SizedBox(width: 14),
+
+              // Content Column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: subtitleColor,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Solid Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: badgeBgColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 7),
+
+                    // Description
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        height: 1.35,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Tags Row
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: tags.map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: tagBgColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: tagTextColor,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Circular Chevron Button
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: arrowBgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: arrowColor,
+                    size: 22,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              description,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.4,
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Ideal para:',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: tags.map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: iconBgColor.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    tag,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: iconColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

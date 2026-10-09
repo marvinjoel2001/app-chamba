@@ -73,10 +73,10 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
           ..addAll(modalities.modalities);
         if (modalities.hourlyRate != null) {
           _hourlyRateController.text =
-              modalities.hourlyRate!.toStringAsFixed(0);
+              modalities.hourlyRate!.toStringAsFixed(2);
         }
         if (modalities.dailyRate != null) {
-          _dailyRateController.text = modalities.dailyRate!.toStringAsFixed(0);
+          _dailyRateController.text = modalities.dailyRate!.toStringAsFixed(2);
         }
       },
       onFailure: (_) {},
@@ -270,8 +270,8 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
                           color: AppTheme.colorHighlightSoft,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: AppTheme.colorHighlight
-                                .withValues(alpha: 0.4),
+                            color:
+                                AppTheme.colorHighlight.withValues(alpha: 0.4),
                           ),
                         ),
                         child: const Row(
@@ -339,9 +339,8 @@ class _ModalityCheck extends StatelessWidget {
             : AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: selected
-              ? AppTheme.colorPrimary
-              : AppTheme.colorGlassBorderSoft,
+          color:
+              selected ? AppTheme.colorPrimary : AppTheme.colorGlassBorderSoft,
           width: 2,
         ),
       ),
@@ -375,13 +374,11 @@ class _ModalityCheck extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           description,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: AppTheme.colorMuted,
-                                height: 1.3,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.colorMuted,
+                                    height: 1.3,
+                                  ),
                         ),
                       ],
                     ),

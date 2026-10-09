@@ -15,13 +15,13 @@ Flutter starter with clean scalable folder layout and Riverpod state management.
 ```bash
 flutter pub get
 flutter run \
-  --dart-define=API_BASE_URL=https://backend-chamba-production.up.railway.app/api \
-  --dart-define=SOCKET_BASE_URL=https://backend-chamba-production.up.railway.app
+  --dart-define=API_BASE_URL=https://web-production-f0db6d.up.railway.app/api \
+  --dart-define=SOCKET_BASE_URL=https://web-production-f0db6d.up.railway.app
 ```
 
 `API_BASE_URL` and `SOCKET_BASE_URL` must be provided; their defaults are empty.
 
-For the production profile in `.vscode/launch.json`, use `env/dart_define.prod.json` (ignored by Git). The current Railway backend is `https://backend-chamba-production.up.railway.app`; the previous `eloquent-vibrancy-production` address is no longer available.
+For the production profile in `.vscode/launch.json`, use `env/dart_define.prod.json` (ignored by Git). The current Railway backend is `https://web-production-f0db6d.up.railway.app`; the previous `eloquent-vibrancy-production` address is no longer available.
 
 ## Variables locales seguras
 

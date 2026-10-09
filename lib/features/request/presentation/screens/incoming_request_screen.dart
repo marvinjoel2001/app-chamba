@@ -22,6 +22,17 @@ import '../../../worker/presentation/screens/verification_checkpoint_screen.dart
 import '../state/request_dependencies.dart';
 import 'job_in_progress_screen.dart';
 
+String _priceTypeLabel(dynamic value) {
+  final label = value?.toString().trim() ?? '';
+  return switch (label.toLowerCase()) {
+    'fixed' => 'Por trabajo',
+    'hourly' => 'Por hora',
+    'daily' => 'Por día',
+    '' => 'Presupuesto',
+    _ => label,
+  };
+}
+
 class IncomingRequestScreen extends StatefulWidget {
   const IncomingRequestScreen(
       {this.isActive = true, this.focusRequestId, super.key});
@@ -260,7 +271,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           ))
               .fold(
             onSuccess: (value) => value,
-            onFailure: (failure) => throw Exception(failure.message),
+            onFailure: (failure) {
+              if (mounted) setState(() => _error = failure.message);
+              return null;
+            },
           );
         }
       });
@@ -1726,7 +1740,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     )
                   else
                     Text(
-                      req['priceType']?.toString() ?? 'Presupuesto',
+                      _priceTypeLabel(req['priceType']),
                       style: const TextStyle(
                           color: AppTheme.colorMuted, fontSize: 12),
                     ),
@@ -2191,7 +2205,7 @@ class _JobDetailsSheet extends StatelessWidget {
     final detailClientName = (client?['name']?.toString() ??
             '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}')
         .trim();
-    final priceType = requestData['priceType']?.toString() ?? 'Precio fijo';
+    final priceType = _priceTypeLabel(requestData['priceType']);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,

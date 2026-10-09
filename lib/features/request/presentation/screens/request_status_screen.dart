@@ -695,7 +695,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('💰 ¡Oferta mejorada a Bs ${_draftBudget.toStringAsFixed(0)}! Notificando a trabajadores...'),
+          content: Text('💰 ¡Oferta mejorada a Bs ${_draftBudget.toStringAsFixed(2)}! Notificando a trabajadores...'),
           backgroundColor: const Color(0xFF00D26A),
         ),
       );
@@ -772,7 +772,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         'Oferta actual:\n'
                         'Bs ${formatRate(_currentBudget / units)} por $unitLabel × '
                         '${units.toStringAsFixed(0)} $unitsLabel '
-                        '= Bs ${_currentBudget.toStringAsFixed(0)} en total',
+                        '= Bs ${_currentBudget.toStringAsFixed(2)} en total',
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppTheme.colorMuted,
@@ -784,7 +784,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Text(
-                        'Oferta actual: Bs ${_currentBudget.toStringAsFixed(0)}',
+                        'Oferta actual: Bs ${_currentBudget.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppTheme.colorMuted,
@@ -806,7 +806,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       labelStyle: const TextStyle(color: AppTheme.colorMuted),
                       hintText: 'Ej. ${(suggested + 10).toInt()}',
                       hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                      helperText: 'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(0)}',
+                      helperText: 'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(2)}',
                       helperStyle: TextStyle(color: isInvalid ? Colors.orangeAccent : const Color(0xFF00D26A)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -852,7 +852,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Ingresa un monto mayor a Bs ${_currentBudget.toStringAsFixed(0)}'),
+                      content: Text('Ingresa un monto mayor a Bs ${_currentBudget.toStringAsFixed(2)}'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -1677,7 +1677,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   /// modalidades por hora/día se muestra el desglose para que el cliente
   /// sepa que el monto es el total del trabajo.
   String _budgetBadgeText() {
-    final total = 'Bs ${_currentBudget.toStringAsFixed(0)}';
+    final total = 'Bs ${_currentBudget.toStringAsFixed(2)}';
     final modality = _request?['modality']?.toString() ?? 'fixed';
     final units = modality == 'hourly'
         ? (double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0)

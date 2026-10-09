@@ -82,6 +82,7 @@ class _ChatScreenState extends State<ChatScreen>
     WidgetsBinding.instance.addObserver(this);
     _realtime.connect(userId: SessionStore.currentUser?.id);
     _realtime.on('message.new', _onMessage);
+    _realtime.on('job.client_confirmed', _onWorkStarted);
     for (final event in [
       'request.status.updated',
       'job.completed',
@@ -141,6 +142,7 @@ class _ChatScreenState extends State<ChatScreen>
     didPushNext();
     _realtime.leaveThread(widget.threadId);
     _realtime.off('message.new', _onMessage);
+    _realtime.off('job.client_confirmed', _onWorkStarted);
     for (final event in [
       'request.status.updated',
       'job.completed',
@@ -161,6 +163,14 @@ class _ChatScreenState extends State<ChatScreen>
       return Map<String, dynamic>.from(jsonDecode(value.toString()) as Map);
     } catch (_) {
       return {};
+    }
+  }
+
+  void _onWorkStarted(dynamic value) {
+    final data = _payload(value);
+    if (mounted &&
+        data['requestId']?.toString() == (_thread?.jobId ?? widget.jobId)) {
+      _reload();
     }
   }
 
@@ -593,7 +603,7 @@ class _ChatScreenState extends State<ChatScreen>
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 3),
                             Text(
-                                '${thread.category ?? 'Trabajo confirmado'} · Bs ${thread.agreedPrice.toStringAsFixed(0)}',
+                                '${thread.category ?? 'Trabajo confirmado'} · Bs ${thread.agreedPrice.toStringAsFixed(2)}',
                                 style: const TextStyle(
                                     color: _muted, fontSize: 12),
                                 maxLines: 1,

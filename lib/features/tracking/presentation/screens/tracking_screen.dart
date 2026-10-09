@@ -1494,7 +1494,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Tarifa: Bs ${hourlyRate.toStringAsFixed(0)}/hr',
+                  'Tarifa: Bs ${hourlyRate.toStringAsFixed(2)}/hr',
                   style:
                       const TextStyle(color: AppTheme.colorMuted, fontSize: 10),
                 ),
@@ -1610,7 +1610,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Bs ${dailyRate.toStringAsFixed(0)}/día',
+                    'Bs ${dailyRate.toStringAsFixed(2)}/día',
                     style: const TextStyle(
                       color: AppTheme.colorSuccess,
                       fontSize: 11,

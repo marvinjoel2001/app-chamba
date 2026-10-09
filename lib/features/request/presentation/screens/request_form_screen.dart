@@ -1,8 +1,8 @@
 import 'dart:convert';
 import '../../../../core/session/session_credentials.dart';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -13,13 +13,12 @@ import 'package:mime/mime.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
-import '../../../../core/services/toast_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
+import '../widgets/request_form_widgets.dart';
 
 class RequestFormScreen extends StatefulWidget {
   const RequestFormScreen({
@@ -93,7 +92,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   bool _loadingPaymentMethods = true;
 
   final ScrollController _scrollController = ScrollController();
-  double _scrollProgress = 0.0;
 
   @override
   void initState() {
@@ -111,17 +109,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         .toList();
     _initializeLocation();
     _loadPaymentMethods();
-
-    _scrollController.addListener(() {
-      if (_scrollController.hasClients &&
-          _scrollController.position.maxScrollExtent > 0) {
-        setState(() {
-          _scrollProgress = (_scrollController.offset /
-                  _scrollController.position.maxScrollExtent)
-              .clamp(0.0, 1.0);
-        });
-      }
-    });
   }
 
   @override
@@ -386,7 +373,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           const Center(child: Text('Mapa no disponible')),
                         if (isUpdating)
                           Container(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                             child: const Center(
                               child: CircularProgressIndicator(),
                             ),
@@ -416,6 +403,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                           icon: const Icon(Icons.my_location),
                           label: const Text('Actualizar con mi GPS actual'),
                           style: OutlinedButton.styleFrom(
+                            foregroundColor: requestPurple,
+                            side: const BorderSide(color: requestPurple),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
@@ -446,10 +435,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       final uri = Uri.parse(
         '${AppConfig.apiBaseUrl}/payment-methods',
       );
-      final response = await _client.get(
-        uri,
-        headers: SessionCredentials.headers,
-      );
+      final response = await _client
+          .get(uri, headers: SessionCredentials.headers)
+          .timeout(const Duration(seconds: 12));
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -470,7 +459,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         setState(() => _loadingPaymentMethods = false);
       }
     } catch (e) {
-      setState(() => _loadingPaymentMethods = false);
+      if (mounted) setState(() => _loadingPaymentMethods = false);
     }
   }
 
@@ -687,7 +676,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   )
@@ -704,7 +693,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 Text(
                   _locationBlockMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  style: const TextStyle(
+                      height: 1.2, fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 14),
                 ElevatedButton(
@@ -740,7 +730,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                         : _locationBlockType == 'deniedForever'
                             ? 'Abrir Ajustes'
                             : 'Permitir ubicacion',
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(height: 1.2, color: Colors.white),
                   ),
                 ),
               ],
@@ -752,693 +742,543 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
       children: [
-        // Qué necesitas?
-        const Text(
-          '¿Qué necesitas?',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _DescriptionField(controller: _descriptionController),
-        const SizedBox(height: 24),
-
-        // Categoría del servicio
-        const Text(
-          'Categoría del servicio',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: _suggestedCategories.isEmpty
-              ? const [_CategoryPill(label: 'General', selected: true)]
-              : _suggestedCategories.map((category) {
-                  final label =
-                      category['name']?.toString().trim().isNotEmpty == true
-                          ? category['name'].toString().trim()
-                          : 'General';
-                  // Simulamos que todas están pre-seleccionadas si son sugeridas por la IA,
-                  // o permitimos que el usuario las seleccione. Por simplicidad visual,
-                  // las mostraremos todas "activas" o la primera activa si se desea.
-                  return _CategoryPill(
-                    label: label,
-                    selected:
-                        true, // Mostrar todas sugeridas como activas según el pedido
-                  );
-                }).toList(),
-        ),
-        const SizedBox(height: 24),
-
-        // Ubicación del servicio
-        const Text(
-          'Ubicación del servicio',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[100]!),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Placeholder del mapa
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.location_on,
-                    color: AppTheme.colorPrimary,
-                    size: 28,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _resolvedAddress ?? 'Ubicación actual',
+        RequestStepCard(
+          number: 1,
+          title: 'Información del servicio',
+          subtitle: 'Describe qué necesitas realizar',
+          color: requestPurple,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Expanded(
+                  child: Text('Descripción del servicio',
+                      style: TextStyle(
+                          height: 1.2,
+                          color: requestInk,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700))),
+              TextButton.icon(
+                  onPressed: _loading ? null : _pickImages,
+                  style: TextButton.styleFrom(
+                      foregroundColor: requestPurple,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 0),
+                      minimumSize: const Size(0, 23),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  icon:
+                      const Icon(Icons.add_photo_alternate_outlined, size: 17),
+                  label: Text(
+                      _pendingImages.isEmpty
+                          ? 'Fotos'
+                          : '${_pendingImages.length}/5',
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Ubicación detectada',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: _loading ? null : _showLocationMap,
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Ver / Actualizar ubicación',
-                            style: TextStyle(
-                              color: AppTheme.colorPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(Icons.chevron_right,
-                              size: 14, color: AppTheme.colorPrimary),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Presupuesto estimado
-        const Text(
-          'Presupuesto',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (widget.modality == 'fixed') ...[
-          _buildAmountField('Monto total', _budgetController),
-        ] else if (widget.modality == 'hourly') ...[
-          Row(
-            children: [
-              Expanded(
-                  child: _buildNumberField(
-                      'Horas estimadas', _estimatedHoursController)),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: _buildAmountField(
-                      'Pago por hora', _hourlyRateController)),
-            ],
-          ),
-        ] else if (widget.modality == 'daily') ...[
-          Row(
-            children: [
-              Expanded(
-                  child: _buildNumberField('Días de trabajo', _daysController)),
-              const SizedBox(width: 12),
-              Expanded(
-                  child:
-                      _buildAmountField('Pago por día', _dailyRateController)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: GestureDetector(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (date != null) {
-                      setState(() =>
-                          _startDate = date.toIso8601String().split('T')[0]);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            size: 20, color: AppTheme.colorPrimary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _startDate ?? 'Fecha de inicio',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _startDate != null
-                                  ? Colors.black87
-                                  : Colors.grey[500],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: GestureDetector(
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime:
-                          _startTime ?? const TimeOfDay(hour: 8, minute: 0),
-                    );
-                    if (time != null) {
-                      setState(() => _startTime = time);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.access_time,
-                            size: 20, color: AppTheme.colorPrimary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _startTime != null
-                                ? _formatTimeOfDay(_startTime!)
-                                : 'Hora',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _startTime != null
-                                  ? Colors.black87
-                                  : Colors.grey[500],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppTheme.colorPrimary.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_outline,
-                  color: AppTheme.colorPrimary, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  priceType == 'Por hora'
-                      ? 'Se calculará el pago en base a las horas trabajadas. Podrás acordar la tarifa final con el trabajador.'
-                      : priceType == 'Por día'
-                          ? 'Se calculará el pago por cada día de trabajo. Podrás acordar la tarifa final con el trabajador.'
-                          : 'El precio es referencial. Podrás acordar el monto final con el trabajador seleccionado.',
-                  style: TextStyle(
-                    color: AppTheme.colorPrimary.withOpacity(0.8),
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Método de pago
-        const Text(
-          'Método de pago',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF090D16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: _loadingPaymentMethods || _paymentMethods.isEmpty
-              ? null
-              : () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (_) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _paymentMethods
-                            .map((m) => ListTile(
-                                  title: Text(m.name),
-                                  subtitle: Text(m.description ?? ''),
-                                  onTap: () {
-                                    setState(() => _selectedPaymentMethod = m);
-                                    Navigator.pop(context);
-                                  },
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                  );
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorPrimary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.payments_outlined,
-                    color: AppTheme.colorPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _selectedPaymentMethod?.name ?? 'Efectivo',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _selectedPaymentMethod?.description ??
-                            'Pagarás al finalizar el trabajo',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.keyboard_arrow_down, color: Colors.grey[400]),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Fotos del trabajo
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            const Text(
-              'Fotos del trabajo ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF090D16),
-              ),
-            ),
-            Text(
-              '(opcional)',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: _loading ? null : _pickImages,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(
-                  color: AppTheme.colorPrimary.withOpacity(0.3),
-                  style: BorderStyle.none),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                // Dash simulation wrapper
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorPrimary.withOpacity(0.05),
+                          height: 1.2,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600))),
+            ]),
+            const SizedBox(height: 5),
+            Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppTheme.colorPrimary.withOpacity(0.3)),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.camera_alt,
-                        color: AppTheme.colorPrimary, size: 28),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+                    border: Border.all(color: const Color(0xFFE5E5F0))),
+                child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Agrega fotos para que los trabajadores entiendan mejor lo que necesitas.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Agregar fotos',
-                        style: TextStyle(
-                          color: AppTheme.colorPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_pendingImages.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 84,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _pendingImages.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final image = _pendingImages[index];
-                return Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(
-                        image.bytes,
-                        width: 84,
-                        height: 84,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: _loading
-                            ? null
-                            : () {
-                                setState(() {
-                                  _pendingImages.removeAt(index);
-                                });
-                              },
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-        const SizedBox(height: 32),
-
-        // Botón Publicar
-        ElevatedButton(
-          onPressed: _loading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.colorPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            elevation: 0,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_loading)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2),
-                )
-              else
-                const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _loading ? 'Publicando...' : 'Publicar solicitud',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+                      const RequestIconTile(
+                          icon: Icons.edit_document,
+                          color: requestPurple,
+                          size: 36),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                            TextField(
+                                controller: _descriptionController,
+                                enabled: !_loading,
+                                minLines: 1,
+                                maxLines: 4,
+                                onChanged: (_) => setState(() {}),
+                                style: const TextStyle(
+                                    color: requestInk,
+                                    fontSize: 13.5,
+                                    height: 1.2),
+                                decoration: const InputDecoration(
+                                    hintText:
+                                        'Describe el trabajo que necesitas',
+                                    hintStyle: TextStyle(
+                                        height: 1.2, color: requestMuted),
+                                    isDense: true,
+                                    filled: false,
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero)),
+                            const SizedBox(height: 5),
+                            Text('${_descriptionController.text.length}/120',
+                                style: const TextStyle(
+                                    height: 1.2,
+                                    fontSize: 10,
+                                    color: requestMuted)),
+                          ])),
+                    ])),
+            if (_pendingImages.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                  height: 65,
+                  child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _pendingImages.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, index) => Stack(children: [
+                            ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(_pendingImages[index].bytes,
+                                    width: 65, height: 65, fit: BoxFit.cover)),
+                            Positioned(
+                                top: 0,
+                                right: 0,
+                                child: IconButton(
+                                    tooltip: 'Quitar foto ${index + 1}',
+                                    visualDensity: VisualDensity.compact,
+                                    style: IconButton.styleFrom(
+                                        backgroundColor: Colors.black54,
+                                        minimumSize: const Size(25, 25)),
+                                    onPressed: _loading
+                                        ? null
+                                        : () => setState(() =>
+                                            _pendingImages.removeAt(index)),
+                                    icon: const Icon(Icons.close,
+                                        size: 14, color: Colors.white))),
+                          ]))),
             ],
-          ),
+          ]),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 10),
+        RequestStepCard(
+          number: 2,
+          title: 'Detalles del trabajo',
+          subtitle: 'Define la categoría, ubicación y tiempo',
+          color: requestBlue,
+          illustration: SizedBox(
+              width: 78,
+              child: Opacity(
+                  opacity: .8,
+                  child: Image.asset('assets/images/request/calendar.png',
+                      fit: BoxFit.contain))),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const RequestFieldLabel(
+                text: 'Categoría del servicio',
+                icon: Icons.calendar_month_rounded,
+                color: requestGreen),
+            const SizedBox(height: 5),
+            Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: RequestChoiceTile(
+                    title: _primaryCategoryName,
+                    subtitle: _primaryCategoryName == 'General'
+                        ? 'Servicio general y otros'
+                        : 'Categoría del trabajo',
+                    leading: const RequestIconTile(
+                        icon: Icons.category_outlined,
+                        color: requestPurple,
+                        size: 34),
+                    onTap: _loading ? null : _showCategoryPicker)),
+            const SizedBox(height: 9),
+            const RequestFieldLabel(
+                text: 'Ubicación del servicio',
+                icon: Icons.location_on_rounded,
+                color: requestBlue),
+            const SizedBox(height: 5),
+            Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: RequestChoiceTile(
+                    title: _resolvedAddress ?? 'Ubicación actual',
+                    subtitle: 'Ubicación detectada',
+                    leading: _locationThumbnail(),
+                    onTap: _loading ? null : _showLocationMap,
+                    extra: const Row(children: [
+                      Icon(Icons.near_me_outlined,
+                          color: requestPurple, size: 14),
+                      SizedBox(width: 5),
+                      Flexible(
+                          child: Text('Ver / Actualizar ubicación',
+                              style: TextStyle(
+                                  height: 1.2,
+                                  color: requestPurple,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600)))
+                    ]))),
+            const SizedBox(height: 9),
+            RequestFieldLabel(
+                text: widget.modality == 'daily'
+                    ? 'Fecha y duración'
+                    : 'Duración y presupuesto',
+                icon: widget.modality == 'hourly'
+                    ? Icons.schedule_rounded
+                    : Icons.event_note_rounded,
+                color: requestGreen),
+            const SizedBox(height: 5),
+            Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Column(children: [
+                  if (widget.modality == 'daily') ...[
+                    Row(children: [
+                      Expanded(
+                          child: RequestDateTile(
+                              label: 'Fecha de inicio',
+                              value: _displayStartDate,
+                              icon: Icons.calendar_month_rounded,
+                              onTap: _loading ? null : _pickStartDate)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: RequestDateTile(
+                              label: 'Hora de inicio',
+                              value: _startTime != null
+                                  ? _formatTimeOfDay(_startTime!)
+                                  : 'Elegir hora',
+                              icon: Icons.schedule_rounded,
+                              onTap: _loading ? null : _pickStartTime)),
+                    ]),
+                    const SizedBox(height: 8),
+                  ],
+                  if (widget.modality == 'fixed')
+                    RequestAmountField(
+                        label: 'Monto total',
+                        controller: _budgetController,
+                        enabled: !_loading)
+                  else
+                    Row(children: [
+                      Expanded(
+                          child: RequestQuantityField(
+                              label: widget.modality == 'daily'
+                                  ? 'Días de trabajo'
+                                  : 'Horas estimadas',
+                              controller: widget.modality == 'daily'
+                                  ? _daysController
+                                  : _estimatedHoursController,
+                              enabled: !_loading)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: RequestAmountField(
+                              label: widget.modality == 'daily'
+                                  ? 'Pago por día'
+                                  : 'Pago por hora',
+                              controller: widget.modality == 'daily'
+                                  ? _dailyRateController
+                                  : _hourlyRateController,
+                              enabled: !_loading)),
+                    ]),
+                ])),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        RequestStepCard(
+            number: 3,
+            title: 'Método de pago',
+            subtitle: 'Selecciona cómo quieres pagar',
+            color: requestOrange,
+            child: RequestChoiceTile(
+                title: _selectedPaymentMethod?.name ?? 'Efectivo',
+                subtitle: _loadingPaymentMethods
+                    ? 'Cargando métodos de pago…'
+                    : _selectedPaymentMethod?.description ??
+                        'Pagarás al finalizar el trabajo',
+                leading: const RequestIconTile(
+                    icon: Icons.payments_outlined,
+                    color: requestOrange,
+                    size: 38),
+                color: requestInk,
+                background: const Color(0xFFFFFBF2),
+                borderColor: const Color(0xFFFFD993),
+                showArrow:
+                    !_loadingPaymentMethods && _paymentMethods.isNotEmpty,
+                onTap: _loading ||
+                        _loadingPaymentMethods ||
+                        _paymentMethods.isEmpty
+                    ? null
+                    : _showPaymentPicker)),
       ],
     );
   }
 
-  Widget _buildAmountField(String label, TextEditingController controller) {
-    return _AmountField(label: label, controller: controller);
+  String get _displayStartDate {
+    final date = DateTime.tryParse(_startDate ?? '');
+    if (date == null) return 'Elegir fecha';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
-  Widget _buildNumberField(String label, TextEditingController controller) {
-    return _NumberField(label: label, controller: controller);
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final current = DateTime.tryParse(_startDate ?? '');
+    final date = await showDatePicker(
+        context: context,
+        initialDate: current != null && !current.isBefore(today)
+            ? current
+            : today.add(const Duration(days: 1)),
+        firstDate: today,
+        lastDate: today.add(const Duration(days: 365)));
+    if (date != null && mounted) {
+      setState(() => _startDate = date.toIso8601String().split('T')[0]);
+    }
   }
+
+  Future<void> _pickStartTime() async {
+    final time = await showTimePicker(
+        context: context,
+        initialTime: _startTime ?? const TimeOfDay(hour: 8, minute: 0));
+    if (time != null && mounted) setState(() => _startTime = time);
+  }
+
+  Future<void> _showPaymentPicker() async {
+    final method = await showModalBottomSheet<PaymentMethod>(
+        context: context,
+        backgroundColor: Colors.white,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+                child: SingleChildScrollView(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text('Método de pago',
+                      style: TextStyle(
+                          height: 1.2,
+                          color: requestInk,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700))),
+              ..._paymentMethods.map((m) => ListTile(
+                  leading: const RequestIconTile(
+                      icon: Icons.payments_outlined,
+                      color: requestOrange,
+                      size: 38),
+                  title: Text(m.name,
+                      style: const TextStyle(height: 1.2, color: requestInk)),
+                  subtitle: Text(m.description ?? '',
+                      style: const TextStyle(height: 1.2, color: requestMuted)),
+                  trailing: m.id == _selectedPaymentMethod?.id
+                      ? const Icon(Icons.check_circle, color: requestPurple)
+                      : null,
+                  onTap: () => Navigator.pop(sheetContext, m))),
+            ]))));
+    if (method != null && mounted) {
+      setState(() => _selectedPaymentMethod = method);
+    }
+  }
+
+  Future<void> _showCategoryPicker() async {
+    final future = MobileBackendService.instance.categories();
+    final category = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        backgroundColor: Colors.white,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+            child: SizedBox(
+                height: MediaQuery.sizeOf(sheetContext).height * .55,
+                child: Column(children: [
+                  const Text('Categoría del servicio',
+                      style: TextStyle(
+                          height: 1.2,
+                          color: requestInk,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
+                  Expanded(
+                      child: FutureBuilder<Map<String, dynamic>>(
+                          future: future,
+                          builder: (_, snapshot) {
+                            final choices = <String, Map<String, dynamic>>{
+                              'General': {'name': 'General', 'confidence': 1.0},
+                              for (final item in _suggestedCategories)
+                                item['name'].toString(): item,
+                              for (final item
+                                  in (snapshot.data?['categories'] as List? ??
+                                      []))
+                                if (item is Map && item['active'] != false)
+                                  item['name'].toString():
+                                      Map<String, dynamic>.from(item),
+                            };
+                            return ListView(children: [
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting)
+                                const LinearProgressIndicator(
+                                    color: requestPurple),
+                              if (snapshot.hasError)
+                                const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Text(
+                                        'No se pudo cargar el catálogo. Puedes elegir una categoría sugerida.',
+                                        style: TextStyle(
+                                            height: 1.2, color: requestMuted))),
+                              ...choices.values.map((item) => ListTile(
+                                  leading: const RequestIconTile(
+                                      icon: Icons.category_outlined,
+                                      color: requestPurple,
+                                      size: 34),
+                                  title: Text(item['name'].toString(),
+                                      style: const TextStyle(
+                                          height: 1.2, color: requestInk)),
+                                  trailing: item['name'] == _primaryCategoryName
+                                      ? const Icon(Icons.check_circle,
+                                          color: requestPurple)
+                                      : null,
+                                  onTap: () =>
+                                      Navigator.pop(sheetContext, item))),
+                            ]);
+                          })),
+                ]))));
+    if (category != null && mounted) {
+      setState(() {
+        _suggestedCategories.clear();
+        _suggestedCategories.add({...category, 'confidence': 1.0});
+      });
+    }
+  }
+
+  Widget _locationThumbnail() => ClipRRect(
+      borderRadius: BorderRadius.circular(9),
+      child: SizedBox(
+          width: 48,
+          height: 52,
+          child: IgnorePointer(
+              child: AppConfig.mapboxAccessToken.isNotEmpty &&
+                      _latitude != null &&
+                      _longitude != null
+                  ? FlutterMap(
+                      key: ValueKey('$_latitude,$_longitude'),
+                      options: MapOptions(
+                          initialCenter: LatLng(_latitude!, _longitude!),
+                          initialZoom: 14,
+                          interactionOptions: const InteractionOptions(
+                              flags: InteractiveFlag.none)),
+                      children: [
+                          TileLayer(
+                              urlTemplate:
+                                  'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                              userAgentPackageName: 'com.chambatrabajo.app',
+                              additionalOptions: {
+                                'accessToken': AppConfig.mapboxAccessToken
+                              }),
+                          MarkerLayer(markers: [
+                            Marker(
+                                point: LatLng(_latitude!, _longitude!),
+                                width: 28,
+                                height: 32,
+                                child: const Icon(Icons.location_on,
+                                    color: requestPurple, size: 30))
+                          ]),
+                        ])
+                  : const ColoredBox(
+                      color: Color(0xFFF0F2F7),
+                      child: Center(
+                          child: Icon(Icons.location_on,
+                              color: requestPurple, size: 30))))));
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+            child: Column(children: [
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: Row(children: [
+                Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: requestPurple.withValues(alpha: .08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 3))
+                        ]),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
+                        tooltip: 'Volver',
+                        onPressed:
+                            _loading ? null : () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back_rounded,
+                            color: requestInk, size: 25))),
+                const SizedBox(width: 16),
+                const Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Nueva solicitud',
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('Nueva solicitud',
                           style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF090D16),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Cuéntanos qué necesitas',
+                              height: 1.2,
+                              fontSize: 23,
+                              fontWeight: FontWeight.w800,
+                              color: requestInk,
+                              letterSpacing: -.5)),
+                      SizedBox(height: 3),
+                      Text('Cuéntanos los detalles de tu solicitud',
                           style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Progress Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: _scrollProgress < 0.1 ? 32 : 8,
-                    height: _scrollProgress < 0.1 ? 6 : 8,
-                    decoration: BoxDecoration(
-                      color: AppTheme.colorPrimary,
-                      borderRadius:
-                          BorderRadius.circular(_scrollProgress < 0.1 ? 3 : 4),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 24,
-                    height: 2,
-                    color: _scrollProgress >= 0.1
-                        ? AppTheme.colorPrimary.withOpacity(0.5)
-                        : Colors.grey[200],
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: _scrollProgress >= 0.1 && _scrollProgress < 0.8
-                        ? 32
-                        : 8,
-                    height:
-                        _scrollProgress >= 0.1 && _scrollProgress < 0.8 ? 6 : 8,
-                    decoration: BoxDecoration(
-                      color: _scrollProgress >= 0.1
-                          ? AppTheme.colorPrimary
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(
-                          _scrollProgress >= 0.1 && _scrollProgress < 0.8
-                              ? 3
-                              : 4),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 24,
-                    height: 2,
-                    color: _scrollProgress >= 0.8
-                        ? AppTheme.colorPrimary.withOpacity(0.5)
-                        : Colors.grey[200],
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: _scrollProgress >= 0.8 ? 32 : 8,
-                    height: _scrollProgress >= 0.8 ? 6 : 8,
-                    decoration: BoxDecoration(
-                      color: _scrollProgress >= 0.8
-                          ? AppTheme.colorPrimary
-                          : Colors.grey[200],
-                      borderRadius:
-                          BorderRadius.circular(_scrollProgress >= 0.8 ? 3 : 4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Body
-            Expanded(child: _buildLocationState(context)),
-          ],
-        ),
-      ),
-    );
-  }
+                              height: 1.2,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: requestMuted)),
+                    ])),
+              ])),
+          Expanded(child: _buildLocationState(context)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 7, 14, 9),
+            child: Container(
+                decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFF8138FF), Color(0xFF7133F8)]),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                          color: requestPurple.withValues(alpha: .15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                        borderRadius: BorderRadius.circular(15),
+                        onTap: _loading ||
+                                _checkingLocation ||
+                                _locationBlockMessage != null
+                            ? null
+                            : _submit,
+                        child: SizedBox(
+                            height: 48,
+                            child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                      _loading
+                                          ? 'Publicando…'
+                                          : 'Publicar solicitud',
+                                      style: const TextStyle(
+                                          height: 1.2,
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700)),
+                                  const SizedBox(width: 13),
+                                  if (_loading)
+                                    const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2))
+                                  else
+                                    const Icon(Icons.arrow_forward_rounded,
+                                        color: Colors.white, size: 23),
+                                ]))))),
+          ),
+        ])),
+      ));
 }
 
 class _PendingImage {
@@ -1462,7 +1302,7 @@ class _ImageSourceBottomSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -1562,7 +1402,7 @@ class _OptionTile extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -1594,346 +1434,6 @@ class _OptionTile extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CategoryPill extends StatelessWidget {
-  const _CategoryPill({
-    required this.label,
-    required this.selected,
-  });
-
-  final String label;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? AppTheme.colorPrimary.withOpacity(0.1) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: selected ? Colors.transparent : Colors.grey[300]!,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? AppTheme.colorPrimary : Colors.black87,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 13,
-        ),
-      ),
-    );
-  }
-}
-
-class _PriceTypeOption extends StatelessWidget {
-  const _PriceTypeOption({
-    required this.label,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.colorPrimary.withOpacity(0.05)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppTheme.colorPrimary : Colors.grey[200]!,
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? AppTheme.colorPrimary : Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isSelected
-                    ? AppTheme.colorPrimary.withOpacity(0.6)
-                    : Colors.grey[500],
-                fontSize: 9,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AmountField extends StatefulWidget {
-  final String label;
-  final TextEditingController controller;
-  const _AmountField({required this.label, required this.controller});
-
-  @override
-  State<_AmountField> createState() => _AmountFieldState();
-}
-
-class _AmountFieldState extends State<_AmountField> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFocus = _focusNode.hasFocus;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(
-          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
-          width: hasFocus ? 1.5 : 1.0,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
-          Row(
-            children: [
-              const Text('Bs ',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black87)),
-              Expanded(
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black87),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NumberField extends StatefulWidget {
-  final String label;
-  final TextEditingController controller;
-  const _NumberField({required this.label, required this.controller});
-
-  @override
-  State<_NumberField> createState() => _NumberFieldState();
-}
-
-class _NumberFieldState extends State<_NumberField> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFocus = _focusNode.hasFocus;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(
-          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
-          width: hasFocus ? 1.5 : 1.0,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: hasFocus ? AppTheme.colorPrimary : Colors.grey[600])),
-          TextField(
-            controller: widget.controller,
-            focusNode: _focusNode,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.black87),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-              filled: true,
-              fillColor: Colors.transparent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DescriptionField extends StatefulWidget {
-  final TextEditingController controller;
-  const _DescriptionField({required this.controller});
-
-  @override
-  State<_DescriptionField> createState() => _DescriptionFieldState();
-}
-
-class _DescriptionFieldState extends State<_DescriptionField> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFocus = _focusNode.hasFocus;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(
-          color: hasFocus ? AppTheme.colorPrimary : Colors.grey[200]!,
-          width: hasFocus ? 1.5 : 1.0,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppTheme.colorPrimary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.edit_outlined,
-              color: AppTheme.colorPrimary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                TextField(
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  minLines: 2,
-                  maxLines: null,
-                  readOnly: false,
-                  onChanged: (_) => setState(() {}),
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Ejemplo: Busco alguien que limpie mi techo y canaletas.',
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${widget.controller.text.length}/120',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[400]),
-                )
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
