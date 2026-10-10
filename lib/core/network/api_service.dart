@@ -87,14 +87,18 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
   }) async {
+    final requestHeaders = _jsonHeaders(headers);
     for (var attempt = 0;; attempt++) {
       try {
         return await _send(
           (candidate) => client.get(
             _buildUri(candidate, path, queryParameters),
-            headers: _jsonHeaders(headers),
+            headers: requestHeaders,
           ),
           timeoutMessage: _timeoutGetMessage,
+          sessionToken: path.startsWith('/auth/')
+              ? null
+              : _bearerToken(requestHeaders),
         );
       } on NetworkException catch (e) {
         // Un timeout ya hizo esperar 15 s al usuario: no multiplicar la espera.
@@ -116,14 +120,18 @@ class ApiService {
     Map<String, String>? headers,
     Duration timeout = _requestTimeout,
   }) {
+    final requestHeaders = _jsonHeaders(headers);
     return _send(
       (candidate) => client.post(
         _buildUri(candidate, path),
-        headers: _jsonHeaders(headers),
+        headers: requestHeaders,
         body: jsonEncode(body ?? {}),
       ),
       timeoutMessage: _timeoutPostMessage,
       timeout: timeout,
+      sessionToken: path.startsWith('/auth/')
+          ? null
+          : _bearerToken(requestHeaders),
     );
   }
 
@@ -131,6 +139,7 @@ class ApiService {
     Future<http.Response> Function(String candidateBaseUrl) request, {
     required String timeoutMessage,
     Duration timeout = _requestTimeout,
+    String? sessionToken,
   }) async {
     NetworkException? lastNetworkError;
 
@@ -138,6 +147,9 @@ class ApiService {
       final stopwatch = Stopwatch()..start();
       try {
         final response = await request(candidate).timeout(timeout);
+        if (response.statusCode == 401) {
+          SessionCredentials.expireIfCurrent(sessionToken);
+        }
         ConnectivityService.instance.reportRequest(
           stopwatch.elapsed,
           failed: false,
@@ -163,6 +175,16 @@ class ApiService {
 
   Map<String, String> _jsonHeaders(Map<String, String>? headers) {
     return {...SessionCredentials.headers, ...?headers};
+  }
+
+  String? _bearerToken(Map<String, String> headers) {
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'authorization' &&
+          entry.value.startsWith('Bearer ')) {
+        return entry.value.substring(7);
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> _decodeBody(String body) {

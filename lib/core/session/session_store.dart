@@ -194,7 +194,6 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
-    await WorkerBackgroundService.setEnabled(false);
     SessionCredentials.accessToken = null;
     SessionCredentials.pushToken = null;
     SessionCredentials.visibleThreadId = null;
@@ -208,5 +207,6 @@ class SessionStore {
     await prefs.remove(_keySessionUser);
     await prefs.remove('session_access_token');
     await prefs.remove(_workerBgEnabledKey);
+    await WorkerBackgroundService.setEnabled(false);
   }
 }

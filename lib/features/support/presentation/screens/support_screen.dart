@@ -57,12 +57,14 @@ class SupportScreen extends StatefulWidget {
     this.requestId,
     this.disputeId,
     this.reportedUserId,
+    this.backend = MobileBackendService.instance,
     super.key,
   });
 
   final String? requestId;
   final String? disputeId;
   final String? reportedUserId;
+  final MobileBackendService backend;
 
   @override
   State<SupportScreen> createState() => _SupportScreenState();
@@ -89,7 +91,7 @@ class _SupportScreenState extends State<SupportScreen> {
       return;
     }
     try {
-      final result = await MobileBackendService.instance.getUserActiveDisputes(user.id);
+      final result = await widget.backend.getUserActiveDisputes(user.id);
       if (mounted) {
         setState(() {
           _activeDisputes = result['disputes'] ?? [];
@@ -113,7 +115,7 @@ class _SupportScreenState extends State<SupportScreen> {
     setState(() => _selectedReason = reason);
 
     try {
-      final result = await MobileBackendService.instance.createDispute(
+      final result = await widget.backend.createDispute(
         requestId: requestId,
         reportedBy: user.id,
         reportedUser: widget.reportedUserId,
@@ -123,7 +125,7 @@ class _SupportScreenState extends State<SupportScreen> {
       if (disputeId == null) throw Exception('No se pudo crear el reporte');
 
       // Send initial automated message
-      await MobileBackendService.instance.sendDisputeMessage(
+      await widget.backend.sendDisputeMessage(
         disputeId: disputeId,
         senderType: 'user',
         senderId: user.id,
@@ -145,6 +147,7 @@ class _SupportScreenState extends State<SupportScreen> {
   Widget build(BuildContext context) {
     if (_disputeId != null) {
       return _SupportChatView(
+        backend: widget.backend,
         disputeId: _disputeId!,
         reason: _selectedReason ?? '',
       );
@@ -295,12 +298,14 @@ class _SupportScreenState extends State<SupportScreen> {
 /// Chat view with support after selecting a reason.
 class _SupportChatView extends StatefulWidget {
   const _SupportChatView({
+    required this.backend,
     required this.disputeId,
     required this.reason,
   });
 
   final String disputeId;
   final String reason;
+  final MobileBackendService backend;
 
   @override
   State<_SupportChatView> createState() => _SupportChatViewState();
@@ -365,7 +370,7 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
   /// Fetches only new messages and appends them, avoiding full reload
   Future<void> _fetchNewMessagesOnly() async {
     try {
-      final result = await MobileBackendService.instance.getDisputeMessages(
+      final result = await widget.backend.getDisputeMessages(
         disputeId: widget.disputeId,
         readBy: _readBy,
       );
@@ -447,7 +452,7 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
 
   Future<void> _loadMessages() async {
     try {
-      final result = await MobileBackendService.instance.getDisputeMessages(
+      final result = await widget.backend.getDisputeMessages(
         disputeId: widget.disputeId,
         readBy: _readBy,
       );
@@ -485,15 +490,17 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
     if (user == null) return;
 
     setState(() => _sending = true);
-    _controller.clear();
 
     try {
-      await MobileBackendService.instance.sendDisputeMessage(
+      await widget.backend.sendDisputeMessage(
         disputeId: widget.disputeId,
         senderType: 'user',
         senderId: user.id,
         content: text,
       );
+      if (!mounted) return;
+      // Mantener el borrador si falla y no borrar texto nuevo escrito al enviar.
+      if (_controller.text.trim() == text) _controller.clear();
       await _loadMessages();
     } catch (e) {
       if (!mounted) return;

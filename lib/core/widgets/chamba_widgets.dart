@@ -139,9 +139,15 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
     );
 
     final foreground =
-        widget.isYellow ? AppTheme.colorText : AppTheme.colorTextOnPurple;
+        widget.isYellow ? AppTheme.colorBackground : AppTheme.colorTextOnPurple;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      onTap: enabled ? widget.onPressed : null,
+      excludeSemantics: true,
+      child: GestureDetector(
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
       onTapUp: enabled
           ? (_) {
@@ -171,18 +177,22 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
                   Icon(widget.icon, color: foreground, size: iconSize),
                   SizedBox(width: iconGap),
                 ],
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontSize: textSize,
-                    fontWeight: FontWeight.w700,
-                    color: foreground,
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: textSize,
+                      fontWeight: FontWeight.w700,
+                      color: foreground,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -232,7 +242,13 @@ class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
 
     const foreground = Colors.white;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      onTap: enabled ? widget.onPressed : null,
+      excludeSemantics: true,
+      child: GestureDetector(
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
       onTapUp: enabled
           ? (_) {
@@ -262,18 +278,22 @@ class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
                   Icon(widget.icon, color: foreground, size: iconSize),
                   SizedBox(width: iconGap),
                 ],
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontSize: textSize,
-                    fontWeight: FontWeight.w600,
-                    color: foreground,
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: textSize,
+                      fontWeight: FontWeight.w600,
+                      color: foreground,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
