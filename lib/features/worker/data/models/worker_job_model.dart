@@ -16,6 +16,7 @@ class WorkerJobModel extends WorkerJob {
     super.workElapsedSeconds,
     super.threadId,
     super.paymentMethod,
+    super.offerStatus,
   });
 
   factory WorkerJobModel.fromJson(Map<String, dynamic> json) {
@@ -36,6 +37,7 @@ class WorkerJobModel extends WorkerJob {
       threadId: json['threadId']?.toString(),
       paymentMethod: json['paymentMethod']?.toString() ??
           json['payment_method']?.toString(),
+      offerStatus: json['offerStatus']?.toString().trim().toLowerCase(),
     );
   }
 
@@ -51,6 +53,8 @@ class WorkerJobModel extends WorkerJob {
       'completedAt': completedAt?.toUtc().toIso8601String(),
       'workElapsedSeconds': workElapsedSeconds,
       'threadId': threadId,
+      'paymentMethod': paymentMethod,
+      'offerStatus': offerStatus,
       'client': {
         'firstName': clientFirstName,
         'lastName': clientLastName,

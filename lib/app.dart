@@ -14,9 +14,11 @@ import 'features/onboarding/presentation/screens/splash_screen.dart';
 class ChambaApp extends StatefulWidget {
   const ChambaApp({super.key});
 
-  static final RouteObserver<PageRoute<dynamic>> routeObserver = RouteObserver<PageRoute<dynamic>>();
+  static final RouteObserver<PageRoute<dynamic>> routeObserver =
+      RouteObserver<PageRoute<dynamic>>();
 
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   State<ChambaApp> createState() => _ChambaAppState();
@@ -39,8 +41,10 @@ class _ChambaAppState extends State<ChambaApp> {
 
   Future<void> _returnToLogin() async {
     try {
-      RealtimeService.instance.disconnect();
+      RealtimeService.instance.dispose();
       await SessionStore.clear();
+    } catch (error) {
+      debugPrint('No se pudo detener un servicio al expirar la sesión: $error');
     } finally {
       if (mounted && SessionCredentials.accessToken == null) {
         ChambaApp.navigatorKey.currentState?.pushAndRemoveUntil(

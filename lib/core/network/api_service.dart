@@ -96,9 +96,8 @@ class ApiService {
             headers: requestHeaders,
           ),
           timeoutMessage: _timeoutGetMessage,
-          sessionToken: path.startsWith('/auth/')
-              ? null
-              : _bearerToken(requestHeaders),
+          sessionToken:
+              path.startsWith('/auth/') ? null : _bearerToken(requestHeaders),
         );
       } on NetworkException catch (e) {
         // Un timeout ya hizo esperar 15 s al usuario: no multiplicar la espera.
@@ -129,9 +128,8 @@ class ApiService {
       ),
       timeoutMessage: _timeoutPostMessage,
       timeout: timeout,
-      sessionToken: path.startsWith('/auth/')
-          ? null
-          : _bearerToken(requestHeaders),
+      sessionToken:
+          path.startsWith('/auth/') ? null : _bearerToken(requestHeaders),
     );
   }
 

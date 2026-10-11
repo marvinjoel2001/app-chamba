@@ -15,8 +15,9 @@ class SessionCredentials {
     accessToken = null;
     sessionExpirations.value++;
   }
+
   static Map<String, String> get headers => {
-    if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-    'Content-Type': 'application/json',
-  };
+        if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      };
 }

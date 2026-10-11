@@ -148,51 +148,51 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
       onTap: enabled ? widget.onPressed : null,
       excludeSemantics: true,
       child: GestureDetector(
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: enabled
-          ? (_) {
-              setState(() => _pressed = false);
-              widget.onPressed?.call();
-            }
-          : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        scale: _pressed ? 0.97 : 1,
-        child: AnimatedOpacity(
+        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: enabled
+            ? (_) {
+                setState(() => _pressed = false);
+                widget.onPressed?.call();
+              }
+            : null,
+        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+        child: AnimatedScale(
           duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1 : 0.6,
-          child: Container(
-            constraints: BoxConstraints(minHeight: minHeight),
-            decoration: decoration,
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: verticalPadding,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(widget.icon, color: foreground, size: iconSize),
-                  SizedBox(width: iconGap),
-                ],
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: textSize,
-                      fontWeight: FontWeight.w700,
-                      color: foreground,
+          curve: Curves.easeOut,
+          scale: _pressed ? 0.97 : 1,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: enabled ? 1 : 0.6,
+            child: Container(
+              constraints: BoxConstraints(minHeight: minHeight),
+              decoration: decoration,
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, color: foreground, size: iconSize),
+                    SizedBox(width: iconGap),
+                  ],
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: textSize,
+                        fontWeight: FontWeight.w700,
+                        color: foreground,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -249,51 +249,51 @@ class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
       onTap: enabled ? widget.onPressed : null,
       excludeSemantics: true,
       child: GestureDetector(
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: enabled
-          ? (_) {
-              setState(() => _pressed = false);
-              widget.onPressed?.call();
-            }
-          : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        scale: _pressed ? 0.97 : 1,
-        child: AnimatedOpacity(
+        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: enabled
+            ? (_) {
+                setState(() => _pressed = false);
+                widget.onPressed?.call();
+              }
+            : null,
+        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+        child: AnimatedScale(
           duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1 : 0.6,
-          child: Container(
-            constraints: BoxConstraints(minHeight: minHeight),
-            decoration: decoration,
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: verticalPadding,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(widget.icon, color: foreground, size: iconSize),
-                  SizedBox(width: iconGap),
-                ],
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: textSize,
-                      fontWeight: FontWeight.w600,
-                      color: foreground,
+          curve: Curves.easeOut,
+          scale: _pressed ? 0.97 : 1,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: enabled ? 1 : 0.6,
+            child: Container(
+              constraints: BoxConstraints(minHeight: minHeight),
+              decoration: decoration,
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, color: foreground, size: iconSize),
+                    SizedBox(width: iconGap),
+                  ],
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: textSize,
+                        fontWeight: FontWeight.w600,
+                        color: foreground,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -423,7 +423,8 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
   ];
   static const _workerItems = [
     _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
-    _NavItemData(icon: Icons.account_balance_wallet_rounded, label: 'Billetera'),
+    _NavItemData(
+        icon: Icons.account_balance_wallet_rounded, label: 'Billetera'),
     _NavItemData(icon: Icons.chat_bubble_rounded, label: 'Mensajes'),
     _NavItemData(icon: Icons.person_rounded, label: 'Perfil'),
   ];
@@ -680,7 +681,8 @@ class ChambaNetworkImage extends StatelessWidget {
           height: height,
           color: AppTheme.colorSurfaceSoft,
           child: const Center(
-            child: Icon(Icons.broken_image, color: AppTheme.colorMuted, size: 20),
+            child:
+                Icon(Icons.broken_image, color: AppTheme.colorMuted, size: 20),
           ),
         );
       },
@@ -708,7 +710,8 @@ class ChambaNetworkAvatar extends StatelessWidget {
         backgroundColor: AppTheme.colorSurfaceSoft,
         child: Text(
           fallbackText,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.colorText),
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, color: AppTheme.colorText),
         ),
       );
     }

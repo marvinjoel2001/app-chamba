@@ -31,9 +31,10 @@ extension _DateFilterLabel on _DateFilter {
 }
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({this.getWorkerHistoryUseCase, super.key});
+  const WalletScreen({this.getWorkerHistoryUseCase, this.onFindJobs, super.key});
 
   final GetWorkerHistoryUseCase? getWorkerHistoryUseCase;
+  final VoidCallback? onFindJobs;
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -72,8 +73,9 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
   @override
   void didUpdateWidget(covariant WalletScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Recargar datos cuando el widget se actualiza
-    _load();
+    if (oldWidget.getWorkerHistoryUseCase != widget.getWorkerHistoryUseCase) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -119,7 +121,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
   /// Filtra los trabajos según el período seleccionado (solo completados)
   List<WorkerJob> get _filteredJobs {
     // Solo mostrar trabajos completados en la billetera
-    final completed = _allJobs.where((job) => job.isCompleted).toList();
+    final completed = _allJobs.where((job) => job.isEarned).toList();
 
     if (_filter == _DateFilter.all) return completed;
 
@@ -156,12 +158,12 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
   }
 
   bool get _hasNonCashEarnings {
-    return _allJobs.any((job) => job.isCompleted && job.isNonCashPayment);
+    return _allJobs.any((job) => job.isEarned && job.isNonCashPayment);
   }
 
   double get _nonCashBalance {
     return _filteredJobs
-        .where((job) => job.isCompleted && job.isNonCashPayment)
+        .where((job) => job.isEarned && job.isNonCashPayment)
         .fold(0.0, (sum, job) => sum + job.amount);
   }
 
@@ -1140,9 +1142,7 @@ class _WalletScreenState extends State<WalletScreen> with RouteAware {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  // Usually goes to explore or radar screen
-                },
+                onPressed: widget.onFindJobs,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF651FFF),
                   padding: const EdgeInsets.symmetric(vertical: 16),

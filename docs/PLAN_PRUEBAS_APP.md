@@ -780,3 +780,58 @@ Codex: por favor revisa este plan **contra el código** de `app-chamba/lib` (y c
 4. **Escala tipográfica y botones**: ¿estás de acuerdo con la escala permitida de §2.1 y la jerarquía de §2.2, o propones otra?
 5. **Prioridad**: marca qué casos deberían automatizarse primero (§7.2).
 6. **Restricciones**: no modificar la app ni ejecutar pruebas contra producción durante la revisión; coordinar en `COMUNICACION_AGENTES.md`.
+
+## 11. Revisión de Codex
+
+### Alcance y autorización (2026-10-11)
+
+El usuario reemplazó la restricción de §10.6: autorizó corregir la app, ejecutar pruebas reales en producción con sus sesiones de prueba y subir las correcciones a Git. Los defines locales de producción y local apuntan a `https://web-production-f0db6d.up.railway.app/api`, con socket en el mismo host. Estos JSON contienen claves y permanecen fuera de Git.
+
+Pixel 5 (`emulator-5554`) tiene sesión de cliente y Pixel 6 (`emulator-5556`) de trabajador. Se compiló e instaló la APK debug actualizada en ambos conservando las sesiones. Los roles actuales reemplazan los del registro antiguo de agentes.
+
+### Defectos confirmados y corregidos
+
+| Defecto | Corrección y evidencia |
+|---|---|
+| Un 401 dejaba al usuario en pantallas protegidas | Se invalida solo el token que originó la petición, se limpia la sesión, se desecha el socket y se vuelve una sola vez al login. Tests de 401 simultáneos, respuesta de cuenta anterior, login inválido y navegación con limpieza persistida. |
+| Botones compartidos desbordaban con texto ampliado y carecían de semántica explícita | Texto flexible y semántica de botón habilitado/deshabilitado. Tests a escala 2.0 para botones primario y secundario. |
+| H-14: blanco sobre amarillo no tenía contraste suficiente | Texto oscuro en la variante amarilla; test de contraste mínimo 4.5:1 (antes 1.83:1). |
+| Soporte perdía el borrador si fallaba el envío | Se borra únicamente tras éxito y si el usuario no escribió otro texto durante la petición. Tres tests de éxito, error y edición concurrente. |
+| H-15: ganancias incluían ofertas rechazadas en trabajos completados | El historial del backend incluye ofertas aceptadas y rechazadas. Se conserva `offerStatus` y se suma exclusivamente `accepted` + `completed`, también para saldo no efectivo. Test con Bs 125 aceptados y Bs 800 rechazados. No equivale a verificar cobro de dinero. |
+| “Buscar trabajos” en billetera vacía no hacía nada | El CTA abre la pestaña de inicio del trabajador; test de callback. |
+
+### Ejecución y límites
+
+- Suite Flutter: **75 pruebas aprobadas y 1 omitida**. `api_test` se omite sin URL; no se ejecutó su registro automático contra producción.
+- APK debug con defines de producción: compilación correcta e instalación en ambos emuladores.
+- Análisis estático: 148 avisos de lint/deprecación, sin errores de compilación; `flutter analyze` retorna 1 por esos avisos. No se presenta como análisis limpio.
+- API real con las dos sesiones: precio cerrado (solicitud, oferta, aceptación, llegada, confirmación, finalización e historial), precio por hora, dos ciclos de pausa/reanudación sin acumular tiempo pausado, cancelación con rechazo HTTP 400 de finalización posterior y calificación con supresión de duplicado: **aprobados**.
+- Precio cerrado: Bs 100. Por hora: tarifa Bs 20/h, importe final Bs 0.02 consistente con el tiempo efectivo del ensayo corto. No se efectuaron cargos de tarjeta.
+- Las cuentas no tenían ubicación persistida en el backend; las solicitudes API usaron coordenadas sintéticas 0,0 sin cambiar el GPS guardado. Estos resultados no validan descubrimiento geográfico, mapa ni creación desde la UI.
+- Revisión visual completa bloqueada por Android: “System UI isn't responding”, entrada ADB inestable y errores del almacenamiento del emulador. Reinicio en frío y ajuste de memoria no permitieron completar el recorrido. No hay evidencia suficiente para aprobar todas las pantallas, push, sockets, accesibilidad global o §9.2.
+
+Solicitudes de prueba creadas, para posterior limpieza por el responsable:
+
+| Solicitud | Estado |
+|---|---|
+| `d11565fd-a15a-45f9-ab55-fe921da71da3` | Completada, precio cerrado |
+| `76a59e58-c2a2-4ece-9d31-6f21f1dce6f2` | Completada, por hora |
+| `c9523d6b-717d-4722-9b4d-5cdba81ce345` | Cancelada |
+
+`docs/qa-live.ps1` reproduce estos escenarios de API de forma explícita; por defecto solo inspecciona. Lee las sesiones debug en memoria y no imprime tokens. Repetir escenarios mutantes crea nuevas solicitudes reales. `docs/android-qa.ps1` permite capturas binarias e interacción ADB; las capturas nuevas de cuentas se excluyeron del commit.
+
+### Exactitud del plan y cobertura pendiente
+
+- H-01/H-02: hay tamaños pequeños y fraccionarios en código; su impacto visual y severidad necesitan prueba en dispositivo estable. Adoptar la escala de §2.1 como objetivo, sin reprobar automáticamente 14/16/18 px: son tamaños utilizables según función, contraste y ampliación.
+- H-03/H-04: botones nativos y colores locales confirman falta de centralización, pero su sola presencia no demuestra un fallo funcional. Priorizar estados habilitado, cargando, deshabilitado, área táctil y contraste. La jerarquía de §2.2 es adecuada.
+- H-05/H-06/H-07/H-08: inconsistencias de moneda, textos y excepciones quedan pendientes de normalización y recorrido visual; no se certifican corregidas.
+- H-09: accesibilidad mejorada en botones compartidos, no en toda la app. Contar `Semantics` no basta: Flutter ya proporciona semántica en varios controles nativos. Añadir lector de pantalla, orden de foco y etiquetas de iconos al recorrido.
+- H-10: la búsqueda de constructores solo encuentra declaraciones de `RadarScreen`, `EmptyRequestsScreen` y también `RoleSelectionScreen`; no hay navegación activa a esas clases. No contarlas como pantallas alcanzables sin definir su entrada.
+- H-11: el bucle de ping requiere ubicaciones y `_isSimulating`; la primera carga de ubicaciones desactiva esa bandera. La simulación es código inactivo y el respaldo geográfico fijo requiere decisión de producto; no se corrigió ni se validó el mapa visualmente.
+- H-12: mínimo de contraseña de 4 coincide con backend; elevarlo requiere cambiar contrato y mensajes conjuntamente. H-13: actualizar spec con navegación vigente. H-14/H-15: corregidos como se describe arriba. H-16: no existe recuperación móvil completa; requiere funcionalidad de backend y canal de verificación, no solo un enlace de login.
+- Descripción de 120 caracteres: restricción del formulario, sin máximo equivalente comprobado en backend. Cinco fotos sí tienen límite de backend. Habilidades 1–5 es regla de UI; backend normaliza hasta 20 y no exige ese mismo mínimo. Añadir pruebas de contrato antes de tratar estos límites como invariantes del servidor.
+- Oferta de 120 s: valor predeterminado configurable en backend, no duración universal. Polling de 8 s existe en solicitudes entrantes; distinguirlo de timeouts HTTP y del reloj autoritativo del servidor.
+- Ampliar cobertura con 401 y cambio de cuenta durante peticiones, pérdida/edición de borradores, wallet con ofertas rechazadas, doble aceptación concurrente para un trabajador, reconexión y eventos fuera de orden, permisos revocados, regreso de background y recuperación de contraseña cuando exista. Pagos Stripe, disputas y bloqueo necesitan sesiones/entornos y evidencias específicas; no quedaron cubiertos por estas pruebas de efectivo.
+- Prioridad de automatización: sesión y billetera (ya añadidas), reloj/cancelación (API verificada), exclusión concurrente de trabajos, negociación/expiración y notificaciones. Después validaciones de formulario y pruebas visuales por pantalla. Evitar un lint que prohíba todo `Color` o tamaño literal antes de acordar excepciones del diseño.
+
+**Salida:** correcciones anteriores verificadas y APK instalada; plan completo pendiente de emuladores estables y de los flujos explícitamente no cubiertos. Los criterios de §9.2 no se dan por cumplidos.

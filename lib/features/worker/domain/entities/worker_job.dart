@@ -23,6 +23,7 @@ class WorkerJob {
     this.workElapsedSeconds,
     this.threadId,
     this.paymentMethod,
+    this.offerStatus,
   });
 
   final String id;
@@ -39,6 +40,7 @@ class WorkerJob {
   final int? workElapsedSeconds;
   final String? threadId;
   final String? paymentMethod;
+  final String? offerStatus;
 
   String get clientFullName {
     final value = '$clientFirstName $clientLastName'.trim();
@@ -47,6 +49,7 @@ class WorkerJob {
 
   bool get isCancelled => status == WorkerJobStatus.cancelled;
   bool get isCompleted => status == WorkerJobStatus.completed;
+  bool get isEarned => isCompleted && offerStatus == 'accepted';
 
   bool get isNonCashPayment {
     if (paymentMethod == null) return false;
@@ -70,6 +73,8 @@ class WorkerJob {
         other.acceptedAt == acceptedAt &&
         other.completedAt == completedAt &&
         other.workElapsedSeconds == workElapsedSeconds &&
+        other.paymentMethod == paymentMethod &&
+        other.offerStatus == offerStatus &&
         other.threadId == threadId;
   }
 
@@ -87,6 +92,8 @@ class WorkerJob {
         acceptedAt,
         completedAt,
         workElapsedSeconds,
+        paymentMethod,
+        offerStatus,
         threadId,
       );
 }

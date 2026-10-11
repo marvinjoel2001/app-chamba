@@ -23,8 +23,10 @@ void main() {
       await showButton(
         tester,
         primary
-            ? ChambaPrimaryButton(label: label, icon: Icons.check, onPressed: () {})
-            : ChambaSecondaryButton(label: label, icon: Icons.check, onPressed: () {}),
+            ? ChambaPrimaryButton(
+                label: label, icon: Icons.check, onPressed: () {})
+            : ChambaSecondaryButton(
+                label: label, icon: Icons.check, onPressed: () {}),
         scale: 2,
       );
       expect(tester.takeException(), isNull);
@@ -40,17 +42,23 @@ void main() {
             ? const ChambaPrimaryButton(label: 'Guardar', onPressed: null)
             : const ChambaSecondaryButton(label: 'Guardar', onPressed: null),
       );
-      expect(tester.getSemantics(find.text('Guardar')),
-          matchesSemantics(label: 'Guardar', isButton: true,
-              hasEnabledState: true, isEnabled: false));
+      expect(
+          tester.getSemantics(find.text('Guardar')),
+          matchesSemantics(
+              label: 'Guardar',
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: false));
       semantics.dispose();
     });
   }
 
   testWidgets('yellow confirmation button has readable text contrast',
       (tester) async {
-    await showButton(tester,
-        ChambaPrimaryButton(label: 'Aceptar', isYellow: true, onPressed: () {}));
+    await showButton(
+        tester,
+        ChambaPrimaryButton(
+            label: 'Aceptar', isYellow: true, onPressed: () {}));
     final foreground = tester.widget<Text>(find.text('Aceptar')).style!.color!;
     final background = AppTheme.colorHighlight;
     final light = background.computeLuminance();

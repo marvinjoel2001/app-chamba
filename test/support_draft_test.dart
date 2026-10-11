@@ -14,24 +14,28 @@ class _Backend extends Fake implements MobileBackendService {
   Future<Map<String, dynamic>> getUserActiveDisputes(String userId) async =>
       {'disputes': []};
   @override
-  Future<Map<String, dynamic>> getDisputeMessages({required String disputeId,
-      String? readBy}) async => {'messages': []};
+  Future<Map<String, dynamic>> getDisputeMessages(
+          {required String disputeId, String? readBy}) async =>
+      {'messages': []};
   @override
-  Future<Map<String, dynamic>> sendDisputeMessage({required String disputeId,
-      required String senderType, String? senderId, required String content}) {
+  Future<Map<String, dynamic>> sendDisputeMessage(
+      {required String disputeId,
+      required String senderType,
+      String? senderId,
+      required String content}) {
     sends++;
     return response.future;
   }
 }
 
 void main() {
-  setUp(() => SessionStore.currentUser = const SessionUser(id: 'qa',
-      type: 'client', firstName: 'QA', email: 'qa@example.invalid'));
+  setUp(() => SessionStore.currentUser = const SessionUser(
+      id: 'qa', type: 'client', firstName: 'QA', email: 'qa@example.invalid'));
   tearDown(() => SessionStore.currentUser = null);
 
   Future<void> open(WidgetTester tester, _Backend backend) async {
-    await tester.pumpWidget(MaterialApp(home: SupportScreen(
-        disputeId: 'qa-dispute', backend: backend)));
+    await tester.pumpWidget(MaterialApp(
+        home: SupportScreen(disputeId: 'qa-dispute', backend: backend)));
     await tester.pump();
     await tester.enterText(find.byType(TextField), 'Necesito ayuda');
     await tester.tap(find.byIcon(Icons.send));
