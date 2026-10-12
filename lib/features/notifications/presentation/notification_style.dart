@@ -20,8 +20,10 @@ class NotificationStyle {
   static const _pink = Color(0xFFDB2777);
 
   static NotificationStyle of(String type) => switch (type) {
-        'offer_new' => const NotificationStyle(Icons.local_offer_rounded, _violet),
-        'counter_offer' || 'offer_client_counter' =>
+        'offer_new' =>
+          const NotificationStyle(Icons.local_offer_rounded, _violet),
+        'counter_offer' ||
+        'offer_client_counter' =>
           const NotificationStyle(Icons.swap_horiz_rounded, _violet),
         'offer_accepted' =>
           const NotificationStyle(Icons.handshake_rounded, _green),
@@ -48,12 +50,18 @@ class NotificationStyle {
           const NotificationStyle(Icons.gavel_rounded, _teal),
         'verification_update' =>
           const NotificationStyle(Icons.badge_rounded, _violet),
-        'payment_received' || 'payment' =>
+        'payment_received' ||
+        'payment' =>
           const NotificationStyle(Icons.payments_rounded, _green),
-        'message_new' || 'chat_message' =>
+        'message_new' ||
+        'chat_message' =>
           const NotificationStyle(Icons.chat_rounded, _blue),
         'support_message' =>
           const NotificationStyle(Icons.support_agent_rounded, _pink),
+        // Avisos especiales enviados desde el panel admin.
+        'announcement' ||
+        'broadcast' =>
+          const NotificationStyle(Icons.campaign_rounded, _violet),
         _ => const NotificationStyle(Icons.notifications_rounded, _violet),
       };
 }

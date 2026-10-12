@@ -12,6 +12,7 @@ import '../network/realtime_service.dart';
 import '../navigation/app_flows.dart';
 import '../services/mobile_backend_service.dart';
 import '../services/new_request_alert.dart';
+import '../services/sound_effect_service.dart';
 import '../services/toast_service.dart';
 import '../session/session_store.dart';
 import '../session/session_credentials.dart';
@@ -83,6 +84,9 @@ class PushNotificationService {
     if (type == 'message_new' && data['threadId'] == SessionCredentials.visibleThreadId) return true;
     if (type == 'request_new') {
       NewRequestAlert.instance.announceFromPush(data);
+    } else {
+      // Only the shared, deduplicated foreground owner plays the chime.
+      unawaited(SoundEffectService.playMessageChime());
     }
     ToastService.show(title: data['title']?.toString() ?? 'Chamba', body: data['body']?.toString() ?? '',
       type: ToastType.info, onTap: () => NotificationRouter.openFromData(data));

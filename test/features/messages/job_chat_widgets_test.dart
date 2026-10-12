@@ -29,22 +29,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('notification entry stays visible without any accepted jobs',
+  testWidgets('notifications tab has a single entry point and empty state',
       (tester) async {
-    var opened = false;
     await tester.pumpWidget(MaterialApp(
         home: MessagesInbox(
             threads: const [],
             notifications: const [],
-            unreadNotifications: 0,
             onRefresh: () async {},
-            onNotifications: () => opened = true,
             onNotification: (_) {},
             onThread: (_) {})));
     expect(find.text('Notificaciones'), findsOneWidget);
-    expect(find.text('Trabajos confirmados'), findsNothing);
-    await tester.tap(find.text('Notificaciones'));
-    expect(opened, isTrue);
+    expect(find.text('Estás al día'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_active_rounded), findsNothing);
+    expect(find.text('Trabajos en curso'), findsNothing);
   });
   testWidgets('contact alert blocks a send without reaching the repository',
       (tester) async {
@@ -95,10 +92,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(
           home: MessagesInbox(
               threads: [previewThread()],
-              notifications: previewNotifications(),
-              unreadNotifications: 7,
-              onRefresh: () async {},
-              onNotifications: () {},
+              notifications: previewNotifications(),
+              onRefresh: () async {},
               onNotification: (_) {},
               onThread: (_) {})));
       await tester.pumpAndSettle();

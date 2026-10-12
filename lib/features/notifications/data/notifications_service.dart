@@ -4,8 +4,32 @@ import 'package:http/http.dart' as http;
 import '../../../../core/config/app_config.dart';
 import '../../../../core/session/session_store.dart';
 import '../domain/models/app_notification.dart';
+import '../domain/models/notification_counts.dart';
 
 class NotificationsService {
+  static Future<NotificationTypeCounts> getCounts() async {
+    final userId = SessionStore.currentUser?.id;
+    if (userId == null) return {};
+    final response = await http
+        .get(
+          Uri.parse(
+              '${AppConfig.apiBaseUrl}/mobile/notifications/counts?userId=$userId'),
+          headers: SessionCredentials.headers,
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      throw Exception('No pudimos obtener los contadores');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return {
+      for (final row in data['byType'] as List<dynamic>)
+        row['type'] as String: (
+          unread: (row['unread'] as num).toInt(),
+          read: (row['read'] as num).toInt()
+        )
+    };
+  }
+
   static Future<({List<AppNotification> items, bool hasMore})>
       getNotifications({
     int page = 1,
@@ -33,7 +57,8 @@ class NotificationsService {
         final hasMore = data['hasMore'] as bool? ?? false;
         return (items: items, hasMore: hasMore);
       } else {
-        throw Exception('Error al obtener notificaciones (Status: ${response.statusCode})');
+        throw Exception(
+            'Error al obtener notificaciones (Status: ${response.statusCode})');
       }
     } catch (e) {
       throw Exception('Fallo al obtener notificaciones: $e');
@@ -52,9 +77,10 @@ class NotificationsService {
             body: jsonEncode({'userId': userId, 'ids': ids}),
           )
           .timeout(const Duration(seconds: 12));
-          
+
       if (response.statusCode != 200) {
-        throw Exception('Error al marcar notificaciones como leídas (Status: ${response.statusCode})');
+        throw Exception(
+            'Error al marcar notificaciones como leídas (Status: ${response.statusCode})');
       }
     } catch (e) {
       throw Exception('Fallo al marcar notificaciones como leídas: $e');
@@ -79,7 +105,8 @@ class NotificationsService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return (data['count'] as num?)?.toInt() ?? 0;
       } else {
-        throw Exception('Error al obtener conteo de notificaciones (Status: ${response.statusCode})');
+        throw Exception(
+            'Error al obtener conteo de notificaciones (Status: ${response.statusCode})');
       }
     } catch (e) {
       throw Exception('Fallo al obtener conteo de notificaciones: $e');

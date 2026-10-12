@@ -13,14 +13,17 @@ import '../../../history/presentation/screens/job_history_details_screen.dart';
 import '../../../notifications/data/notifications_service.dart';
 import '../../../notifications/domain/models/app_notification.dart';
 import '../../../notifications/presentation/notification_style.dart';
-import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../request/presentation/screens/job_in_progress_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../domain/entities/chat_thread.dart';
 import '../state/messages_dependencies.dart';
 
 class MessagesScreen extends StatefulWidget {
-  const MessagesScreen({super.key});
+  const MessagesScreen({this.isActive = true, super.key});
+
+  /// `true` mientras la pestaña está a la vista: los avisos mostrados se
+  /// marcan como leídos (antes lo hacía la pantalla de notificaciones aparte).
+  final bool isActive;
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
@@ -31,6 +34,52 @@ class _MessagesScreenState extends State<MessagesScreen>
   List<ChatThread> _threads = [];
   List<AppNotification> _notifications = [];
   bool _loading = true, _fetching = false, _again = false;
+  bool _hasMore = false, _loadingMore = false;
+  int _page = 1;
+
+  /// Avisos que estaban sin leer cuando se mostraron en esta visita: siguen
+  /// destacados aunque el servidor ya los tenga como leídos.
+  final Set<String> _sessionUnread = {};
+  final Set<String> _markingRead = {};
+
+  @override
+  void didUpdateWidget(covariant MessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _markShownAsRead();
+    } else if (!widget.isActive && oldWidget.isActive) {
+      setState(_sessionUnread.clear);
+    }
+  }
+
+  void _markShownAsRead() {
+    if (!widget.isActive) return;
+    final ids = _notifications
+        .where((n) => !n.isRead && !_markingRead.contains(n.id))
+        .map((n) => n.id)
+        .toList();
+    if (ids.isEmpty) return;
+    _sessionUnread.addAll(ids);
+    _markingRead.addAll(ids);
+    unawaited(NotificationsService.markAsRead(ids: ids)
+        .then((_) => UnreadNotificationsNotifier.instance.refresh())
+        .catchError((_) {/* Se reintenta en la próxima carga. */})
+        .whenComplete(() => _markingRead.removeAll(ids)));
+  }
+
+  List<AppNotification> get _displayedNotifications => [
+        for (final n in _notifications)
+          n.isRead && _sessionUnread.contains(n.id)
+              ? AppNotification(
+                  id: n.id,
+                  title: n.title,
+                  body: n.body,
+                  type: n.type,
+                  isRead: false,
+                  createdAt: n.createdAt,
+                  data: n.data)
+              : n,
+      ];
   String? _error, _notificationError;
   @override
   void initState() {
@@ -85,7 +134,7 @@ class _MessagesScreenState extends State<MessagesScreen>
       if (mounted)
         setState(() {
           _loading = false;
-          _error = 'Inicia sesión para ver tus mensajes.';
+          _error = 'Inicia sesión para ver tus notificaciones.';
         });
       return;
     }
@@ -97,6 +146,7 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (!mounted) return;
     setState(() => _loading = false);
     _fetching = false;
+    _markShownAsRead();
     if (_again) {
       _again = false;
       _reload();
@@ -119,12 +169,17 @@ class _MessagesScreenState extends State<MessagesScreen>
         onFailure: (failure) => setState(() => _error = failure.message));
   }
 
+  static const _pageSize = 20;
+
   Future<void> _loadNotifications() async {
     try {
-      final result = await NotificationsService.getNotifications(limit: 8);
+      final result =
+          await NotificationsService.getNotifications(page: 1, limit: _pageSize);
       if (mounted)
         setState(() {
           _notifications = result.items;
+          _hasMore = result.hasMore;
+          _page = 1;
           _notificationError = null;
         });
     } catch (_) {
@@ -134,10 +189,28 @@ class _MessagesScreenState extends State<MessagesScreen>
     }
   }
 
-  Future<void> _openNotifications() async {
-    await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()));
-    if (mounted) _reload();
+  Future<void> _loadMoreNotifications() async {
+    if (_loadingMore || !_hasMore || _fetching) return;
+    setState(() => _loadingMore = true);
+    try {
+      final result = await NotificationsService.getNotifications(
+          page: _page + 1, limit: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        final seen = _notifications.map((n) => n.id).toSet();
+        _notifications = [
+          ..._notifications,
+          ...result.items.where((n) => !seen.contains(n.id)),
+        ];
+        _hasMore = result.hasMore;
+        _page++;
+      });
+      _markShownAsRead();
+    } catch (_) {
+      // Se reintenta al volver a llegar al final de la lista.
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
   }
 
   Future<void> _openNotification(AppNotification notification) async {
@@ -182,44 +255,60 @@ class _MessagesScreenState extends State<MessagesScreen>
   }
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<int>(
-      valueListenable: UnreadNotificationsNotifier.instance,
-      builder: (context, unread, _) => MessagesInbox(
-          threads: _threads,
-          notifications: _notifications,
-          unreadNotifications: unread,
-          loading: _loading,
-          error: _error,
-          notificationError: _notificationError,
-          onRefresh: _load,
-          onNotifications: _openNotifications,
-          onNotification: _openNotification,
-          onThread: _openThread));
+  Widget build(BuildContext context) => MessagesInbox(
+      threads: _threads,
+      notifications: _displayedNotifications,
+      loading: _loading,
+      error: _error,
+      notificationError: _notificationError,
+      hasMore: _hasMore,
+      loadingMore: _loadingMore,
+      onRefresh: _load,
+      onLoadMore: _loadMoreNotifications,
+      onNotification: _openNotification,
+      onThread: _openThread);
 }
 
+/// Pestaña "Notificaciones": chats de trabajos en curso arriba y, debajo, todos
+/// los avisos agrupados por día (con paginación al hacer scroll). Es el único
+/// lugar de la app para ver notificaciones.
 class MessagesInbox extends StatelessWidget {
   const MessagesInbox(
       {required this.threads,
       required this.notifications,
-      required this.unreadNotifications,
       required this.onRefresh,
-      required this.onNotifications,
       required this.onNotification,
       required this.onThread,
+      this.onLoadMore,
+      this.hasMore = false,
+      this.loadingMore = false,
       this.loading = false,
       this.error,
       this.notificationError,
       super.key});
   final List<ChatThread> threads;
   final List<AppNotification> notifications;
-  final int unreadNotifications;
-  final bool loading;
+  final bool loading, hasMore, loadingMore;
   final String? error, notificationError;
   final Future<void> Function() onRefresh;
-  final VoidCallback onNotifications;
+  final VoidCallback? onLoadMore;
   final ValueChanged<AppNotification> onNotification;
   final ValueChanged<ChatThread> onThread;
   static const _ink = AppTheme.colorText, _muted = AppTheme.colorMuted;
+
+  /// Avisos con encabezados de día intercalados ("Hoy", "Ayer", …).
+  List<Object> _grouped() {
+    final items = <Object>[];
+    DateTime? lastDay;
+    for (final n in notifications) {
+      if (lastDay == null || !isSameLocalDay(lastDay, n.createdAt)) {
+        items.add(dayHeaderLabel(n.createdAt));
+        lastDay = n.createdAt;
+      }
+      items.add(n);
+    }
+    return items;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,62 +317,49 @@ class MessagesInbox extends StatelessWidget {
         .toList();
     final active = confirmed.where((thread) => thread.isActive).toList();
     final archived = confirmed.where((thread) => !thread.isActive).toList();
-    return Theme(
-        data: Theme.of(context).copyWith(
-            brightness: Brightness.light,
-            colorScheme: ColorScheme.fromSeed(
-                seedColor: AppTheme.colorPrimary,
-                brightness: Brightness.light)),
-        child: Scaffold(
-            backgroundColor: AppTheme.colorBackground,
-            body: SafeArea(
+    final grouped = _grouped();
+    return Scaffold(
+        backgroundColor: AppTheme.colorBackground,
+        body: SafeArea(
+            child: NotificationListener<ScrollNotification>(
+                onNotification: (scroll) {
+                  if (hasMore &&
+                      !loadingMore &&
+                      scroll.metrics.extentAfter < 400) {
+                    onLoadMore?.call();
+                  }
+                  return false;
+                },
                 child: RefreshIndicator(
                     onRefresh: onRefresh,
                     child: CustomScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         slivers: [
-                          SliverToBoxAdapter(
+                          const SliverToBoxAdapter(
                               child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 22, 20, 20),
-                                  child: Row(
+                                  padding: EdgeInsets.fromLTRB(20, 22, 20, 8),
+                                  child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Expanded(
-                                            child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                              Text('Mensajes',
-                                                  style: TextStyle(
-                                                      fontSize: 28,
-                                                      color: _ink,
-                                                      fontWeight:
-                                                          FontWeight.w800)),
-                                              SizedBox(height: 5),
-                                              Text(
-                                                  'Tus trabajos, ofertas y novedades\nen un solo lugar.',
-                                                  style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: _muted,
-                                                      height: 1.5))
-                                            ])),
-                                        const SizedBox(width: 12),
-                                        NotificationBell(
-                                            unread: unreadNotifications,
-                                            onPressed: onNotifications),
+                                        Text('Notificaciones',
+                                            style: TextStyle(
+                                                fontSize: 28,
+                                                color: _ink,
+                                                fontWeight: FontWeight.w800)),
+                                        SizedBox(height: 5),
+                                        Text(
+                                            'Novedades de tus trabajos y ofertas.',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color: _muted,
+                                                height: 1.5))
                                       ]))),
-                          SliverToBoxAdapter(
-                              child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: _notificationSummary())),
                           if (error != null || notificationError != null)
                             SliverToBoxAdapter(
                                 child: Padding(
                                     padding: const EdgeInsets.fromLTRB(
-                                        20, 12, 20, 0),
+                                        20, 8, 20, 0),
                                     child: Text(
                                         [
                                           if (error != null) error!,
@@ -297,65 +373,54 @@ class MessagesInbox extends StatelessWidget {
                               notifications.isEmpty)
                             const SliverToBoxAdapter(
                                 child: Padding(
-                                    padding: EdgeInsets.only(top: 24),
+                                    padding: EdgeInsets.only(top: 16),
                                     child: SkeletonList(
-                                        count: 5,
+                                        count: 6,
                                         lines: 3,
                                         circleLeading: false,
                                         shrinkWrap: true,
                                         padding: EdgeInsets.zero))),
                           if (active.isNotEmpty) ...[
                             const SliverToBoxAdapter(
-                                child: _SectionLabel('Trabajos confirmados')),
+                                child: _SectionLabel('Trabajos en curso')),
                             SliverList.builder(
                                 itemCount: active.length,
                                 itemBuilder: (context, index) =>
                                     _threadTile(active[index])),
                           ],
-                          if (notifications.isNotEmpty) ...[
-                            const SliverToBoxAdapter(
-                                child: _SectionLabel('Actividad reciente')),
+                          if (grouped.isNotEmpty)
                             SliverList.builder(
-                                itemCount: notifications.length,
-                                itemBuilder: (context, index) =>
-                                    _notificationTile(notifications[index])),
-                            SliverToBoxAdapter(
-                                child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
-                                    child: TextButton(
-                                        onPressed: onNotifications,
-                                        child: const Text(
-                                            'Ver todas las notificaciones')))),
-                          ],
+                                itemCount: grouped.length,
+                                itemBuilder: (context, index) {
+                                  final item = grouped[index];
+                                  return item is String
+                                      ? _SectionLabel(item)
+                                      : _notificationTile(
+                                          item as AppNotification);
+                                }),
+                          if (loadingMore)
+                            const SliverToBoxAdapter(
+                                child: SkeletonListTile(
+                                    lines: 3, circleLeading: false)),
                           if (!loading && notifications.isEmpty && active.isEmpty)
                             SliverToBoxAdapter(
                                 child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 28, vertical: 30),
-                                    child: Column(children: [
-                                      const Icon(
-                                          Icons.notifications_none_rounded,
-                                          color: AppTheme.colorPrimaryLight,
-                                          size: 40),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                          notificationError == null
-                                              ? 'Estás al día'
-                                              : 'Tu actividad sigue aquí',
-                                          style: const TextStyle(
-                                              color: _ink,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600)),
-                                      const SizedBox(height: 6),
-                                      const Text(
-                                          'Las novedades de tus trabajos aparecerán aquí.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              color: _muted,
-                                              fontSize: 12,
-                                              height: 1.5))
-                                    ]))),
+                                    padding: const EdgeInsets.only(top: 40),
+                                    child: ChambaEmptyState(
+                                        icon: Icons.notifications_none_rounded,
+                                        title: notificationError == null
+                                            ? 'Estás al día'
+                                            : 'Sin conexión',
+                                        message:
+                                            'Aquí verás las ofertas, cambios de estado y '
+                                            'mensajes importantes de tus trabajos.',
+                                        actionLabel: notificationError == null
+                                            ? null
+                                            : 'Reintentar',
+                                        actionIcon: Icons.refresh_rounded,
+                                        onAction: notificationError == null
+                                            ? null
+                                            : () => onRefresh()))),
                           if (archived.isNotEmpty)
                             SliverToBoxAdapter(
                                 child: ExpansionTile(
@@ -376,52 +441,8 @@ class MessagesInbox extends StatelessWidget {
                         ])))));
   }
 
-  Widget _notificationSummary() => ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Material(
-              color: AppTheme.colorPrimaryTint,
-              child: InkWell(
-                  onTap: onNotifications,
-                  child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                          border: Border.all(
-                              color: AppTheme.colorPrimary
-                                  .withValues(alpha: 0.14)),
-                          borderRadius: BorderRadius.circular(18)),
-                      child: Row(children: [
-                        Container(
-                            width: 48,
-                            height: 48,
-                            decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle),
-                            child: const Icon(
-                                Icons.notifications_active_rounded,
-                                color: AppTheme.colorPrimary,
-                                size: 27)),
-                        const SizedBox(width: 14),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              const Text('Notificaciones',
-                                  style: TextStyle(
-                                      color: _ink,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 5),
-                              Text(
-                                  unreadNotifications == 0
-                                      ? 'No hay notificaciones nuevas'
-                                      : '$unreadNotifications ${unreadNotifications == 1 ? 'notificación nueva' : 'notificaciones nuevas'}',
-                                  style: const TextStyle(
-                                      color: _muted, fontSize: 12),
-                                  maxLines: 2)
-                            ])),
-                        const Icon(Icons.chevron_right_rounded,
-                            color: AppTheme.colorPrimary, size: 24),
-                      ])))));
+  static bool _isAnnouncement(AppNotification n) =>
+      n.type == 'announcement' || n.type == 'broadcast';
 
   Widget _notificationTile(AppNotification notification) {
     return _tile(
@@ -445,9 +466,13 @@ class MessagesInbox extends StatelessWidget {
                             ? FontWeight.w600
                             : FontWeight.w700)),
                 const SizedBox(height: 4),
+                // Los avisos del equipo se leen completos aquí: no llevan a
+                // otra pantalla.
                 Text(notification.body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: _isAnnouncement(notification) ? null : 2,
+                    overflow: _isAnnouncement(notification)
+                        ? null
+                        : TextOverflow.ellipsis,
                     style: const TextStyle(
                         color: _muted,
                         fontSize: 12,
@@ -543,32 +568,6 @@ class MessagesInbox extends StatelessWidget {
               onTap: onTap,
               child:
                   Padding(padding: const EdgeInsets.all(14), child: child))));
-}
-
-class NotificationBell extends StatelessWidget {
-  const NotificationBell(
-      {required this.unread, required this.onPressed, super.key});
-  final int unread;
-  final VoidCallback onPressed;
-  @override
-  Widget build(BuildContext context) => Container(
-      width: 46,
-      height: 46,
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.colorGlassBorder),
-          boxShadow: AppTheme.shadowSm),
-      child: IconButton(
-          tooltip: unread == 0
-              ? 'Notificaciones'
-              : '$unread notificaciones sin leer',
-          onPressed: onPressed,
-          icon: Badge(
-              isLabelVisible: unread > 0,
-              backgroundColor: AppTheme.colorError,
-              child: const Icon(Icons.notifications_none_rounded,
-                  color: AppTheme.colorPrimary, size: 24))));
 }
 
 class _SectionLabel extends StatelessWidget {

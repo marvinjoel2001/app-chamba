@@ -35,6 +35,17 @@ class _ExploreScreenState extends State<ExploreScreen>
     with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final TextEditingController _promptController = TextEditingController();
+
+  /// Avisa a la vista enfocada del compositor (otra ruta) que cambió el
+  /// estado de esta pantalla: escucha de voz, nivel del micrófono, análisis.
+  final ValueNotifier<int> _composerTick = ValueNotifier<int>(0);
+  bool _focusedComposerOpen = false;
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _composerTick.value++;
+  }
   final RealtimeService _realtime = RealtimeService.instance;
   bool _loading = true;
   bool _refreshing = false;
@@ -87,6 +98,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     _realtime.off('job.cancelled', _onJobFinished);
     _realtime.off('offer.new', _onNewOffer);
     _promptController.dispose();
+    _composerTick.dispose();
     _micPulseController.dispose();
     _micSoundPlayer.dispose();
     super.dispose();
@@ -349,6 +361,37 @@ class _ExploreScreenState extends State<ExploreScreen>
       normalized = normalized.replaceAll(source, target);
     });
     return normalized.replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ');
+  }
+
+  /// Abre el compositor a pantalla completa (fondo difuminado, sugerencias y
+  /// micrófono grande) al tocar el campo de texto del inicio. Con [listen]
+  /// (micrófono del inicio) empieza a escuchar apenas termina de abrirse.
+  Future<void> _openFocusedComposer({bool listen = false}) async {
+    if (_focusedComposerOpen || _analyzingPrompt) return;
+    _focusedComposerOpen = true;
+    FocusManager.instance.primaryFocus?.unfocus();
+    HapticFeedback.selectionClick();
+    if (listen) {
+      // Tras la animación de entrada, para que el beep coincida con la vista.
+      Future<void>.delayed(const Duration(milliseconds: 340), () {
+        if (mounted && _focusedComposerOpen && !_isListening) {
+          _listenToSpeech();
+        }
+      });
+    }
+    final submit = await Navigator.of(context, rootNavigator: true).push<bool>(
+      PageRouteBuilder<bool>(
+        opaque: false,
+        barrierDismissible: false,
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, animation, __) =>
+            _FocusedComposer(state: this, animation: animation),
+      ),
+    );
+    _focusedComposerOpen = false;
+    if (!mounted) return;
+    if (submit == true) await _startRequestFlow();
   }
 
   Future<void> _startRequestFlow() async {
@@ -817,7 +860,10 @@ class _ExploreScreenState extends State<ExploreScreen>
                           controller: _promptController,
                           minLines: 2,
                           maxLines: 4,
-                          readOnly: _analyzingPrompt,
+                          // Se escribe en la vista enfocada: aquí solo abre.
+                          readOnly: true,
+                          showCursor: false,
+                          onTap: _openFocusedComposer,
                           textInputAction: TextInputAction.newline,
                           keyboardType: TextInputType.multiline,
                           style: const TextStyle(
@@ -848,7 +894,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: _listenToSpeech,
+                    // Abre la vista enfocada y empieza a escuchar ahí.
+                    onTap: () => _openFocusedComposer(listen: true),
                     child: SizedBox(
                       width: 64,
                       height: 64,
@@ -1594,6 +1641,423 @@ class _PulseBadgeState extends State<PulseBadge> with SingleTickerProviderStateM
           ),
         );
       },
+    );
+  }
+}
+
+/// Compositor enfocado del inicio: fondo difuminado, saludo, tarjeta con el
+/// campo y el micrófono, y sugerencias de qué pedir. Comparte el controlador,
+/// la voz y el envío con [_ExploreScreenState].
+class _FocusedComposer extends StatefulWidget {
+  const _FocusedComposer({required this.state, required this.animation});
+
+  final _ExploreScreenState state;
+  final Animation<double> animation;
+
+  static const suggestions = [
+    'Necesito alguien que limpie mi casa',
+    'Reparar un aire acondicionado',
+    'Mudanza para este fin de semana',
+    'Arreglar una fuga en el baño',
+  ];
+
+  @override
+  State<_FocusedComposer> createState() => _FocusedComposerState();
+}
+
+class _FocusedComposerState extends State<_FocusedComposer> {
+  final FocusNode _focus = FocusNode();
+
+  _ExploreScreenState get _s => widget.state;
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _close() {
+    if (_s._isListening) _s._listenToSpeech();
+    Navigator.of(context).pop(false);
+  }
+
+  void _submit() {
+    if (_s._promptController.text.trim().isEmpty) {
+      _focus.requestFocus();
+      return;
+    }
+    if (_s._isListening) _s._listenToSpeech();
+    Navigator.of(context).pop(true);
+  }
+
+  void _useSuggestion(String text) {
+    HapticFeedback.selectionClick();
+    final controller = _s._promptController;
+    controller.text = text;
+    controller.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rawName = SessionStore.currentUser?.firstName.trim() ?? '';
+    final name = rawName.isEmpty
+        ? ''
+        : rawName[0].toUpperCase() + rawName.substring(1);
+    final curved = CurvedAnimation(
+      parent: widget.animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.systemOverlay,
+      child: AnimatedBuilder(
+        animation: curved,
+        builder: (context, child) => BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: 14 * curved.value,
+            sigmaY: 14 * curved.value,
+          ),
+          child: ColoredBox(
+            color: const Color(0xFFF7F6FC).withValues(alpha: 0.62 * curved.value),
+            child: child,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                _s._composerTick,
+                _s._promptController,
+                _s._micPulseController,
+              ]),
+              builder: (context, _) => LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _CloseButton(onTap: _close),
+                        ),
+                        const SizedBox(height: 32),
+                        FadeTransition(
+                          opacity: curved,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.06),
+                              end: Offset.zero,
+                            ).animate(curved),
+                            child: Column(
+                              children: [
+                                Text(
+                                  name.isEmpty ? 'Hola' : 'Hola, $name',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: AppTheme.colorText,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  '¿Qué servicio necesitas hoy?',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppTheme.colorMuted,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
+                                _buildCard(),
+                                const SizedBox(height: 24),
+                                for (final s in _FocusedComposer.suggestions)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _SuggestionChip(
+                                      text: s,
+                                      onTap: _s._analyzingPrompt
+                                          ? null
+                                          : () => _useSuggestion(s),
+                                    ),
+                                  ),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard() {
+    final hasText = _s._promptController.text.trim().isNotEmpty;
+    final listening = _s._isListening;
+    final analyzing = _s._analyzingPrompt;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.white, Color(0xFFF5F0FF)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x2E7C3AED),
+            blurRadius: 40,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          SvgPicture.string(
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">'
+            '<path d="M10 2.5L11.75 8.25L17.5 10L11.75 11.75L10 17.5L8.25 11.75L2.5 10L8.25 8.25L10 2.5Z" fill="#7C3AED"/>'
+            '<path d="M19 13L19.65 15.35L22 16L19.65 16.65L19 19L18.35 16.65L16 16L18.35 15.35L19 13Z" fill="#7C3AED"/>'
+            '</svg>',
+            width: 30,
+            height: 30,
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _s._promptController,
+            focusNode: _focus,
+            readOnly: analyzing,
+            minLines: 1,
+            maxLines: 4,
+            textAlign: TextAlign.center,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _submit(),
+            style: const TextStyle(
+              color: AppTheme.colorText,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              hintText: listening ? 'Te escucho…' : 'Cuéntame qué necesitas...',
+              hintStyle: TextStyle(
+                color: AppTheme.colorMuted.withValues(alpha: 0.9),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          _BigMicButton(
+            listening: listening,
+            level: _s._micSoundLevel,
+            pulse: _s._micPulseController.value,
+            onTap: analyzing ? null : _s._listenToSpeech,
+          ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              listening ? 'Escuchando… toca para detener' : 'Toca para hablar',
+              key: ValueKey(listening),
+              style: TextStyle(
+                color: listening ? AppTheme.colorError : AppTheme.colorMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: hasText
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child: ChambaPrimaryButton(
+                      label: analyzing ? 'Analizando...' : 'Solicitar',
+                      icon: Icons.send_rounded,
+                      onPressed: analyzing ? null : _submit,
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CloseButton extends StatelessWidget {
+  const _CloseButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Cerrar',
+      excludeSemantics: true,
+      child: Material(
+        color: AppTheme.colorText.withValues(alpha: 0.42),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: const SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(Icons.close_rounded, color: Colors.white, size: 24),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BigMicButton extends StatelessWidget {
+  const _BigMicButton({
+    required this.listening,
+    required this.level,
+    required this.pulse,
+    required this.onTap,
+  });
+
+  final bool listening;
+  final double level;
+  final double pulse;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = listening ? AppTheme.colorError : AppTheme.colorPrimary;
+    Widget ring(double progress) => Container(
+          width: 80 + progress * 40,
+          height: 80 + progress * 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: color.withValues(alpha: (1 - progress) * 0.45),
+              width: 2,
+            ),
+          ),
+        );
+
+    return Semantics(
+      button: true,
+      label: listening ? 'Detener dictado' : 'Dictar por voz',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: SizedBox(
+          width: 124,
+          height: 124,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Halo suave permanente.
+              Container(
+                width: 104,
+                height: 104,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.08),
+                ),
+              ),
+              if (listening) ...[ring(pulse), ring((pulse + 0.5) % 1.0)],
+              AnimatedScale(
+                scale: listening ? 1.0 + level * 0.15 : 1.0,
+                duration: const Duration(milliseconds: 120),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: listening
+                          ? const [Color(0xFFF0505F), Color(0xFFC81E3A)]
+                          : const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.38),
+                        blurRadius: 22,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: Colors.white,
+                    size: 34,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestionChip extends StatelessWidget {
+  const _SuggestionChip({required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.78),
+      shape: StadiumBorder(
+        side: BorderSide(color: AppTheme.colorPrimary.withValues(alpha: 0.12)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: AppTheme.colorPrimary.withValues(alpha: 0.10),
+        highlightColor: AppTheme.colorPrimary.withValues(alpha: 0.06),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+          child: Text(
+            '“$text”',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.colorText,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

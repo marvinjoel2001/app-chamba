@@ -108,12 +108,12 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ? [
             IncomingRequestScreen(isActive: currentIndex == 0),
             WalletScreen(onFindJobs: () => setState(() => currentIndex = 0)),
-            const MessagesScreen(),
+            MessagesScreen(isActive: currentIndex == _messagesTabIndex),
             const ProfileMenuScreen(),
           ]
         : [
             ExploreScreen(role: widget.role),
-            const MessagesScreen(),
+            MessagesScreen(isActive: currentIndex == _messagesTabIndex),
             const ProfileMenuScreen(),
           ];
 
@@ -140,17 +140,23 @@ class _MainShellScreenState extends State<MainShellScreen> {
             ),
           )),
         ]),
-        bottomNavigationBar: ValueListenableBuilder<int>(
-          valueListenable: UnreadMessagesNotifier.instance,
-          builder: (context, unreadCount, _) {
+        // La pestaña "Notificaciones" cuenta avisos y mensajes de chat sin leer.
+        bottomNavigationBar: ListenableBuilder(
+          listenable: Listenable.merge([
+            UnreadMessagesNotifier.instance,
+            UnreadNotificationsNotifier.instance,
+          ]),
+          builder: (context, _) {
             return ChambaBottomNavWithBadge(
               role: widget.role,
               currentIndex: currentIndex,
-              unreadCount: unreadCount,
+              unreadCount: UnreadMessagesNotifier.instance.value +
+                  UnreadNotificationsNotifier.instance.value,
               messagesTabIndex: _messagesTabIndex,
               onTap: (index) {
                 if (index == _messagesTabIndex) {
                   UnreadMessagesNotifier.instance.refresh();
+                  UnreadNotificationsNotifier.instance.refresh();
                 }
                 setState(() {
                   currentIndex = index;

@@ -56,7 +56,7 @@ class NotificationRouter {
     if (requestId != null && (deepLink.startsWith('/request') || [
       'request_new', 'offer_new', 'offer_accepted', 'counter_offer', 'offer_client_counter', 'arrival_confirmed',
       'worker_arrived', 'job_finished', 'job_cancelled', 'job_starting_soon', 'request_timeout',
-      'offer_rejected', 'request_closed', 'agency_offer_sent', 'improve_offer_reminder'].contains(type))) {
+      'offer_rejected', 'request_closed', 'agency_offer_sent', 'improve_offer_reminder', 'payment_received', 'payment'].contains(type))) {
       _openRequest(requestId, type);
       return true;
     }
@@ -161,14 +161,22 @@ class NotificationRouter {
       final job = response['request'] as Map<String, dynamic>;
       final status = job['requestStatus'];
       final worker = SessionStore.currentUser?.type == 'worker';
-      final terminal = status == 'cancelled' || status == 'completed' || status == 'expired' || ['offer_rejected', 'request_closed', 'request_timeout'].contains(type);
-      final Widget screen = terminal ? RequestOutcomeScreen(requestId: requestId)
-        : status == 'assigned' ? (worker ? JobInProgressScreen(requestId: requestId) : TrackingScreen(requestId: requestId))
-        : worker ? IncomingRequestScreen(focusRequestId: requestId) : RequestStatusScreen(requestId: requestId);
-      _pushUnlessOnTop(nav, screen, 'notif:request:' + requestId + ':' + status.toString());
+      final screen = destinationForRequest(requestId: requestId, status: status?.toString() ?? '', type: type, isWorker: worker);
+      _pushUnlessOnTop(nav, screen, 'notif:request:$requestId:$status');
     } catch (_) {
       ToastService.show(title: 'No pudimos abrir la solicitud', body: 'Revisa tu conexión o consulta tus notificaciones.', type: ToastType.info);
     }
+  }
+
+  @visibleForTesting
+  static Widget destinationForRequest({required String requestId, required String status, required String type, required bool isWorker}) {
+    final terminal = ['cancelled', 'completed', 'expired'].contains(status) ||
+        ['offer_rejected', 'request_closed', 'request_timeout'].contains(type);
+    if (terminal) return RequestOutcomeScreen(requestId: requestId);
+    if (status == 'assigned' || status == 'in_progress') {
+      return isWorker ? JobInProgressScreen(requestId: requestId) : TrackingScreen(requestId: requestId);
+    }
+    return isWorker ? IncomingRequestScreen(focusRequestId: requestId) : RequestStatusScreen(requestId: requestId);
   }
 
   /// Evita apilar la misma pantalla varias veces cuando el usuario toca

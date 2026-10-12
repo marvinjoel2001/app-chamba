@@ -125,9 +125,7 @@ class _MessagesPreview extends StatelessWidget {
         body: MessagesInbox(
           threads: _threads,
           notifications: _notifications.take(4).toList(),
-          unreadNotifications: 2,
           onRefresh: () async {},
-          onNotifications: () {},
           onNotification: (_) {},
           onThread: (_) {},
         ),

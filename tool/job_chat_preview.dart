@@ -166,10 +166,8 @@ class _PreviewState extends State<_Preview> {
         body: index == 0
             ? MessagesInbox(
                 threads: const [],
-                notifications: previewNotifications(),
-                unreadNotifications: 7,
-                onRefresh: () async {},
-                onNotifications: () {},
+                notifications: previewNotifications(),
+                onRefresh: () async {},
                 onNotification: (_) {},
                 onThread: (_) {})
             : chat(closed: index == 2),

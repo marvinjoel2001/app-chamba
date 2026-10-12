@@ -104,6 +104,7 @@ flutter:
     - assets/images/chat/
     - assets/images/modalities/
     - assets/images/request/
+    - assets/images/notifications/
     - assets/legal/
     - assets/sounds/mic_start.wav
     - assets/sounds/mic_stop.wav

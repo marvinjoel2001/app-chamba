@@ -5,9 +5,19 @@ import '../../features/notifications/data/notifications_service.dart';
 import 'session_store.dart';
 
 class UnreadNotificationsNotifier extends ValueNotifier<int> {
-  UnreadNotificationsNotifier._() : super(0) {
+  UnreadNotificationsNotifier._()
+      : _loadCount = NotificationsService.getUnreadCount,
+        super(0) {
     _startPolling();
   }
+
+  @visibleForTesting
+  UnreadNotificationsNotifier.forTesting({
+    required Future<int> Function() loadCount,
+  })  : _loadCount = loadCount,
+        super(0);
+
+  final Future<int> Function() _loadCount;
 
   static final UnreadNotificationsNotifier instance =
       UnreadNotificationsNotifier._();
@@ -23,9 +33,30 @@ class UnreadNotificationsNotifier extends ValueNotifier<int> {
 
   Future<void> refresh() => _fetchCount();
 
-  bool _fetching = false;
-  Future<void> _fetchCount() async {
-    if (_fetching) return;
+  Future<void>? _refreshTask;
+  bool _refreshAgain = false;
+
+  Future<void> _fetchCount() {
+    final pending = _refreshTask;
+    if (pending != null) {
+      // A socket event may arrive after the in-flight request read the count.
+      // Fetch again rather than dropping that event until the next poll.
+      _refreshAgain = true;
+      return pending;
+    }
+    return _refreshTask = _refreshUntilCurrent().whenComplete(() {
+      _refreshTask = null;
+    });
+  }
+
+  Future<void> _refreshUntilCurrent() async {
+    do {
+      _refreshAgain = false;
+      await _fetchOnce();
+    } while (_refreshAgain);
+  }
+
+  Future<void> _fetchOnce() async {
     if (!SessionStore.isLoggedIn) {
       if (value != 0) {
         value = 0;
@@ -35,11 +66,15 @@ class UnreadNotificationsNotifier extends ValueNotifier<int> {
     }
 
     final userId = SessionStore.currentUser?.id;
-    _fetching = true;
     try {
-      final count = await NotificationsService.getUnreadCount();
-      if (SessionStore.currentUser?.id == userId && count != value) { value = count; await _updateAppBadge(count); }
-    } catch (_) {} finally { _fetching = false; }
+      final count = await _loadCount();
+      if (SessionStore.currentUser?.id == userId && count != value) {
+        value = count;
+        await _updateAppBadge(count);
+      }
+    } catch (_) {
+      // Keep the last confirmed count during an outage.
+    }
   }
 
   Future<void> markAllAsRead() async {
