@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
@@ -23,29 +24,32 @@ class ChambaBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
-      child: Stack(
-        children: [
-          if (showGrid) const _DotGrid(),
-          Positioned(
-            top: -130,
-            left: -125,
-            child: _GlowCircle(
-              size: 240,
-              color: AppTheme.colorPrimary.withValues(alpha: 0.05),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Container(
+        decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
+        child: Stack(
+          children: [
+            if (showGrid) const _DotGrid(),
+            Positioned(
+              top: -130,
+              left: -125,
+              child: _GlowCircle(
+                size: 240,
+                color: AppTheme.colorPrimary.withValues(alpha: 0.05),
+              ),
             ),
-          ),
-          Positioned(
-            bottom: -140,
-            right: -130,
-            child: _GlowCircle(
-              size: 250,
-              color: AppTheme.colorHighlight.withValues(alpha: 0.05),
+            Positioned(
+              bottom: -140,
+              right: -130,
+              child: _GlowCircle(
+                size: 250,
+                color: AppTheme.colorHighlight.withValues(alpha: 0.05),
+              ),
             ),
-          ),
-          child,
-        ],
+            child,
+          ],
+        ),
       ),
     );
   }

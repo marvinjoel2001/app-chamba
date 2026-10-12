@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/worker_background_service.dart';
@@ -126,39 +127,43 @@ class _MainShellScreenState extends State<MainShellScreen> {
     // Tema claro para mensajes y perfil, oscuro para el resto
     final theme = isLightTab ? AppTheme.light() : AppTheme.dark();
 
-    return Theme(
-      data: theme,
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: IndexedStack(
-          index: currentIndex,
-          children: List.generate(
-            pages.length,
-            (i) => _visitedIndices.contains(i)
-                ? pages[i]
-                : const SizedBox.shrink(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value:
+          isLightTab ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      child: Theme(
+        data: theme,
+        child: Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          body: IndexedStack(
+            index: currentIndex,
+            children: List.generate(
+              pages.length,
+              (i) => _visitedIndices.contains(i)
+                  ? pages[i]
+                  : const SizedBox.shrink(),
+            ),
           ),
-        ),
-        bottomNavigationBar: ValueListenableBuilder<int>(
-          valueListenable: UnreadMessagesNotifier.instance,
-          builder: (context, unreadCount, _) {
-            return ChambaBottomNavWithBadge(
-              role: widget.role,
-              currentIndex: currentIndex,
-              unreadCount: unreadCount,
-              messagesTabIndex: _messagesTabIndex,
-              isLightTheme: isLightTab,
-              onTap: (index) {
-                if (index == _messagesTabIndex) {
-                  UnreadMessagesNotifier.instance.refresh();
-                }
-                setState(() {
-                  currentIndex = index;
-                  _visitedIndices.add(index);
-                });
-              },
-            );
-          },
+          bottomNavigationBar: ValueListenableBuilder<int>(
+            valueListenable: UnreadMessagesNotifier.instance,
+            builder: (context, unreadCount, _) {
+              return ChambaBottomNavWithBadge(
+                role: widget.role,
+                currentIndex: currentIndex,
+                unreadCount: unreadCount,
+                messagesTabIndex: _messagesTabIndex,
+                isLightTheme: isLightTab,
+                onTap: (index) {
+                  if (index == _messagesTabIndex) {
+                    UnreadMessagesNotifier.instance.refresh();
+                  }
+                  setState(() {
+                    currentIndex = index;
+                    _visitedIndices.add(index);
+                  });
+                },
+              );
+            },
+          ),
         ),
       ),
     );
