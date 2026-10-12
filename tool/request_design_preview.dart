@@ -8,7 +8,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: AppTheme.dark(),
+    theme: AppTheme.light(),
     home: Builder(
         builder: (context) => Scaffold(
               appBar: AppBar(title: const Text('Vista de diseño · QA')),

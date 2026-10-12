@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
@@ -8,8 +9,6 @@ import '../../../../core/services/app_permissions_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
-import '../../../worker/presentation/state/worker_dependencies.dart';
-import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../auth/presentation/screens/blocked_screen.dart';
 import 'required_permissions_screen.dart';
@@ -83,35 +82,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
     Widget nextScreen = MainShellScreen(role: user.type);
 
-    if (user.type == 'worker') {
-      final result = await WorkerDependencies.getWorkerSkills(
-        workerUserId: user.id,
-      );
-      var shouldOpenSkills = false;
-      result.fold(
-        onSuccess: (skills) {
-          shouldOpenSkills = skills.isEmpty;
-        },
-        onFailure: (_) {},
-      );
-      if (!mounted) {
-        return;
-      }
-      if (shouldOpenSkills) {
-        nextScreen = const SkillsSelectionScreen(forceToHomeAfterSave: true);
-      }
-    }
-
     if (!mounted) {
       return;
     }
 
-    final allPermissionsGranted =
+    final allPermissionsGranted = user.needsWorkerVerification ||
         await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
     if (!mounted) {
       return;
     }
-    final promptRecommended = allPermissionsGranted &&
+    final promptRecommended = !user.needsWorkerVerification &&
+        allPermissionsGranted &&
         await AppPermissionsService.shouldPromptRecommendedPermissions(
           user.type,
         );
@@ -119,7 +100,8 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
     if (!allPermissionsGranted || promptRecommended) {
-      nextScreen = RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
+      nextScreen =
+          RequiredPermissionsScreen(role: user.type, nextScreen: nextScreen);
     }
 
     _go(nextScreen);
@@ -142,116 +124,134 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/backgrounds/backgroundSplash.png'),
-            fit: BoxFit.cover,
+      backgroundColor: AppTheme.colorBackground,
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: AppTheme.systemOverlay,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image:
+                  AssetImage('assets/images/backgrounds/backgroundSplash.png'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Spacer(),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.colorPrimary.withValues(alpha: 0.5),
-                          blurRadius: 50,
-                          spreadRadius: 15,
+          // Velo claro sobre la foto: se intuyen los trabajadores de fondo
+          // pero la pantalla se lee como modo claro.
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.92),
+                  const Color(0xFFF7F6FC).withValues(alpha: 0.93),
+                  const Color(0xFFF7F6FC),
+                ],
+                stops: const [0, 0.6, 1],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Spacer(),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  AppTheme.colorPrimary.withValues(alpha: 0.22),
+                              blurRadius: 60,
+                              spreadRadius: 10,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.colorGlassDarkSoft,
-                      ),
-                      padding: const EdgeInsets.all(28),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/icon/icon.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  Text(
-                    'Chamba',
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      shadows: [
-                        BoxShadow(
-                          color: AppTheme.colorPrimary.withValues(alpha: 0.6),
-                          blurRadius: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: 220,
-                    child: Column(
-                      children: [
-                        LinearProgressIndicator(
-                          value: progress,
-                          color: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          minHeight: 5,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        const SizedBox(height: 20),
-                        AnimatedOpacity(
-                          opacity: progress > 0.1 ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: Column(
-                            children: [
-                              Text(
-                                _statusText,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.7),
-                                      letterSpacing: 1.2,
-                                    ),
-                              ),
-                              if (_isSlowBackend) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Esto puede tomar hasta 30 segundos',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.colorHighlight
-                                            .withOpacity(0.8),
-                                        fontSize: 11,
-                                      ),
-                                ),
-                              ],
-                            ],
+                        child: Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border:
+                                Border.all(color: AppTheme.colorGlassBorder),
+                          ),
+                          padding: const EdgeInsets.all(28),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/icon/icon.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 40),
+                      Text(
+                        'Chamba',
+                        style:
+                            Theme.of(context).textTheme.displayLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.colorText,
+                                  letterSpacing: -0.5,
+                                ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        width: 220,
+                        child: Column(
+                          children: [
+                            LinearProgressIndicator(
+                              value: progress,
+                              color: AppTheme.colorPrimary,
+                              backgroundColor: AppTheme.colorPrimaryTint,
+                              minHeight: 5,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            const SizedBox(height: 20),
+                            AnimatedOpacity(
+                              opacity: progress > 0.1 ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _statusText,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: AppTheme.colorMuted,
+                                          letterSpacing: 1.2,
+                                        ),
+                                  ),
+                                  if (_isSlowBackend) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Esto puede tomar hasta 30 segundos',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: AppTheme.colorHighlightInk,
+                                            fontSize: 11,
+                                          ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 60),
+                    ],
                   ),
-                  const SizedBox(height: 60),
-                ],
+                ),
               ),
             ),
           ),

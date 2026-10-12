@@ -13,6 +13,7 @@ import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
 import '../../../worker/presentation/screens/wallet_screen.dart';
 import '../../../worker/presentation/screens/profile_menu_screen.dart';
+import '../../../worker/presentation/screens/worker_onboarding_banner.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({required this.role, super.key});
@@ -66,7 +67,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     }
 
     final data = payload is Map
-        ? Map<String, dynamic>.from(payload as Map)
+        ? Map<String, dynamic>.from(payload)
         : <String, dynamic>{};
     final nextVerificationStatus = data['verificationStatus']?.toString() ??
         currentUser.verificationStatus;
@@ -97,6 +98,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     );
 
     await SessionStore.setCurrentUser(updatedUser);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -119,22 +121,16 @@ class _MainShellScreenState extends State<MainShellScreen> {
       currentIndex = pages.length - 1;
     }
 
-    // Detectar si está en la pestaña de mensajes
-    final isOnMessagesTab = currentIndex == _messagesTabIndex;
-    final isOnProfileTab = currentIndex == pages.length - 1;
-    final isLightTab = isOnMessagesTab || isOnProfileTab;
-
-    // Tema claro para mensajes y perfil, oscuro para el resto
-    final theme = isLightTab ? AppTheme.light() : AppTheme.dark();
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value:
-          isLightTab ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-      child: Theme(
-        data: theme,
-        child: Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          body: IndexedStack(
+      value: AppTheme.systemOverlay,
+      child: Scaffold(
+        backgroundColor: AppTheme.colorBackground,
+        body: Column(children: [
+          if (isWorker)
+            WorkerOnboardingBanner(
+                key: ValueKey(SessionStore.currentUser?.verificationStatus)),
+          Expanded(
+              child: IndexedStack(
             index: currentIndex,
             children: List.generate(
               pages.length,
@@ -142,28 +138,27 @@ class _MainShellScreenState extends State<MainShellScreen> {
                   ? pages[i]
                   : const SizedBox.shrink(),
             ),
-          ),
-          bottomNavigationBar: ValueListenableBuilder<int>(
-            valueListenable: UnreadMessagesNotifier.instance,
-            builder: (context, unreadCount, _) {
-              return ChambaBottomNavWithBadge(
-                role: widget.role,
-                currentIndex: currentIndex,
-                unreadCount: unreadCount,
-                messagesTabIndex: _messagesTabIndex,
-                isLightTheme: isLightTab,
-                onTap: (index) {
-                  if (index == _messagesTabIndex) {
-                    UnreadMessagesNotifier.instance.refresh();
-                  }
-                  setState(() {
-                    currentIndex = index;
-                    _visitedIndices.add(index);
-                  });
-                },
-              );
-            },
-          ),
+          )),
+        ]),
+        bottomNavigationBar: ValueListenableBuilder<int>(
+          valueListenable: UnreadMessagesNotifier.instance,
+          builder: (context, unreadCount, _) {
+            return ChambaBottomNavWithBadge(
+              role: widget.role,
+              currentIndex: currentIndex,
+              unreadCount: unreadCount,
+              messagesTabIndex: _messagesTabIndex,
+              onTap: (index) {
+                if (index == _messagesTabIndex) {
+                  UnreadMessagesNotifier.instance.refresh();
+                }
+                setState(() {
+                  currentIndex = index;
+                  _visitedIndices.add(index);
+                });
+              },
+            );
+          },
         ),
       ),
     );

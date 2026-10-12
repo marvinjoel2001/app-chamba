@@ -235,7 +235,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           duration: const Duration(seconds: 8),
           action: SnackBarAction(
             label: 'Editar',
-            textColor: const Color(0xFF00D26A),
+            textColor: AppTheme.colorSuccess,
             onPressed: () {
               _sendImproveOffer(promptDialog: true);
             },
@@ -601,7 +601,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error al aceptar oferta: $e'), backgroundColor: Colors.red));
+      ).showSnackBar(SnackBar(content: Text('Error al aceptar oferta: $e'), backgroundColor: AppTheme.colorError));
     } finally {
       if (mounted) setState(() => _acceptingOffer = false);
     }
@@ -630,31 +630,31 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF151D29),
+      backgroundColor: Colors.white,
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text('Más recientes', style: TextStyle(color: Colors.white)),
-                trailing: _sortBy == 'recent' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                title: const Text('Más recientes', style: TextStyle(color: AppTheme.colorText)),
+                trailing: _sortBy == 'recent' ? const Icon(Icons.check, color: AppTheme.colorPrimary) : null,
                 onTap: () {
                   setState(() => _sortBy = 'recent');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                title: const Text('Menor precio', style: TextStyle(color: Colors.white)),
-                trailing: _sortBy == 'lowest_price' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                title: const Text('Menor precio', style: TextStyle(color: AppTheme.colorText)),
+                trailing: _sortBy == 'lowest_price' ? const Icon(Icons.check, color: AppTheme.colorPrimary) : null,
                 onTap: () {
                   setState(() => _sortBy = 'lowest_price');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                title: const Text('Mayor precio', style: TextStyle(color: Colors.white)),
-                trailing: _sortBy == 'highest_price' ? const Icon(Icons.check, color: Color(0xFF8A2BE2)) : null,
+                title: const Text('Mayor precio', style: TextStyle(color: AppTheme.colorText)),
+                trailing: _sortBy == 'highest_price' ? const Icon(Icons.check, color: AppTheme.colorPrimary) : null,
                 onTap: () {
                   setState(() => _sortBy = 'highest_price');
                   Navigator.pop(context);
@@ -696,7 +696,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('💰 ¡Oferta mejorada a Bs ${_draftBudget.toStringAsFixed(2)}! Notificando a trabajadores...'),
-          backgroundColor: const Color(0xFF00D26A),
+          backgroundColor: AppTheme.colorSuccess,
         ),
       );
       await _load();
@@ -736,15 +736,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF151D29),
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
             children: [
-              Icon(Icons.monetization_on_outlined, color: Color(0xFF00D26A)),
+              Icon(Icons.monetization_on_outlined, color: AppTheme.colorSuccess),
               SizedBox(width: 8),
               Text(
                 'Mejorar oferta',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppTheme.colorText, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -764,9 +764,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       padding: const EdgeInsets.all(10),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: AppTheme.colorText.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        border: Border.all(color: AppTheme.colorText.withValues(alpha: 0.1)),
                       ),
                       child: Text(
                         'Oferta actual:\n'
@@ -795,26 +795,26 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     controller: controller,
                     keyboardType: TextInputType.number,
                     autofocus: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: AppTheme.colorText, fontSize: 18, fontWeight: FontWeight.bold),
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
                       prefixText: 'Bs ',
-                      prefixStyle: const TextStyle(color: Color(0xFF00D26A), fontSize: 18, fontWeight: FontWeight.bold),
+                      prefixStyle: const TextStyle(color: AppTheme.colorSuccess, fontSize: 18, fontWeight: FontWeight.bold),
                       labelText: units > 0
                           ? 'Nuevo monto TOTAL del trabajo'
                           : 'Nueva oferta',
                       labelStyle: const TextStyle(color: AppTheme.colorMuted),
                       hintText: 'Ej. ${(suggested + 10).toInt()}',
-                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      hintStyle: TextStyle(color: AppTheme.colorText.withValues(alpha: 0.3)),
                       helperText: 'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(2)}',
-                      helperStyle: TextStyle(color: isInvalid ? Colors.orangeAccent : const Color(0xFF00D26A)),
+                      helperStyle: TextStyle(color: isInvalid ? AppTheme.colorWarning : AppTheme.colorSuccess),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                        borderSide: BorderSide(color: AppTheme.colorText.withValues(alpha: 0.2)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFF00D26A), width: 2),
+                        borderSide: const BorderSide(color: AppTheme.colorSuccess, width: 2),
                       ),
                     ),
                   ),
@@ -837,11 +837,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+              child: const Text('Cancelar', style: TextStyle(color: AppTheme.colorMuted)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D26A),
+                backgroundColor: AppTheme.colorSuccess,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -902,7 +902,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   void _showCancelConfirmation() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF151D29),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -916,21 +916,21 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withValues(alpha: 0.1),
+                    color: AppTheme.colorError.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 40),
+                  child: const Icon(Icons.delete_outline, color: AppTheme.colorError, size: 40),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   '¿Cancelar solicitud?',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppTheme.colorText, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Se cancelará la búsqueda y todos los trabajadores dejarán de recibir esta solicitud.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+                  style: TextStyle(color: AppTheme.colorText.withValues(alpha: 0.7), fontSize: 14),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -941,7 +941,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       _cancelRequest();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
+                      backgroundColor: AppTheme.colorError,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -957,7 +957,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('No, volver', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    child: const Text('No, volver', style: TextStyle(color: AppTheme.colorText, fontSize: 16)),
                   ),
                 ),
               ],
@@ -981,7 +981,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   void _showRequestMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF151D29),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -995,31 +995,31 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppTheme.colorText.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 16),
 
               ListTile(
-                leading: const Icon(Icons.monetization_on_outlined, color: Color(0xFF00D26A), size: 20),
-                title: const Text('Mejorar presupuesto', style: TextStyle(color: Colors.white)),
+                leading: const Icon(Icons.monetization_on_outlined, color: AppTheme.colorSuccess, size: 20),
+                title: const Text('Mejorar presupuesto', style: TextStyle(color: AppTheme.colorText)),
                 onTap: () {
                   Navigator.pop(context);
                   _sendImproveOffer(promptDialog: true);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.share, color: Colors.white, size: 20),
-                title: const Text('Compartir solicitud', style: TextStyle(color: Colors.white)),
+                leading: const Icon(Icons.share, color: AppTheme.colorText, size: 20),
+                title: const Text('Compartir solicitud', style: TextStyle(color: AppTheme.colorText)),
                 onTap: () {
                   Navigator.pop(context);
                   _shareRequest();
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                title: const Text('Cancelar solicitud', style: TextStyle(color: Colors.redAccent)),
+                leading: const Icon(Icons.delete_outline, color: AppTheme.colorError, size: 20),
+                title: const Text('Cancelar solicitud', style: TextStyle(color: AppTheme.colorError)),
                 onTap: () {
                   Navigator.pop(context);
                   _showCancelConfirmation();
@@ -1038,7 +1038,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     if (_isCancelling) {
       return const Scaffold(
         backgroundColor: AppTheme.colorBackground,
-        body: Center(child: CircularProgressIndicator(color: Colors.redAccent)),
+        body: Center(child: CircularProgressIndicator(color: AppTheme.colorError)),
       );
     }
     final lat = widget.latitude ?? -16.5002;
@@ -1065,7 +1065,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     children: [
                       TileLayer(
                         urlTemplate:
-                            'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                            'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                         userAgentPackageName: 'com.chambatrabajo.app',
                         additionalOptions: {
                           'accessToken': AppConfig.mapboxAccessToken,
@@ -1086,12 +1086,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                             polylines: [
                               Polyline(
                                 points: visiblePoints,
-                                color: const Color(0xFF8A2BE2).withValues(alpha: 0.3),
+                                color: AppTheme.colorPrimary.withValues(alpha: 0.3),
                                 strokeWidth: 12.0, // Glow
                               ),
                               Polyline(
                                 points: visiblePoints,
-                                color: const Color(0xFF8A2BE2),
+                                color: AppTheme.colorPrimary,
                                 strokeWidth: 3.0,
                               ),
                             ],
@@ -1111,7 +1111,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                   painter: _RadarWavePainter(
                                     center: mapCenter,
                                     waves: _radarWaves.map((a) => a.value).toList(),
-                                    color: const Color(0xFF8A2BE2),
+                                    color: AppTheme.colorPrimary,
                                   ),
                                   size: const Size(300, 300),
                                 );
@@ -1131,7 +1131,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                               child: Container(
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Color(0xFF8A2BE2),
+                                  color: AppTheme.colorPrimary,
                                 ),
                               ),
                             ),
@@ -1154,6 +1154,25 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                   ),
           ),
 
+          // Velo superior para que el título se lea sobre el mapa claro.
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 190,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xF5F7F6FC), Color(0x00F7F6FC)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ── HEADER SUPERIOR ──────────────────────────
           Positioned(
             top: 0,
@@ -1167,9 +1186,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
                       style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF151D29).withValues(alpha: 0.8),
+                        backgroundColor: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                     Expanded(
@@ -1182,7 +1201,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     ? 'Problema de conexión'
                                     : 'Buscando trabajadores...',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppTheme.colorText,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1195,7 +1214,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     : 'Estamos conectando con los mejores\nperfiles cerca de ti'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: AppTheme.colorText.withValues(alpha: 0.7),
                               fontSize: 13,
                             ),
                           ),
@@ -1212,9 +1231,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           ),
                         );
                       },
-                      icon: const Icon(Icons.help_outline, color: Colors.white),
+                      icon: const Icon(Icons.help_outline, color: AppTheme.colorText),
                       style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF151D29).withValues(alpha: 0.8),
+                        backgroundColor: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -1239,8 +1258,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     bottom: 0,
                     child: Container(
                       decoration: const BoxDecoration(
-                        color: Color(0xFF151D29),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)), boxShadow: AppTheme.shadowLg,
                       ),
                       child: Column(
                       children: [
@@ -1249,14 +1268,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: AppTheme.colorText.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         const SizedBox(height: 16),
                         Expanded(
                           child: _loading && offers.isEmpty
-                              ? const Center(child: CircularProgressIndicator())
+                              ? const SkeletonList(count: 3, lines: 3, trailing: true, padding: EdgeInsets.zero)
                               : RefreshIndicator(
                                   onRefresh: _load,
                                   child: ListView(
@@ -1270,7 +1289,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                         const Text(
                                           'Ofertas recibidas',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: AppTheme.colorText,
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1280,14 +1299,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF8A2BE2)
+                                            color: AppTheme.colorPrimary
                                                 .withValues(alpha: 0.2),
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
                                             '${offers.length}',
                                             style: const TextStyle(
-                                              color: Color(0xFF8A2BE2),
+                                              color: AppTheme.colorPrimary,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -1296,14 +1315,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                         TextButton.icon(
                                           onPressed: _showSortOptions,
                                           icon: const Icon(Icons.tune,
-                                              color: Colors.white, size: 16),
+                                              color: AppTheme.colorPrimary, size: 16),
                                           label: Text(
                                             _sortBy == 'lowest_price' ? 'Menor precio' : 
                                             _sortBy == 'highest_price' ? 'Mayor precio' : 'Más recientes',
-                                            style: const TextStyle(color: Colors.white),
+                                            style: const TextStyle(color: AppTheme.colorPrimary),
                                           ),
                                           style: TextButton.styleFrom(
-                                            backgroundColor: const Color(0xFF1A2436),
+                                            backgroundColor: AppTheme.colorPrimaryTint,
                                             shape: RoundedRectangleBorder(
                                               borderRadius: BorderRadius.circular(8),
                                             ),
@@ -1315,7 +1334,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                     Text(
                                       'Responde y elige la mejor opción',
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.6),
+                                        color: AppTheme.colorText.withValues(alpha: 0.6),
                                         fontSize: 13,
                                       ),
                                     ),
@@ -1331,21 +1350,21 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                               Container(
                                                 padding: const EdgeInsets.all(14),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withValues(alpha: 0.12),
+                                                  color: AppTheme.colorHighlight.withValues(alpha: 0.12),
                                                   shape: BoxShape.circle,
                                                 ),
-                                                child: const Icon(Icons.info_outline_rounded, color: Colors.amberAccent, size: 36),
+                                                child: const Icon(Icons.info_outline_rounded, color: AppTheme.colorHighlightInk, size: 36),
                                               ),
                                               const SizedBox(height: 14),
                                               const Text(
                                                 'Solicitud no disponible',
-                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                                style: TextStyle(color: AppTheme.colorText, fontSize: 16, fontWeight: FontWeight.bold),
                                               ),
                                               const SizedBox(height: 6),
                                               Text(
                                                 _infoMessage!,
                                                 textAlign: TextAlign.center,
-                                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                                                style: TextStyle(color: AppTheme.colorText.withValues(alpha: 0.7), fontSize: 13),
                                               ),
                                               const SizedBox(height: 18),
                                               ChambaSecondaryButton(
@@ -1362,18 +1381,18 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                         margin: const EdgeInsets.only(bottom: 16),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.withValues(alpha: 0.12),
+                                          color: AppTheme.colorError.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+                                          border: Border.all(color: AppTheme.colorError.withValues(alpha: 0.35)),
                                         ),
                                         child: Row(
                                           children: [
-                                            const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                                            const Icon(Icons.warning_amber_rounded, color: AppTheme.colorWarning, size: 20),
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
                                                 _error!,
-                                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                                style: const TextStyle(color: AppTheme.colorText, fontSize: 13),
                                               ),
                                             ),
                                             TextButton(
@@ -1393,21 +1412,21 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                               Container(
                                                 padding: const EdgeInsets.all(14),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.red.withValues(alpha: 0.12),
+                                                  color: AppTheme.colorError.withValues(alpha: 0.12),
                                                   shape: BoxShape.circle,
                                                 ),
-                                                child: const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 36),
+                                                child: const Icon(Icons.cloud_off_rounded, color: AppTheme.colorError, size: 36),
                                               ),
                                               const SizedBox(height: 14),
                                               const Text(
                                                 'Problema de conexión',
-                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                                style: TextStyle(color: AppTheme.colorText, fontSize: 16, fontWeight: FontWeight.bold),
                                               ),
                                               const SizedBox(height: 6),
                                               Text(
                                                 _error!,
                                                 textAlign: TextAlign.center,
-                                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                                                style: TextStyle(color: AppTheme.colorText.withValues(alpha: 0.7), fontSize: 13),
                                               ),
                                               const SizedBox(height: 18),
                                               ChambaSecondaryButton(
@@ -1436,14 +1455,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Icon(Icons.lock_outline,
-                                            color: Colors.white.withValues(alpha: 0.5),
+                                            color: AppTheme.colorText.withValues(alpha: 0.5),
                                             size: 16),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             'Tu información está protegida y solo los trabajadores interesados podrán ver tu solicitud.',
                                             style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.5),
+                                              color: AppTheme.colorText.withValues(alpha: 0.5),
                                               fontSize: 12,
                                             ),
                                           ),
@@ -1468,12 +1487,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A2436),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        border: Border.all(color: AppTheme.colorText.withValues(alpha: 0.05)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: const Color(0x1C1E1B4B),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -1484,7 +1503,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: const BoxDecoration(
-                              color: Color(0xFF8A2BE2),
+                              color: AppTheme.colorPrimary,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.handyman_rounded,
@@ -1499,7 +1518,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                   _request?['title']?.toString() ??
                                       'Cargando solicitud...',
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: AppTheme.colorText,
                                     fontWeight: FontWeight.bold,
                                   ),
                                   maxLines: 2,
@@ -1509,7 +1528,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                 Row(
                                   children: [
                                     Icon(Icons.location_on_outlined,
-                                        color: Colors.white.withValues(alpha: 0.6),
+                                        color: AppTheme.colorText.withValues(alpha: 0.6),
                                         size: 14),
                                     const SizedBox(width: 4),
                                     Expanded(
@@ -1517,7 +1536,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                         _request?['address']?.toString() ??
                                             'Ubicación actual',
                                         style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.6),
+                                          color: AppTheme.colorText.withValues(alpha: 0.6),
                                           fontSize: 12,
                                         ),
                                         maxLines: 1,
@@ -1548,11 +1567,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                               preferBelow: false,
                                               triggerMode: TooltipTriggerMode.tap,
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF151D29).withValues(alpha: 0.9),
+                                                color: Colors.white.withValues(alpha: 0.9),
                                                 borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: const Color(0xFF00D26A).withValues(alpha: 0.5)),
+                                                border: Border.all(color: AppTheme.colorSuccess.withValues(alpha: 0.5)),
                                               ),
-                                              textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+                                              textStyle: const TextStyle(color: AppTheme.colorText, fontSize: 12),
                                               child: ElevatedButton.icon(
                                                 onPressed: _updatingBudget
                                                     ? null
@@ -1563,10 +1582,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                                                 ),
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF00D26A),
+                                                  backgroundColor: AppTheme.colorSuccess,
                                                   foregroundColor: Colors.white,
                                                   elevation: 8,
-                                                  shadowColor: const Color(0xFF00D26A).withValues(alpha: shadowAlpha),
+                                                  shadowColor: AppTheme.colorSuccess.withValues(alpha: shadowAlpha),
                                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                                 ),
@@ -1582,15 +1601,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                             key: const ValueKey('budgetBadge'),
                                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF8A2BE2).withValues(alpha: 0.2),
+                                              color: AppTheme.colorPrimary.withValues(alpha: 0.2),
                                               borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
+                                              border: Border.all(color: AppTheme.colorPrimary.withValues(alpha: 0.5)),
                                             ),
                                             child: Text(
                                               _budgetBadgeText(),
                                               textAlign: TextAlign.center,
                                               style: const TextStyle(
-                                                color: Colors.white,
+                                                color: AppTheme.colorPrimaryDark,
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 13,
                                               ),
@@ -1605,10 +1624,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: const Color(0xFF8A2BE2).withValues(alpha: 0.5)),
+                                    border: Border.all(color: AppTheme.colorPrimary.withValues(alpha: 0.5)),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.more_horiz, color: Color(0xFF8A2BE2), size: 18),
+                                  child: const Icon(Icons.more_horiz, color: AppTheme.colorPrimary, size: 18),
                                 ),
                               ),
                             ],
@@ -1635,16 +1654,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF8A2BE2).withValues(alpha: 0.6),
+                color: AppTheme.colorPrimary.withValues(alpha: 0.6),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),
             ],
           ),
           child: CircleAvatar(
-            backgroundColor: Colors.grey[800],
+            backgroundColor: AppTheme.colorPrimaryTint,
             backgroundImage: (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
-            child: (url == null || url.isEmpty) ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
+            child: (url == null || url.isEmpty) ? const Icon(Icons.person, color: AppTheme.colorPrimary, size: 20) : null,
           ),
         ),
         if (isThinking)
@@ -1710,19 +1729,19 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2436),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: AppTheme.colorText.withValues(alpha: 0.05)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.grey[800],
+            backgroundColor: AppTheme.colorPrimaryTint,
             backgroundImage: avatar != null ? NetworkImage(avatar) : null,
             child: avatar == null
-                ? const Icon(Icons.person, color: Colors.white)
+                ? const Icon(Icons.person, color: AppTheme.colorPrimary)
                 : null,
           ),
           const SizedBox(width: 12),
@@ -1735,7 +1754,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     Text(
                       name.isEmpty ? 'Usuario' : name,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.colorText,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1743,7 +1762,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     if (isVerified) ...[
                       const SizedBox(width: 4),
                       const Icon(Icons.verified,
-                          color: Color(0xFF8A2BE2), size: 16),
+                          color: AppTheme.colorPrimary, size: 16),
                     ],
                   ],
                 ),
@@ -1752,19 +1771,19 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8A2BE2).withOpacity(0.2),
+                      color: AppTheme.colorPrimary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF8A2BE2).withOpacity(0.5)),
+                      border: Border.all(color: AppTheme.colorPrimary.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.business_center, color: Color(0xFF8A2BE2), size: 10),
+                        const Icon(Icons.business_center, color: AppTheme.colorPrimary, size: 10),
                         const SizedBox(width: 4),
                         Text(
                           offer['agencyName'].toString(),
                           style: const TextStyle(
-                            color: Color(0xFF8A2BE2),
+                            color: AppTheme.colorPrimary,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1777,13 +1796,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                 Row(
                   children: [
                     if (rating > 0) ...[
-                      const Icon(Icons.star, color: Colors.orange, size: 14),
+                      const Icon(Icons.star, color: AppTheme.colorWarning, size: 14),
                       const SizedBox(width: 4),
                     ],
                     Text(
                       ratingLabel,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                          color: AppTheme.colorText.withValues(alpha: 0.6), fontSize: 12),
                     ),
                   ],
                 ),
@@ -1794,7 +1813,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         ? 'A menos de 1 km de ti'
                         : 'A ${distanceKm.toStringAsFixed(1)} km de ti',
                     style: const TextStyle(
-                        color: Colors.green,
+                        color: AppTheme.colorSuccess,
                         fontSize: 12,
                         fontWeight: FontWeight.w500),
                   ),
@@ -1808,7 +1827,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               Text(
                 'Bs $amount',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.colorText,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1828,7 +1847,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                       }
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF263346),
+                      backgroundColor: AppTheme.colorSurfaceSoft,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                       minimumSize: Size.zero,
@@ -1836,7 +1855,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                           horizontal: 12, vertical: 8),
                     ),
                     child: const Text('Ver perfil',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
+                        style: TextStyle(color: AppTheme.colorText, fontSize: 12)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
@@ -1844,7 +1863,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         ? null
                         : () => _acceptOffer(item: offer, worker: worker),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8A2BE2),
+                      backgroundColor: AppTheme.colorPrimary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),

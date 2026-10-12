@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -25,7 +23,7 @@ class ChambaBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: AppTheme.systemOverlay,
       child: Container(
         decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: Stack(
@@ -35,16 +33,16 @@ class ChambaBackground extends StatelessWidget {
               top: -130,
               left: -125,
               child: _GlowCircle(
-                size: 240,
-                color: AppTheme.colorPrimary.withValues(alpha: 0.05),
+                size: 260,
+                color: AppTheme.colorPrimary.withValues(alpha: 0.08),
               ),
             ),
             Positioned(
               bottom: -140,
               right: -130,
               child: _GlowCircle(
-                size: 250,
-                color: AppTheme.colorHighlight.withValues(alpha: 0.05),
+                size: 260,
+                color: AppTheme.colorHighlight.withValues(alpha: 0.10),
               ),
             ),
             child,
@@ -71,27 +69,17 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final blur = elevated ? 12.0 : 10.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: elevated ? AppTheme.colorGlassHigh : AppTheme.colorGlass,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: elevated
-                  ? AppTheme.colorGlassBorder
-                  : AppTheme.colorGlassBorder,
-              width: 1,
-            ),
-            boxShadow: elevated ? AppTheme.shadowLg : AppTheme.shadowMd,
-          ),
-          child: child,
-        ),
+    // En modo claro la tarjeta es una superficie blanca opaca: el blur de
+    // fondo ya no se ve y solo costaba GPU en cada frame.
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: elevated ? AppTheme.colorGlassHigh : AppTheme.colorGlass,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: AppTheme.colorGlassBorder, width: 1),
+        boxShadow: elevated ? AppTheme.shadowMd : AppTheme.shadowSm,
       ),
+      child: child,
     );
   }
 }
@@ -129,21 +117,31 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
     final textSize = widget.compact ? 14.0 : 16.0;
     final iconGap = widget.compact ? 8.0 : 10.0;
 
+    final baseColor =
+        widget.isYellow ? AppTheme.colorHighlight : AppTheme.colorPrimary;
+    final pressedColor =
+        widget.isYellow ? const Color(0xFFE0A200) : AppTheme.colorPrimaryDark;
+
     final decoration = BoxDecoration(
       borderRadius: BorderRadius.circular(16),
-      color: widget.isYellow ? AppTheme.colorHighlight : AppTheme.colorPrimary,
+      color: enabled
+          ? (_pressed ? pressedColor : baseColor)
+          : const Color(0xFFDCD7E8),
       border: null,
       boxShadow: enabled
           ? (_pressed
               ? AppTheme.shadowSm
               : widget.isYellow
                   ? AppTheme.shadowYellow
-                  : AppTheme.shadowMd)
+                  : AppTheme.shadowPrimary)
           : const [],
     );
 
-    final foreground =
-        widget.isYellow ? AppTheme.colorBackground : AppTheme.colorTextOnPurple;
+    final foreground = !enabled
+        ? AppTheme.colorMuted
+        : widget.isYellow
+            ? AppTheme.colorText
+            : AppTheme.colorTextOnPurple;
 
     return Semantics(
       button: true,
@@ -166,8 +164,10 @@ class _ChambaPrimaryButtonState extends State<ChambaPrimaryButton> {
           scale: _pressed ? 0.97 : 1,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 150),
-            opacity: enabled ? 1 : 0.6,
-            child: Container(
+            opacity: enabled ? 1 : 0.85,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
               constraints: BoxConstraints(minHeight: minHeight),
               decoration: decoration,
               padding: EdgeInsets.symmetric(
@@ -235,16 +235,17 @@ class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
 
     final decoration = BoxDecoration(
       borderRadius: BorderRadius.circular(16),
-      color: _pressed
-          ? Colors.white.withValues(alpha: 0.12)
-          : AppTheme.colorGlassInputSoft,
+      color: _pressed ? AppTheme.colorPrimaryTint : Colors.white,
       border: Border.all(
-        color: AppTheme.colorGlassBorderSoft,
-        width: 1,
+        color: _pressed
+            ? AppTheme.colorPrimary.withValues(alpha: 0.35)
+            : AppTheme.colorGlassBorderSoft,
+        width: 1.2,
       ),
+      boxShadow: _pressed ? const [] : AppTheme.shadowSm,
     );
 
-    const foreground = Colors.white;
+    final foreground = _pressed ? AppTheme.colorPrimary : AppTheme.colorText;
 
     return Semantics(
       button: true,
@@ -267,8 +268,10 @@ class _ChambaSecondaryButtonState extends State<ChambaSecondaryButton> {
           scale: _pressed ? 0.97 : 1,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 150),
-            opacity: enabled ? 1 : 0.6,
-            child: Container(
+            opacity: enabled ? 1 : 0.5,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
               constraints: BoxConstraints(minHeight: minHeight),
               decoration: decoration,
               padding: EdgeInsets.symmetric(
@@ -397,7 +400,7 @@ class ChambaBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = role == 'worker' ? _workerItems : _clientItems;
-    return _buildNav(context, items, currentIndex, onTap, 0, null, false);
+    return _buildNav(context, items, currentIndex, onTap, 0, null);
   }
 }
 
@@ -409,7 +412,6 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
     required this.unreadCount,
     required this.messagesTabIndex,
     required this.onTap,
-    this.isLightTheme = false,
     super.key,
   });
 
@@ -418,7 +420,6 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
   final int unreadCount;
   final int messagesTabIndex;
   final ValueChanged<int> onTap;
-  final bool isLightTheme;
 
   static const _clientItems = [
     _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
@@ -443,7 +444,6 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
       onTap,
       messagesTabIndex,
       unreadCount,
-      isLightTheme,
     );
   }
 }
@@ -455,18 +455,7 @@ Widget _buildNav(
   ValueChanged<int> onTap,
   int badgeIndex,
   int? badgeCount,
-  bool isLightTheme,
 ) {
-  final bgColor = isLightTheme ? Colors.white : AppTheme.colorBackgroundAlt;
-  final borderColor =
-      isLightTheme ? const Color(0xFFE2E8F0) : AppTheme.colorGlassBorderSoft;
-  final shadow = isLightTheme
-      ? const [
-          BoxShadow(
-              color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 4))
-        ]
-      : AppTheme.shadowMd;
-
   return RepaintBoundary(
     child: SafeArea(
       top: false,
@@ -475,10 +464,10 @@ Widget _buildNav(
         height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: bgColor,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: borderColor),
-          boxShadow: shadow,
+          border: Border.all(color: AppTheme.colorGlassBorder),
+          boxShadow: AppTheme.shadowMd,
         ),
         child: Row(
           children: List.generate(items.length, (index) {
@@ -492,7 +481,6 @@ Widget _buildNav(
                 selected: selected,
                 badgeCount: showBadge ? badgeCount : null,
                 onTap: () => onTap(index),
-                isLightTheme: isLightTheme,
               ),
             );
           }),
@@ -516,7 +504,6 @@ class _BottomNavItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.badgeCount,
-    this.isLightTheme = false,
   });
 
   final IconData icon;
@@ -524,68 +511,84 @@ class _BottomNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final int? badgeCount;
-  final bool isLightTheme;
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = selected
-        ? AppTheme.colorPrimary
-        : (isLightTheme ? const Color(0xFF64748B) : AppTheme.colorMuted);
-    final labelColor =
-        isLightTheme ? const Color(0xFF64748B) : AppTheme.colorMuted;
+    final color = selected ? AppTheme.colorPrimary : AppTheme.colorMuted;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(100),
-      onTap: onTap,
-      child: SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, size: 24, color: iconColor),
-                if (badgeCount != null && badgeCount! > 0)
-                  Positioned(
-                    top: -6,
-                    right: -10,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.colorError,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        badgeCount! > 99 ? '99+' : '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(
+                  horizontal: selected ? 18 : 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppTheme.colorPrimaryTint
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(icon, size: 24, color: color),
+                    if (badgeCount != null && badgeCount! > 0)
+                      Positioned(
+                        top: -6,
+                        right: -10,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.colorError,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: Text(
+                            badgeCount! > 99 ? '99+' : '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: labelColor,
+                  ],
+                ),
               ),
-              child: Text(label, textAlign: TextAlign.center),
-            ),
-          ],
+              const SizedBox(height: 4),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
+                child: Text(label, textAlign: TextAlign.center),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -666,16 +669,11 @@ class ChambaNetworkImage extends StatelessWidget {
       fit: fit,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
-        return Container(
-          width: width,
-          height: height,
-          color: AppTheme.colorSurfaceSoft,
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+        return ChambaShimmer(
+          child: Container(
+            width: width,
+            height: height,
+            color: AppTheme.colorSurfaceSoft,
           ),
         );
       },
@@ -685,8 +683,11 @@ class ChambaNetworkImage extends StatelessWidget {
           height: height,
           color: AppTheme.colorSurfaceSoft,
           child: const Center(
-            child:
-                Icon(Icons.broken_image, color: AppTheme.colorMuted, size: 20),
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              color: AppTheme.colorMuted,
+              size: 20,
+            ),
           ),
         );
       },
@@ -711,11 +712,14 @@ class ChambaNetworkAvatar extends StatelessWidget {
     if (url == null || url!.isEmpty) {
       return CircleAvatar(
         radius: radius,
-        backgroundColor: AppTheme.colorSurfaceSoft,
+        backgroundColor: AppTheme.colorPrimaryTint,
         child: Text(
           fallbackText,
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: AppTheme.colorText),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: AppTheme.colorPrimary,
+            fontSize: radius * 0.7,
+          ),
         ),
       );
     }
@@ -725,6 +729,402 @@ class ChambaNetworkAvatar extends StatelessWidget {
         width: radius * 2,
         height: radius * 2,
         fit: BoxFit.cover,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeletons de carga
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Aplica un brillo animado (shimmer) sobre [child]. Pensado para envolver
+/// formas de [SkeletonBox] sobre fondo transparente: tiñe todo píxel opaco,
+/// así que no debe envolver superficies (tarjetas blancas).
+class ChambaShimmer extends StatefulWidget {
+  const ChambaShimmer({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<ChambaShimmer> createState() => _ChambaShimmerState();
+}
+
+class _ChambaShimmerState extends State<ChambaShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final t = _controller.value * 1.6 - 0.3;
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) => LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: const [
+              _skeletonBase,
+              Color(0xFFF9F8FD),
+              _skeletonBase,
+            ],
+            stops: [
+              (t - 0.25).clamp(0.0, 1.0),
+              t.clamp(0.0, 1.0),
+              (t + 0.25).clamp(0.0, 1.0),
+            ],
+          ).createShader(bounds),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+const Color _skeletonBase = Color(0xFFECE9F4);
+
+/// Bloque gris redondeado para construir skeletons.
+class SkeletonBox extends StatelessWidget {
+  const SkeletonBox({
+    this.width,
+    this.height = 14,
+    this.radius = 8,
+    this.circle = false,
+    super.key,
+  });
+
+  final double? width;
+  final double height;
+  final double radius;
+  final bool circle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: circle ? height : width,
+      height: height,
+      decoration: BoxDecoration(
+        color: _skeletonBase,
+        shape: circle ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: circle ? null : BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+/// Tarjeta skeleton genérica: avatar/ícono + líneas de texto.
+class SkeletonListTile extends StatelessWidget {
+  const SkeletonListTile({
+    this.leadingSize = 44,
+    this.circleLeading = true,
+    this.lines = 2,
+    this.trailing = false,
+    this.padding = const EdgeInsets.all(14),
+    this.margin = const EdgeInsets.fromLTRB(16, 0, 16, 10),
+    this.showCard = true,
+    super.key,
+  });
+
+  final double leadingSize;
+  final bool circleLeading;
+  final int lines;
+  final bool trailing;
+  final EdgeInsets padding;
+  final EdgeInsets margin;
+  final bool showCard;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (leadingSize > 0) ...[
+          SkeletonBox(
+            width: leadingSize,
+            height: leadingSize,
+            radius: 12,
+            circle: circleLeading,
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 2),
+              const FractionallySizedBox(
+                widthFactor: 0.62,
+                child: SkeletonBox(height: 13),
+              ),
+              for (var i = 1; i < lines; i++) ...[
+                const SizedBox(height: 9),
+                FractionallySizedBox(
+                  widthFactor: i == lines - 1 ? 0.42 : 0.88,
+                  child: const SkeletonBox(height: 10),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (trailing) ...[
+          const SizedBox(width: 12),
+          const SkeletonBox(width: 44, height: 12),
+        ],
+      ],
+    );
+
+    return Padding(
+      padding: margin,
+      child: Container(
+        padding: padding,
+        decoration: showCard
+            ? BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.colorGlassBorder),
+              )
+            : null,
+        // El brillo va dentro de la tarjeta: si envolviera la tarjeta, el
+        // ShaderMask también teñiría el fondo blanco y no se verían formas.
+        child: ChambaShimmer(child: content),
+      ),
+    );
+  }
+}
+
+/// Lista de [count] tarjetas skeleton con shimmer. Reemplaza al
+/// `CircularProgressIndicator` centrado cuando se carga una lista.
+/// Cada [SkeletonListTile] ya trae su propio brillo: no lo envuelvas en
+/// [ChambaShimmer].
+class SkeletonList extends StatelessWidget {
+  const SkeletonList({
+    this.count = 6,
+    this.lines = 2,
+    this.leadingSize = 44,
+    this.circleLeading = true,
+    this.trailing = false,
+    this.padding = const EdgeInsets.only(top: 8),
+    this.shrinkWrap = false,
+    super.key,
+  });
+
+  final int count;
+  final int lines;
+  final double leadingSize;
+  final bool circleLeading;
+  final bool trailing;
+  final EdgeInsets padding;
+  final bool shrinkWrap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Cargando',
+      child: ListView.builder(
+        padding: padding,
+        shrinkWrap: shrinkWrap,
+        physics: shrinkWrap
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
+        itemCount: count,
+        itemBuilder: (_, __) => SkeletonListTile(
+          lines: lines,
+          leadingSize: leadingSize,
+          circleLeading: circleLeading,
+          trailing: trailing,
+        ),
+      ),
+    );
+  }
+}
+
+/// Estado vacío/error consistente: ícono en círculo tintado, título, texto y
+/// acción opcional.
+class ChambaEmptyState extends StatelessWidget {
+  const ChambaEmptyState({
+    required this.icon,
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.actionIcon,
+    this.onAction,
+    this.color = AppTheme.colorPrimary,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? message;
+  final String? actionLabel;
+  final IconData? actionIcon;
+  final VoidCallback? onAction;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 36, color: color),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.colorText,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (message != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              message!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppTheme.colorMuted,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 22),
+            ChambaSecondaryButton(
+              label: actionLabel!,
+              icon: actionIcon,
+              onPressed: onAction,
+              compact: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton de una conversación: burbujas alternadas izquierda/derecha.
+class SkeletonChat extends StatelessWidget {
+  const SkeletonChat({this.count = 7, super.key});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    const widths = [0.62, 0.48, 0.7, 0.4, 0.56, 0.66, 0.45, 0.6];
+    return Semantics(
+      label: 'Cargando mensajes',
+      child: ChambaShimmer(
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: count,
+          itemBuilder: (context, index) {
+            final mine = index.isOdd;
+            final width = MediaQuery.sizeOf(context).width *
+                widths[index % widths.length];
+            return Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SkeletonBox(
+                  width: width,
+                  height: index % 3 == 0 ? 58 : 40,
+                  radius: 16,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Skeleton de una grilla de fotos (portafolio, galerías).
+class SkeletonGrid extends StatelessWidget {
+  const SkeletonGrid({
+    this.count = 6,
+    this.crossAxisCount = 3,
+    this.padding = const EdgeInsets.all(16),
+    super.key,
+  });
+
+  final int count;
+  final int crossAxisCount;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChambaShimmer(
+      child: GridView.builder(
+        padding: padding,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+        ),
+        itemCount: count,
+        itemBuilder: (_, __) => const SkeletonBox(radius: 14, height: 120),
+      ),
+    );
+  }
+}
+
+/// Skeleton de un perfil: avatar, nombre, métricas y tarjetas.
+class SkeletonProfile extends StatelessWidget {
+  const SkeletonProfile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChambaShimmer(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [
+          Center(child: SkeletonBox(height: 92, circle: true)),
+          SizedBox(height: 16),
+          Center(child: SkeletonBox(width: 170, height: 18)),
+          SizedBox(height: 10),
+          Center(child: SkeletonBox(width: 110, height: 12)),
+          SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 64, radius: 16)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 64, radius: 16)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 64, radius: 16)),
+            ],
+          ),
+          SizedBox(height: 20),
+          SkeletonBox(height: 110, radius: 20),
+          SizedBox(height: 12),
+          SkeletonBox(height: 110, radius: 20),
+        ],
       ),
     );
   }

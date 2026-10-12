@@ -15,6 +15,8 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/category_visuals.dart';
+import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
@@ -884,9 +886,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                     subtitle: _primaryCategoryName == 'General'
                         ? 'Servicio general y otros'
                         : 'Categoría del trabajo',
-                    leading: const RequestIconTile(
-                        icon: Icons.category_outlined,
-                        color: requestPurple,
+                    leading: RequestIconTile(
+                        icon: CategoryVisual.of(_primaryCategoryName).icon,
+                        color: CategoryVisual.of(_primaryCategoryName).color,
                         size: 34),
                     onTap: _loading ? null : _showCategoryPicker)),
             const SizedBox(height: 9),
@@ -1107,8 +1109,17 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                             return ListView(children: [
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting)
-                                const LinearProgressIndicator(
-                                    color: requestPurple),
+                                Column(children: [
+                                  for (var i = 0; i < 5; i++)
+                                    const SkeletonListTile(
+                                        lines: 1,
+                                        leadingSize: 38,
+                                        circleLeading: false,
+                                        showCard: false,
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 10),
+                                        margin: EdgeInsets.zero),
+                                ]),
                               if (snapshot.hasError)
                                 const Padding(
                                     padding: EdgeInsets.all(12),
@@ -1117,15 +1128,23 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                         style: TextStyle(
                                             height: 1.2, color: requestMuted))),
                               ...choices.values.map((item) => ListTile(
-                                  leading: const RequestIconTile(
-                                      icon: Icons.category_outlined,
-                                      color: requestPurple,
-                                      size: 34),
+                                  leading: RequestIconTile(
+                                      icon: CategoryVisual.of(
+                                              item['name']?.toString(),
+                                              iconHint:
+                                                  item['icon']?.toString())
+                                          .icon,
+                                      color: CategoryVisual.of(
+                                              item['name']?.toString(),
+                                              iconHint:
+                                                  item['icon']?.toString())
+                                          .color,
+                                      size: 38),
                                   title: Text(item['name'].toString(),
                                       style: const TextStyle(
                                           height: 1.2, color: requestInk)),
                                   trailing: item['name'] == _primaryCategoryName
-                                      ? const Icon(Icons.check_circle,
+                                      ? const Icon(Icons.check_circle_rounded,
                                           color: requestPurple)
                                       : null,
                                   onTap: () =>

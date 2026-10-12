@@ -66,7 +66,12 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       ),
       body: ChambaBackground(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SkeletonList(
+                count: 6,
+                lines: 3,
+                circleLeading: false,
+                trailing: true,
+              )
             : _error != null
                 ? Center(
                     child: Column(
@@ -76,7 +81,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                             size: 48, color: AppTheme.colorError),
                         const SizedBox(height: 16),
                         Text(_error!,
-                            style: const TextStyle(color: Colors.white)),
+                            style: const TextStyle(color: AppTheme.colorText)),
                         const SizedBox(height: 16),
                         ChambaPrimaryButton(
                           label: 'Reintentar',
@@ -170,7 +175,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                 child: Container(
                   width: 80,
                   height: 80,
-                  color: AppTheme.colorPrimary.withOpacity(0.1),
+                  color: AppTheme.colorPrimary.withValues(alpha: 0.1),
                   child: photoUrl != null
                       ? Image.network(photoUrl, fit: BoxFit.cover)
                       : const Icon(Icons.work_outline,
@@ -188,7 +193,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppTheme.colorText,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -231,10 +236,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.2),
+                            color: statusColor.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                             border:
-                                Border.all(color: statusColor.withOpacity(0.5)),
+                                Border.all(color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             statusText,

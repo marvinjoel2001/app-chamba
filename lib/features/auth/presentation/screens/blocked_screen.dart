@@ -44,7 +44,7 @@ class BlockedScreen extends ConsumerWidget {
                         'Acceso Denegado',
                         style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppTheme.colorText,
                             ),
                       ),
                       const SizedBox(height: 16),

@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/push/notification_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../data/notifications_service.dart';
 import '../../domain/models/app_notification.dart';
+import '../notification_style.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.previewItems});
+
+  /// Solo para vistas de diseño/tests: muestra estos avisos sin llamar a la API.
+  @visibleForTesting
+  final List<AppNotification>? previewItems;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -28,6 +33,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    final preview = widget.previewItems;
+    if (preview != null) {
+      _notifications = preview;
+      _hasMore = false;
+      _isLoading = false;
+      return;
+    }
     _loadNotifications();
   }
 
@@ -114,203 +126,204 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'offer_new':
-        return Icons.local_offer;
-      case 'offer_accepted':
-        return Icons.check_circle;
-      case 'request_new':
-        return Icons.work;
-      case 'worker_arrived':
-        return Icons.location_on;
-      case 'job_finished':
-        return Icons.flag;
-      case 'counter_offer':
-        return Icons.monetization_on;
-      case 'offer_rejected':
-        return Icons.cancel;
-      case 'new_review':
-        return Icons.star;
-      case 'arrival_confirmed':
-        return Icons.verified_user;
-      case 'dispute_resolved':
-        return Icons.gavel;
-      case 'dispute_created':
-        return Icons.warning;
-      case 'verification_update':
-        return Icons.how_to_reg;
-      case 'job_cancelled':
-        return Icons.block;
-      case 'support_message':
-        return Icons.support_agent;
-      default:
-        return Icons.notifications;
+  /// Lista plana con encabezados de día intercalados ("Hoy", "Ayer", …).
+  List<Object> _groupedItems() {
+    final items = <Object>[];
+    DateTime? lastDay;
+    for (final n in _notifications) {
+      if (lastDay == null || !isSameLocalDay(lastDay, n.createdAt)) {
+        items.add(dayHeaderLabel(n.createdAt));
+        lastDay = n.createdAt;
+      }
+      items.add(n);
     }
+    return items;
   }
 
-  Color _getColorForType(String type) {
-    switch (type) {
-      case 'offer_new':
-      case 'support_message':
-        return AppTheme.colorInfo;
-      case 'offer_accepted':
-      case 'arrival_confirmed':
-        return AppTheme.colorSuccess;
-      case 'request_new':
-      case 'dispute_created':
-        return AppTheme.colorWarning;
-      case 'worker_arrived':
-      case 'verification_update':
-        return AppTheme.colorPrimary;
-      case 'job_finished':
-        return Colors.purple;
-      case 'counter_offer':
-        return Colors.green;
-      case 'offer_rejected':
-      case 'job_cancelled':
-        return AppTheme.colorError;
-      case 'new_review':
-        return Colors.amber;
-      case 'dispute_resolved':
-        return Colors.teal;
-      default:
-        return AppTheme.colorMuted;
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const SkeletonList(count: 7, lines: 3, circleLeading: false);
     }
+    if (_error != null && _notifications.isEmpty) {
+      return Center(
+        child: ChambaEmptyState(
+          icon: Icons.cloud_off_rounded,
+          color: AppTheme.colorMuted,
+          title: 'Sin conexión',
+          message: _error,
+          actionLabel: 'Reintentar',
+          actionIcon: Icons.refresh_rounded,
+          onAction: _loadNotifications,
+        ),
+      );
+    }
+    if (_notifications.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadNotifications,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 80),
+            ChambaEmptyState(
+              icon: Icons.notifications_none_rounded,
+              title: 'Estás al día',
+              message: 'Aquí verás las ofertas, cambios de estado y '
+                  'mensajes importantes de tus trabajos.',
+            ),
+          ],
+        ),
+      );
+    }
+
+    final items = _groupedItems();
+    return RefreshIndicator(
+      onRefresh: _loadNotifications,
+      child: ListView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 24),
+        itemCount: items.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == items.length) {
+            return const SkeletonListTile(lines: 3, circleLeading: false);
+          }
+          final item = items[index];
+          if (item is String) return _DayHeader(item);
+          return _NotificationCard(
+            notification: item as AppNotification,
+            onTap: () => NotificationRouter.openFromData(
+              {'type': item.type, ...?item.data},
+              fromNotificationCenter: true,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
-      appBar: AppBar(
-        title: const Text('Notificaciones'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+      appBar: AppBar(title: const Text('Notificaciones')),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: KeyedSubtree(
+          key: ValueKey('$_isLoading-${_error != null}-${_notifications.isEmpty}'),
+          child: _buildBody(),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null && _notifications.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.cloud_off_rounded,
-                          size: 52,
-                          color: AppTheme.colorMuted,
+    );
+  }
+}
+
+class _DayHeader extends StatelessWidget {
+  const _DayHeader(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.colorMuted,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationCard extends StatelessWidget {
+  const _NotificationCard({required this.notification, required this.onTap});
+
+  final AppNotification notification;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = !notification.isRead;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: unread ? const Color(0xFFFBF9FF) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: unread
+                    ? AppTheme.colorPrimary.withValues(alpha: 0.22)
+                    : AppTheme.colorGlassBorder,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                NotificationIcon(type: notification.type, unread: unread),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.title,
+                        style: TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 14,
+                          height: 1.3,
+                          fontWeight:
+                              unread ? FontWeight.w700 : FontWeight.w600,
                         ),
-                        const SizedBox(height: 14),
+                      ),
+                      if (notification.body.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          _error!,
-                          textAlign: TextAlign.center,
+                          notification.body,
                           style: const TextStyle(
                             color: AppTheme.colorMuted,
-                            fontSize: 15,
+                            fontSize: 13,
+                            height: 1.45,
+                            fontWeight: FontWeight.w400,
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        ChambaSecondaryButton(
-                          label: 'Reintentar',
-                          icon: Icons.refresh,
-                          onPressed: _loadNotifications,
                         ),
                       ],
-                    ),
-                  ),
-                )
-              : _notifications.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No tienes notificaciones.',
-                        style: TextStyle(color: AppTheme.colorMuted),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            size: 13,
+                            color: AppTheme.colorMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            dateTimeLabel(notification.createdAt),
+                            style: const TextStyle(
+                              color: AppTheme.colorMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                    )
-                  : RefreshIndicator(
-                  onRefresh: _loadNotifications,
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _notifications.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      // Show loading indicator at the end
-                      if (index == _notifications.length) {
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-
-                      final item = _notifications[index];
-                      final color = _getColorForType(item.type);
-
-                      return Container(
-                        color: item.isRead
-                            ? Colors.transparent
-                            : AppTheme.colorPrimary.withOpacity(0.1),
-                        child: ListTile(
-                          onTap: () {
-                            NotificationRouter.openFromData(
-                              {
-                                'type': item.type,
-                                ...?item.data,
-                              },
-                              fromNotificationCenter: true,
-                            );
-                          },
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: color.withOpacity(0.2),
-                            child: Icon(
-                              _getIconForType(item.type),
-                              color: color,
-                            ),
-                          ),
-                          title: Text(
-                            item.title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: item.isRead
-                                      ? FontWeight.normal
-                                      : FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.body,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  DateFormat('dd MMM, HH:mm')
-                                      .format(item.createdAt),
-                                  style: const TextStyle(
-                                    color: AppTheme.colorMuted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    ],
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

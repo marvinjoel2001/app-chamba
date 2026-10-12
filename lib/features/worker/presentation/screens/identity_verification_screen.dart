@@ -38,14 +38,14 @@ class _IdentityVerificationScreenState
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
                     ),
                     const Spacer(),
                     Text(
                       'Verificación de Identidad',
                       style: Theme.of(
                         context,
-                      ).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                      ).textTheme.headlineSmall?.copyWith(color: AppTheme.colorText),
                     ),
                     const Spacer(),
                     const SizedBox(width: 48), // Balance the back button
@@ -107,7 +107,7 @@ class _IdentityVerificationScreenState
           Text(
             'Foto de tu Carnet',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
+              color: AppTheme.colorText,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -117,7 +117,7 @@ class _IdentityVerificationScreenState
             'Encuadra tu carnet de identidad en el rectángulo',
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            ).textTheme.bodyLarge?.copyWith(color: AppTheme.colorMuted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
@@ -127,7 +127,7 @@ class _IdentityVerificationScreenState
               decoration: BoxDecoration(
                 border: Border.all(color: AppTheme.colorPrimary, width: 2),
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.black.withOpacity(0.3),
+                color: AppTheme.colorPrimaryTint,
               ),
               child: _idPhoto != null
                   ? ClipRRect(
@@ -179,7 +179,7 @@ class _IdentityVerificationScreenState
           Text(
             'Foto de tu Rostro',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
+              color: AppTheme.colorText,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -189,7 +189,7 @@ class _IdentityVerificationScreenState
             'Toma una selfie clara de tu rostro',
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            ).textTheme.bodyLarge?.copyWith(color: AppTheme.colorMuted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
@@ -199,7 +199,7 @@ class _IdentityVerificationScreenState
               decoration: BoxDecoration(
                 border: Border.all(color: AppTheme.colorPrimary, width: 2),
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.black.withOpacity(0.1),
+                color: AppTheme.colorPrimaryTint,
               ),
               child: _facePhoto != null
                   ? ClipRRect(
@@ -236,13 +236,13 @@ class _IdentityVerificationScreenState
                         },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: Colors.white),
+                    side: const BorderSide(color: AppTheme.colorGlassBorderSoft),
                   ),
                   child: Text(
                     'Atrás',
                     style: Theme.of(
                       context,
-                    ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                    ).textTheme.bodyLarge?.copyWith(color: AppTheme.colorText),
                   ),
                 ),
               ),

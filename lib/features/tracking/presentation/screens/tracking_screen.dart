@@ -524,7 +524,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     children: [
                       TileLayer(
                         urlTemplate:
-                            'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                            'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                         userAgentPackageName: 'com.chambatrabajo.app',
                         additionalOptions: {
                           'accessToken': AppConfig.mapboxAccessToken,
@@ -635,7 +635,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A2A1A),
+                      color: AppTheme.colorSuccessSoft,
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
                         color: AppTheme.colorSuccess.withValues(alpha: 0.3),
@@ -691,6 +691,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   icon: const Icon(Icons.arrow_back),
                   style: IconButton.styleFrom(
                     backgroundColor: AppTheme.colorGlassDarkSoft,
+                    elevation: 2,
+                    shadowColor: const Color(0x401E1B4B),
                   ),
                 ),
               ),
@@ -735,7 +737,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
             maxChildSize: 0.85,
             builder: (context, scrollController) => Container(
               decoration: const BoxDecoration(
-                color: Color(0xFF0D1728),
+                color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: SingleChildScrollView(
@@ -758,17 +760,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.12),
+                                    color: AppTheme.colorError.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.cloud_off_rounded,
-                                      color: Colors.redAccent, size: 36),
+                                      color: AppTheme.colorError, size: 36),
                                 ),
                                 const SizedBox(height: 14),
                                 const Text(
                                   'Error de conexión',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppTheme.colorText,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -778,7 +780,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   _error!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
+                                    color: AppTheme.colorText.withValues(alpha: 0.7),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -813,22 +815,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   margin: const EdgeInsets.only(bottom: 16),
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.12),
+                                    color: AppTheme.colorError.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                         color:
-                                            Colors.red.withValues(alpha: 0.35)),
+                                            AppTheme.colorError.withValues(alpha: 0.35)),
                                   ),
                                   child: Row(
                                     children: [
                                       const Icon(Icons.warning_amber_rounded,
-                                          color: Colors.orangeAccent, size: 20),
+                                          color: AppTheme.colorWarning, size: 20),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           _error!,
                                           style: const TextStyle(
-                                              color: Colors.white,
+                                              color: AppTheme.colorText,
                                               fontSize: 13),
                                         ),
                                       ),
@@ -1244,6 +1246,8 @@ class _MapBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: highlighted ? AppTheme.colorPrimary : AppTheme.colorGlassDarkSoft,
+      elevation: 3,
+      shadowColor: const Color(0x401E1B4B),
       shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
@@ -1312,7 +1316,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 16, bottom: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF141F32),
+          color: AppTheme.colorSurfaceSoft,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isOvertime
@@ -1483,7 +1487,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                backgroundColor: AppTheme.colorText.withValues(alpha: 0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(
                   isOvertime ? AppTheme.colorWarning : AppTheme.colorPrimary,
                 ),
@@ -1553,7 +1557,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 16, bottom: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF141F32),
+          color: AppTheme.colorSurfaceSoft,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: AppTheme.colorPrimary.withValues(alpha: 0.3),
@@ -1634,7 +1638,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 16, bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF141F32),
+        color: AppTheme.colorSurfaceSoft,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppTheme.colorSuccess.withValues(alpha: 0.25),

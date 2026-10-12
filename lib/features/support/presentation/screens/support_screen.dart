@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 
 /// Reason options shown to the user when reporting a problem.
@@ -163,7 +164,7 @@ class _SupportScreenState extends State<SupportScreen> {
       body: ChambaBackground(
         child: SafeArea(
           child: _isLoadingDisputes
-              ? const Center(child: CircularProgressIndicator())
+              ? const SkeletonList(count: 4, lines: 3, circleLeading: false)
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
@@ -208,7 +209,7 @@ class _SupportScreenState extends State<SupportScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: const BoxDecoration(
-                                        color: Colors.red,
+                                        color: AppTheme.colorError,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Text(
@@ -564,7 +565,7 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
           // Messages
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonChat()
                 : _messages.isEmpty
                     ? const Center(
                         child: Text(
@@ -651,7 +652,7 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                            messageTimeLabel(time),
                                             style: const TextStyle(
                                               color: AppTheme.colorMuted,
                                               fontSize: 10,
@@ -695,7 +696,7 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
             decoration: const BoxDecoration(
               color: AppTheme.colorBackgroundAccent,
               border: Border(
-                top: BorderSide(color: Color(0xFF2A2A3A)),
+                top: BorderSide(color: AppTheme.colorSurfaceSoft),
               ),
             ),
             child: Row(

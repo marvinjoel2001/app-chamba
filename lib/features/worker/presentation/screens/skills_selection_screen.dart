@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/category_visuals.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import 'work_modalities_screen.dart';
@@ -46,15 +47,18 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
   bool _loading = true;
   bool _isOffline = false;
   bool _shouldRedirectToLogin = false;
-  List<(String, IconData)> _skills = const [
-    ('Construccion', Icons.handyman),
-    ('Electricidad', Icons.flash_on),
-    ('Plomeria', Icons.plumbing),
-    ('Jardineria', Icons.yard),
-    ('Transporte', Icons.local_shipping),
-    ('Limpieza', Icons.cleaning_services),
-    ('Mecanica', Icons.work),
-    ('Carpinteria', Icons.architecture),
+  List<(String, IconData)> _skills = [
+    for (final name in const [
+      'Construccion',
+      'Electricidad',
+      'Plomeria',
+      'Jardineria',
+      'Transporte',
+      'Limpieza',
+      'Mecanica',
+      'Carpinteria',
+    ])
+      (name, CategoryVisual.of(name).icon),
   ];
 
   @override
@@ -116,20 +120,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
     );
   }
 
-  IconData _resolveIcon(String label) {
-    final value = label.toLowerCase();
-    if (value.contains('elect')) return Icons.flash_on;
-    if (value.contains('plom') || value.contains('gas')) return Icons.plumbing;
-    if (value.contains('jardin')) return Icons.yard;
-    if (value.contains('transp') || value.contains('logis')) {
-      return Icons.local_shipping;
-    }
-    if (value.contains('limp')) return Icons.cleaning_services;
-    if (value.contains('mecan')) return Icons.build;
-    if (value.contains('carpint')) return Icons.architecture;
-    if (value.contains('pint')) return Icons.format_paint;
-    return Icons.handyman;
-  }
+  IconData _resolveIcon(String label) => CategoryVisual.of(label).icon;
 
   Future<void> _createCategoryFromDialog() async {
     final controller = TextEditingController();
@@ -296,7 +287,7 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
                     ),
                     const Spacer(),
                     Text(

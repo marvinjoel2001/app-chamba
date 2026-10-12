@@ -42,6 +42,9 @@ class SessionUser {
   final bool isAgencyWorker;
   final bool isAvailable;
 
+  bool get needsWorkerVerification =>
+      type == 'worker' && verificationStatus != 'verified';
+
   String get fullName {
     final ln = (lastName ?? '').trim();
     return ln.isEmpty ? firstName : '$firstName $ln';

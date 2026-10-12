@@ -8,7 +8,6 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/services/app_permissions_service.dart';
 import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
-import '../../../worker/presentation/screens/skills_selection_screen.dart';
 
 class GoogleAccountTypeScreen extends StatefulWidget {
   const GoogleAccountTypeScreen({
@@ -19,7 +18,8 @@ class GoogleAccountTypeScreen extends StatefulWidget {
   final Map<String, dynamic> googleData;
 
   @override
-  State<GoogleAccountTypeScreen> createState() => _GoogleAccountTypeScreenState();
+  State<GoogleAccountTypeScreen> createState() =>
+      _GoogleAccountTypeScreenState();
 }
 
 class _GoogleAccountTypeScreenState extends State<GoogleAccountTypeScreen> {
@@ -39,20 +39,17 @@ class _GoogleAccountTypeScreenState extends State<GoogleAccountTypeScreen> {
 
       final userData = result['user'] as Map<String, dynamic>;
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userData), token: result['token'] as String?);
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userData),
+          token: result['token'] as String?);
 
       if (!mounted) return;
       RealtimeService.instance.connect(userId: SessionStore.currentUser?.id);
       AppFlows.initialRouteResolved = true;
-      
-      // Mismo flujo que el registro/login por correo: el worker nuevo elige
-      // sus habilidades y, si faltan permisos (GPS, notificaciones), se piden
-      // antes de entrar al inicio.
+
+      // El perfil se completa dentro de la app después de crear la cuenta.
       Widget nextScreen = MainShellScreen(role: type);
-      if (type == 'worker') {
-        nextScreen = const SkillsSelectionScreen(forceToHomeAfterSave: true);
-      }
-      final allPermissionsGranted =
+      final allPermissionsGranted = SessionStore
+              .currentUser!.needsWorkerVerification ||
           await AppPermissionsService.areAllRequiredPermissionsGranted(type);
       if (!mounted) return;
       final destination = allPermissionsGranted
@@ -157,7 +154,7 @@ class _RoleCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.colorPrimary.withOpacity(0.1),
+                  color: AppTheme.colorPrimary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: AppTheme.colorPrimary, size: 32),

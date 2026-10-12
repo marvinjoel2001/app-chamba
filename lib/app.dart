@@ -69,9 +69,8 @@ class _ChambaAppState extends State<ChambaApp> {
       navigatorObservers: [ChambaApp.routeObserver],
       title: 'Chamba',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: AppTheme.dark(),
-      theme: AppTheme.dark(),
+      themeMode: ThemeMode.light,
+      theme: AppTheme.light(),
       builder: (context, child) =>
           OfflineBannerHost(child: child ?? const SizedBox.shrink()),
       home: const SplashScreen(),

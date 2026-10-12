@@ -187,7 +187,7 @@ class _WorkerPortfolioScreenState extends State<WorkerPortfolioScreen> {
               if (_saving) const LinearProgressIndicator(),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const SkeletonGrid(count: 9)
                     : _error != null
                         ? Center(
                             child: Padding(

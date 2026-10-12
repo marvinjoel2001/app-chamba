@@ -285,8 +285,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         height: 54,
         child: CircleAvatar(
           radius: 22,
-          backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.82),
-          child: const Icon(Icons.handyman, color: Colors.white, size: 22),
+          backgroundColor: AppTheme.colorPrimary,
+          child: const Icon(Icons.handyman_rounded, color: Colors.white, size: 22),
         ),
       )];
     }).toList();
@@ -481,7 +481,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.location_off,
+                Icons.location_off_rounded,
                 size: 34,
                 color: AppTheme.colorText,
               ),
@@ -542,18 +542,13 @@ class _ExploreScreenState extends State<ExploreScreen>
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D1F0D),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: AppTheme.colorSuccess.withValues(alpha: 0.5),
+                color: AppTheme.colorSuccess.withValues(alpha: 0.35),
+                width: 1.5,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.colorSuccess.withValues(alpha: 0.15),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              boxShadow: AppTheme.shadowLg,
             ),
             child: Row(
               children: [
@@ -565,7 +560,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
-                    Icons.directions_run,
+                    Icons.directions_run_rounded,
                     color: AppTheme.colorSuccess,
                     size: 26,
                   ),
@@ -607,7 +602,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                   ),
                 ),
                 const Icon(
-                  Icons.chevron_right,
+                  Icons.chevron_right_rounded,
                   color: AppTheme.colorSuccess,
                   size: 24,
                 ),
@@ -642,19 +637,13 @@ class _ExploreScreenState extends State<ExploreScreen>
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF140C27).withValues(alpha: 0.6),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: const Color(0xFF6A35FF).withValues(alpha: 0.3),
+                color: AppTheme.colorPrimary.withValues(alpha: 0.18),
                 width: 1.5,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6A35FF).withValues(alpha: 0.15),
-                  blurRadius: 30,
-                  spreadRadius: -5,
-                ),
-              ],
+              boxShadow: AppTheme.shadowLg,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -673,9 +662,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                           Text(
                             title,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppTheme.colorText,
                               fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w800,
                               height: 1.2,
                             ),
                             maxLines: 2,
@@ -706,15 +695,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                       height: 90,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.transparent,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6A35FF).withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          )
-                        ],
+                        color: AppTheme.colorPrimaryTint,
+                        border: Border.all(color: AppTheme.colorPrimary.withValues(alpha: 0.12), width: 1),
                       ),
                       child: Center(
                         child: Image.asset(
@@ -729,7 +711,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ),
                 const SizedBox(height: 20),
                 // Divider line (simulating dashed visually with low opacity)
-                Divider(color: Colors.white.withValues(alpha: 0.08), height: 1, thickness: 1),
+                const Divider(color: AppTheme.colorGlassBorderSoft, height: 1, thickness: 1),
                 const SizedBox(height: 16),
                 // Bottom section
                 Row(
@@ -739,11 +721,14 @@ class _ExploreScreenState extends State<ExploreScreen>
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: Colors.transparent,
+                        color: hasOffers ? AppTheme.colorSuccessSoft : AppTheme.colorPrimaryTint,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
                       ),
-                      child: const Icon(Icons.hourglass_bottom_rounded, color: Color(0xFFB388FF), size: 28),
+                      child: Icon(
+                        hasOffers ? Icons.mark_email_unread_rounded : Icons.hourglass_bottom_rounded,
+                        color: hasOffers ? AppTheme.colorSuccess : AppTheme.colorPrimary,
+                        size: 26,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -753,7 +738,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           Text(
                             hasOffers ? '¡Tienes nuevas ofertas!' : 'Buscando trabajadores cerca de ti...',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppTheme.colorText,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -791,8 +776,9 @@ class _ExploreScreenState extends State<ExploreScreen>
             Container(
               padding: const EdgeInsets.only(left: 20, right: 16, top: 16, bottom: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF262744), // Slightly lighter dark purple/blue
+                color: AppTheme.colorGlassInputSoft,
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.colorGlassBorderSoft),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -808,8 +794,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                             SvgPicture.string(
                               '''
                               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10 2.5L11.75 8.25L17.5 10L11.75 11.75L10 17.5L8.25 11.75L2.5 10L8.25 8.25L10 2.5Z" fill="#9357E8"/>
-                                <path d="M19 13L19.65 15.35L22 16L19.65 16.65L19 19L18.35 16.65L16 16L18.35 15.35L19 13Z" fill="#9357E8"/>
+                                <path d="M10 2.5L11.75 8.25L17.5 10L11.75 11.75L10 17.5L8.25 11.75L2.5 10L8.25 8.25L10 2.5Z" fill="#7C3AED"/>
+                                <path d="M19 13L19.65 15.35L22 16L19.65 16.65L19 19L18.35 16.65L16 16L18.35 15.35L19 13Z" fill="#7C3AED"/>
                               </svg>
                               ''',
                               width: 20,
@@ -818,10 +804,10 @@ class _ExploreScreenState extends State<ExploreScreen>
                             const SizedBox(width: 12),
                             Text(
                               'Escribe lo que buscas...',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                              style: const TextStyle(
+                                color: AppTheme.colorMuted,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -835,7 +821,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           textInputAction: TextInputAction.newline,
                           keyboardType: TextInputType.multiline,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppTheme.colorText,
                             fontSize: 17,
                             height: 1.4,
                           ),
@@ -847,7 +833,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 ? 'Te estamos escuchando…\nhabla con confianza.'
                                 : 'Ejemplo: necesito que alguien\nme pinte la casa.',
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: AppTheme.colorMuted.withValues(alpha: 0.85),
                               fontSize: 17,
                               height: 1.4,
                             ),
@@ -883,7 +869,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: Colors.redAccent.withValues(
+                                          color: AppTheme.colorError.withValues(
                                             alpha: (1 - progress) * 0.55,
                                           ),
                                           width: 2,
@@ -917,33 +903,27 @@ class _ExploreScreenState extends State<ExploreScreen>
                                           Color(0xFFB01836),
                                         ]
                                       : const [
-                                          Color(0xFF6B42C6),
-                                          Color(0xFF4B2996),
+                                          Color(0xFF8B5CF6),
+                                          Color(0xFF6D28D9),
                                         ],
                                 ),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   width: 1.5,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                  BoxShadow(
                                     color: (_isListening
-                                            ? Colors.redAccent
-                                            : const Color(0xFF8152DD))
-                                        .withValues(alpha: 0.4),
-                                    blurRadius: 12,
-                                    spreadRadius: -2,
-                                    offset: const Offset(0, -2),
+                                            ? AppTheme.colorError
+                                            : AppTheme.colorPrimary)
+                                        .withValues(alpha: 0.32),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
                               child: Icon(
-                                _isListening ? Icons.mic : Icons.mic_none,
+                                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
                                 color: Colors.white,
                                 size: 26,
                               ),
@@ -966,22 +946,11 @@ class _ExploreScreenState extends State<ExploreScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFF9059FF),
-                    Color(0xFF6A35FF),
+                    Color(0xFF8B5CF6),
+                    Color(0xFF6D28D9),
                   ],
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF7A45FF).withValues(alpha: 0.6),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                boxShadow: AppTheme.shadowPrimary,
               ),
               child: ElevatedButton.icon(
                 onPressed: _analyzingPrompt ? null : _startRequestFlow,
@@ -991,7 +960,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       height: 20, 
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
                     )
-                  : const Icon(Icons.send_outlined, color: Colors.white),
+                  : const Icon(Icons.send_rounded, color: Colors.white),
                 label: Text(
                   _analyzingPrompt ? 'Analizando...' : 'Solicitar',
                   style: const TextStyle(
@@ -1003,7 +972,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
+                  overlayColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -1172,8 +1143,9 @@ class _ExploreScreenState extends State<ExploreScreen>
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
+                color: Colors.white.withValues(alpha: 0.86),
                 borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: AppTheme.colorGlassBorder),
               ),
               child: Center(
                 child: Padding(
@@ -1191,7 +1163,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         'Verifica tu perfil para ver trabajos',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppTheme.colorText,
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1342,32 +1314,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
           if (_loading)
-            Container(
-              color: Colors.black.withOpacity(0.7),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Conectando con el servidor...',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.8),
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Esto puede tomar hasta 30 segundos',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.colorHighlight.withOpacity(0.8),
-                            fontSize: 11,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Positioned.fill(child: _ExploreSkeleton(isClient: _isClient)),
           if (_error != null)
             Positioned(
               left: 20,
@@ -1376,12 +1323,12 @@ class _ExploreScreenState extends State<ExploreScreen>
               child: GlassCard(
                 child: Row(
                   children: [
-                    const Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent, size: 22),
+                    const Icon(Icons.wifi_off_rounded, color: AppTheme.colorWarning, size: 22),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(color: AppTheme.colorText, fontSize: 13),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1391,15 +1338,15 @@ class _ExploreScreenState extends State<ExploreScreen>
                       onPressed: _load,
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: AppTheme.colorPrimary.withValues(alpha: 0.2),
+                        backgroundColor: AppTheme.colorPrimaryTint,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       child: const Text(
                         'Reintentar',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppTheme.colorPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -1416,16 +1363,16 @@ class _ExploreScreenState extends State<ExploreScreen>
               child: Column(
                 children: [
                   _MapControl(
-                    icon: _refreshing ? Icons.hourglass_top : Icons.refresh,
+                    icon: _refreshing ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
                     onTap: _refreshing ? null : _refresh,
                   ),
                   const SizedBox(height: 12),
-                  _MapControl(icon: Icons.add, onTap: _zoomIn),
+                  _MapControl(icon: Icons.add_rounded, onTap: _zoomIn),
                   const SizedBox(height: 12),
-                  _MapControl(icon: Icons.remove, onTap: _zoomOut),
+                  _MapControl(icon: Icons.remove_rounded, onTap: _zoomOut),
                   const SizedBox(height: 12),
                   _MapControl(
-                    icon: _locating ? Icons.hourglass_top : Icons.my_location,
+                    icon: _locating ? Icons.hourglass_top_rounded : Icons.my_location_rounded,
                     highlighted: true,
                     onTap: _locating ? null : _centerOnMyLocation,
                   ),
@@ -1437,7 +1384,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 top: 60,
                 right: 16,
                 child: _MapControl(
-                  icon: Icons.help_outline,
+                  icon: Icons.help_outline_rounded,
                   highlighted: false,
                   onTap: _showHelpSheet,
                 ),
@@ -1468,18 +1415,98 @@ class _MapControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CircleAvatar(
-      radius: 24,
-      backgroundColor: highlighted
-          ? AppTheme.colorPrimary
-          : AppTheme.colorSurfaceSoft.withOpacity(0.5),
-      child: IconButton(
-        onPressed: onTap,
-        icon: Icon(
-          icon,
-          color: highlighted
-              ? AppTheme.colorTextOnPurple
-              : const Color.fromARGB(255, 255, 255, 255),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: highlighted ? AppTheme.shadowPrimary : AppTheme.shadowMd,
+      ),
+      child: Material(
+        color: highlighted ? AppTheme.colorPrimary : Colors.white,
+        shape: CircleBorder(
+          side: highlighted
+              ? BorderSide.none
+              : const BorderSide(color: AppTheme.colorGlassBorder),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          splashColor: highlighted
+              ? Colors.white.withValues(alpha: 0.25)
+              : AppTheme.colorPrimary.withValues(alpha: 0.12),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Icon(
+              icon,
+              color: highlighted ? Colors.white : AppTheme.colorText,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Skeleton de la pantalla de inicio mientras conecta con el servidor.
+class _ExploreSkeleton extends StatelessWidget {
+  const _ExploreSkeleton({required this.isClient});
+
+  final bool isClient;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppTheme.colorBackground,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              if (!isClient) ...[
+                const ChambaShimmer(
+                  child: Row(
+                    children: [
+                      SkeletonBox(height: 48, circle: true),
+                      SizedBox(width: 10),
+                      SkeletonBox(width: 160, height: 22),
+                      Spacer(),
+                      SkeletonBox(height: 48, circle: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Expanded(
+                child: ChambaShimmer(
+                  child: SkeletonBox(radius: 28, height: double.infinity),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: AppTheme.colorGlassBorder),
+                ),
+                child: const ChambaShimmer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: 170, height: 14),
+                      SizedBox(height: 14),
+                      SkeletonBox(height: 16),
+                      SizedBox(height: 8),
+                      SkeletonBox(width: 220, height: 16),
+                      SizedBox(height: 20),
+                      SkeletonBox(height: 54, radius: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1525,16 +1552,13 @@ class _PulseBadgeState extends State<PulseBadge> with SingleTickerProviderStateM
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF6A35FF).withValues(alpha: 0.15 + (_animation.value * 0.25)),
+            color: AppTheme.colorPrimary,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFF6A35FF).withValues(alpha: 0.3 + (_animation.value * 0.4)),
-            ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF6A35FF).withValues(alpha: _animation.value * 0.4),
-                blurRadius: 4 + (_animation.value * 12),
-                spreadRadius: _animation.value * 2,
+                color: AppTheme.colorPrimary.withValues(alpha: _animation.value * 0.35),
+                blurRadius: 4 + (_animation.value * 10),
+                spreadRadius: _animation.value * 1.5,
               )
             ],
           ),

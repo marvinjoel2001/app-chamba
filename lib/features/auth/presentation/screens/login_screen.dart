@@ -1,6 +1,5 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -12,8 +11,6 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/auth_dependencies.dart';
-import '../../../worker/presentation/state/worker_dependencies.dart';
-import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 import 'register_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -53,27 +50,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       role: SessionStore.currentUser?.type ?? 'client',
     );
 
-    if (user.type == 'worker') {
-      final result = await WorkerDependencies.getWorkerSkills(
-        workerUserId: user.id,
-      );
-      result.fold(
-        onSuccess: (skills) {
-          if (skills.isEmpty) {
-            nextScreen = const SkillsSelectionScreen(
-              forceToHomeAfterSave: true,
-            );
-          }
-        },
-        onFailure: (_) {},
-      );
-    }
-
     if (!mounted) return;
 
     RealtimeService.instance.connect(userId: user.id);
 
-    final allPermissionsGranted =
+    final allPermissionsGranted = user.needsWorkerVerification ||
         await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
     if (!mounted) return;
 
@@ -149,8 +130,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
 
-      final result = await MobileBackendService.instance.loginWithGoogle(idToken: auth.idToken!);
-      
+      final result = await MobileBackendService.instance
+          .loginWithGoogle(idToken: auth.idToken!);
+
       if (result['requiresRegistration'] == true) {
         if (!mounted) return;
         Navigator.of(context).push(
@@ -163,7 +145,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         final userData = result['user'] as Map<String, dynamic>;
 
-        await SessionStore.setCurrentUser(SessionUser.fromJson(userData), token: result['token'] as String?);
+        await SessionStore.setCurrentUser(SessionUser.fromJson(userData),
+            token: result['token'] as String?);
 
         if (!mounted) return;
         _handleAuthenticated();
@@ -190,7 +173,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (raw.contains('network_error') || raw.contains('ApiException: 7')) {
       return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
     }
-    if (raw.contains('ApiException: 12501') || raw.contains('sign_in_canceled')) {
+    if (raw.contains('ApiException: 12501') ||
+        raw.contains('sign_in_canceled')) {
       return 'Inicio de sesión con Google cancelado.';
     }
     if (raw.contains('sign_in_failed')) {
@@ -218,320 +202,353 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/backgrounds/backgroundLogin.png'),
-            fit: BoxFit.cover,
+      backgroundColor: AppTheme.colorBackground,
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: AppTheme.systemOverlay,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image:
+                  AssetImage('assets/images/backgrounds/backgroundLogin.png'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Icono de la app enmarcado en un puntero de mapa
-                    Center(
-                      child: SizedBox(
-                        width: 140,
-                        height: 150,
-                        child: Stack(
-                          alignment: Alignment.topCenter,
-                          clipBehavior: Clip.none,
-                          children: [
-                            // Pin principal
-                            Icon(
-                              Icons.location_on,
-                              size: 140,
-                              color: AppTheme.colorPrimary,
-                              shadows: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 10),
-                                ),
-                                BoxShadow(
-                                  color: AppTheme.colorPrimary.withValues(alpha: 0.4),
-                                  blurRadius: 30,
-                                  spreadRadius: 5,
-                                ),
-                              ],
-                            ),
-                            // Imagen circular dentro del pin
-                            Positioned(
-                              top: 18,
-                              child: Container(
-                                width: 64,
-                                height: 64,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white,
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Image.asset(
-                                  'assets/images/icon/icon.png',
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Título Chamba
-                    Text(
-                      'Chamba',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        shadows: [
-                          BoxShadow(
-                            color: AppTheme.colorPrimary.withValues(alpha: 0.6),
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Subtítulo
-                    Text(
-                      'Conecta con clientes\ny oportunidades',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            height: 1.3,
-                          ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Card de login
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: AppTheme.glassContainerDecoration(),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.92),
+                  const Color(0xFFF7F6FC).withValues(alpha: 0.94),
+                  const Color(0xFFF7F6FC),
+                ],
+                stops: const [0, 0.45, 1],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Icono de la app enmarcado en un puntero de mapa
+                        Center(
+                          child: SizedBox(
+                            width: 140,
+                            height: 150,
+                            child: Stack(
+                              alignment: Alignment.topCenter,
+                              clipBehavior: Clip.none,
                               children: [
-                                Text(
-                                  'Iniciar sesión',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(color: AppTheme.colorText),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _identifierVerified
-                                      ? 'Ahora ingresa tu contraseña'
-                                      : 'Ingresa tu teléfono o correo para continuar',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(color: AppTheme.colorMuted),
-                                ),
-                                const SizedBox(height: 20),
-                                TextFormField(
-                                  controller: _identifierController,
-                                  enabled: !_identifierVerified &&
-                                      !_checkingIdentifier,
-                                  style: const TextStyle(
-                                      color: AppTheme.colorText),
-                                  decoration: AppTheme.glassInputDecoration(
-                                    labelText: 'Correo o teléfono',
-                                    icon: Icons.person_outline,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Ingresa tu correo o teléfono';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                if (_identifierVerified) ...[
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _passwordController,
-                                    obscureText: _obscurePassword,
-                                    style: const TextStyle(
-                                      color: AppTheme.colorText,
-                                    ),
-                                    decoration: AppTheme.glassInputDecoration(
-                                      labelText: 'Contraseña',
-                                      icon: Icons.lock_outline,
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword
-                                              ? Icons.visibility_outlined
-                                              : Icons.visibility_off_outlined,
-                                          color: AppTheme.colorMuted,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscurePassword =
-                                                !_obscurePassword;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (!_identifierVerified) {
-                                        return null;
-                                      }
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Ingresa tu contraseña';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ],
-                                const SizedBox(height: 20),
-                                ChambaPrimaryButton(
-                                  label: _checkingIdentifier
-                                      ? 'Verificando...'
-                                      : !_identifierVerified
-                                          ? 'Siguiente'
-                                          : authState.isLoading
-                                              ? 'Ingresando...'
-                                              : 'Entrar',
-                                  onPressed: authState.isLoading ||
-                                          _checkingIdentifier
-                                      ? null
-                                      : () async {
-                                          if (!_formKey.currentState!
-                                              .validate()) {
-                                            return;
-                                          }
-
-                                          if (!_identifierVerified) {
-                                            await _continueWithIdentifier();
-                                            return;
-                                          }
-
-                                          await ref
-                                              .read(authControllerProvider
-                                                  .notifier)
-                                              .login(
-                                                identifier:
-                                                    _identifierController.text,
-                                                password:
-                                                    _passwordController.text,
-                                              );
-                                        },
-                                ),
-                                const SizedBox(height: 16),
-                                // Divider con "o"
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Divider(
-                                        color: AppTheme.colorMuted
-                                            .withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12),
-                                      child: Text(
-                                        'o',
-                                        style: TextStyle(
-                                          color: AppTheme.colorMuted
-                                              .withValues(alpha: 0.6),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Divider(
-                                        color: AppTheme.colorMuted
-                                            .withValues(alpha: 0.3),
-                                      ),
+                                // Pin principal
+                                Icon(
+                                  Icons.location_on,
+                                  size: 140,
+                                  color: AppTheme.colorPrimary,
+                                  shadows: [
+                                    BoxShadow(
+                                      color: AppTheme.colorPrimary
+                                          .withValues(alpha: 0.30),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 12),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-                                // Botón Google
-                                OutlinedButton.icon(
-                                  onPressed: _checkingIdentifier || authState.isLoading
-                                      ? null
-                                      : _continueWithGoogle,
-                                  icon: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
+                                // Imagen circular dentro del pin
+                                Positioned(
+                                  top: 18,
+                                  child: Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Center(
-                                      child: SvgPicture.string(
-                                        '''<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0 0 48 48">
-<path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
-</svg>''',
-                                        width: 18,
-                                        height: 18,
-                                      ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: Image.asset(
+                                      'assets/images/icon/icon.png',
+                                      fit: BoxFit.cover,
                                     ),
                                   ),
-                                  label: const Text(
-                                    'Continuar con Google',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: AppTheme.colorMuted
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (_identifierVerified)
-                                  TextButton(
-                                    onPressed: authState.isLoading
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _identifierVerified = false;
-                                              _passwordController.clear();
-                                            });
-                                          },
-                                    child: const Text('Cambiar usuario'),
-                                  ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => const RegisterScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('Crear cuenta'),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        // Título Chamba
+                        Text(
+                          'Chamba',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .displayLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.colorText,
+                                letterSpacing: -0.5,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Subtítulo
+                        Text(
+                          'Conecta con clientes\ny oportunidades',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.colorMuted,
+                                    height: 1.3,
+                                  ),
+                        ),
+                        const SizedBox(height: 40),
+                        // Card de login
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Builder(
+                            builder: (context) => Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: AppTheme.glassContainerDecoration(
+                                backgroundColor: Colors.white,
+                              ),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Iniciar sesión',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(color: AppTheme.colorText),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _identifierVerified
+                                          ? 'Ahora ingresa tu contraseña'
+                                          : 'Ingresa tu teléfono o correo para continuar',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                              color: AppTheme.colorMuted),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextFormField(
+                                      controller: _identifierController,
+                                      enabled: !_identifierVerified &&
+                                          !_checkingIdentifier,
+                                      style: const TextStyle(
+                                          color: AppTheme.colorText),
+                                      decoration: AppTheme.glassInputDecoration(
+                                        labelText: 'Correo o teléfono',
+                                        icon: Icons.person_outline_rounded,
+                                      ),
+                                      validator: (value) {
+                                        if (value == null ||
+                                            value.trim().isEmpty) {
+                                          return 'Ingresa tu correo o teléfono';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                    if (_identifierVerified) ...[
+                                      const SizedBox(height: 12),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: _obscurePassword,
+                                        style: const TextStyle(
+                                          color: AppTheme.colorText,
+                                        ),
+                                        decoration:
+                                            AppTheme.glassInputDecoration(
+                                          labelText: 'Contraseña',
+                                          icon: Icons.lock_outline_rounded,
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _obscurePassword
+                                                  ? Icons.visibility_outlined
+                                                  : Icons
+                                                      .visibility_off_outlined,
+                                              color: AppTheme.colorMuted,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _obscurePassword =
+                                                    !_obscurePassword;
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                        validator: (value) {
+                                          if (!_identifierVerified) {
+                                            return null;
+                                          }
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Ingresa tu contraseña';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ],
+                                    const SizedBox(height: 20),
+                                    ChambaPrimaryButton(
+                                      label: _checkingIdentifier
+                                          ? 'Verificando...'
+                                          : !_identifierVerified
+                                              ? 'Siguiente'
+                                              : authState.isLoading
+                                                  ? 'Ingresando...'
+                                                  : 'Entrar',
+                                      onPressed: authState.isLoading ||
+                                              _checkingIdentifier
+                                          ? null
+                                          : () async {
+                                              if (!_formKey.currentState!
+                                                  .validate()) {
+                                                return;
+                                              }
+
+                                              if (!_identifierVerified) {
+                                                await _continueWithIdentifier();
+                                                return;
+                                              }
+
+                                              await ref
+                                                  .read(authControllerProvider
+                                                      .notifier)
+                                                  .login(
+                                                    identifier:
+                                                        _identifierController
+                                                            .text,
+                                                    password:
+                                                        _passwordController
+                                                            .text,
+                                                  );
+                                            },
+                                    ),
+                                    const SizedBox(height: 16),
+                                    // Divider con "o"
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Divider(
+                                            color: AppTheme.colorMuted
+                                                .withValues(alpha: 0.3),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12),
+                                          child: Text(
+                                            'o',
+                                            style: TextStyle(
+                                              color: AppTheme.colorMuted
+                                                  .withValues(alpha: 0.6),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Divider(
+                                            color: AppTheme.colorMuted
+                                                .withValues(alpha: 0.3),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    // Botón Google
+                                    OutlinedButton.icon(
+                                      onPressed: _checkingIdentifier ||
+                                              authState.isLoading
+                                          ? null
+                                          : _continueWithGoogle,
+                                      icon: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: AppTheme.colorGlassBorder,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: SvgPicture.string(
+                                            '''<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0 0 48 48">
+<path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+</svg>''',
+                                            width: 18,
+                                            height: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      label: const Text(
+                                        'Continuar con Google',
+                                        style: TextStyle(
+                                          color: AppTheme.colorText,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        side: const BorderSide(
+                                          color: AppTheme.colorGlassBorderSoft,
+                                          width: 1.2,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    if (_identifierVerified)
+                                      TextButton(
+                                        onPressed: authState.isLoading
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _identifierVerified = false;
+                                                  _passwordController.clear();
+                                                });
+                                              },
+                                        child: const Text('Cambiar usuario'),
+                                      ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const RegisterScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text('Crear cuenta'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

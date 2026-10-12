@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/push/notification_router.dart';
@@ -7,9 +6,13 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/session/unread_notifications_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/category_visuals.dart';
+import '../../../../core/utils/date_labels.dart';
+import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../history/presentation/screens/job_history_details_screen.dart';
 import '../../../notifications/data/notifications_service.dart';
 import '../../../notifications/domain/models/app_notification.dart';
+import '../../../notifications/presentation/notification_style.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../request/presentation/screens/job_in_progress_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -216,7 +219,7 @@ class MessagesInbox extends StatelessWidget {
   final VoidCallback onNotifications;
   final ValueChanged<AppNotification> onNotification;
   final ValueChanged<ChatThread> onThread;
-  static const _ink = Color(0xFF17132D), _muted = Color(0xFF878099);
+  static const _ink = AppTheme.colorText, _muted = AppTheme.colorMuted;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +235,7 @@ class MessagesInbox extends StatelessWidget {
                 seedColor: AppTheme.colorPrimary,
                 brightness: Brightness.light)),
         child: Scaffold(
-            backgroundColor: const Color(0xFFF7F6FC),
+            backgroundColor: AppTheme.colorBackground,
             body: SafeArea(
                 child: RefreshIndicator(
                     onRefresh: onRefresh,
@@ -289,12 +292,18 @@ class MessagesInbox extends StatelessWidget {
                                         ].join('\n'),
                                         style: const TextStyle(
                                             color: _muted, fontSize: 12)))),
-                          if (loading)
+                          if (loading &&
+                              threads.isEmpty &&
+                              notifications.isEmpty)
                             const SliverToBoxAdapter(
                                 child: Padding(
-                                    padding: EdgeInsets.all(24),
-                                    child: Center(
-                                        child: CircularProgressIndicator()))),
+                                    padding: EdgeInsets.only(top: 24),
+                                    child: SkeletonList(
+                                        count: 5,
+                                        lines: 3,
+                                        circleLeading: false,
+                                        shrinkWrap: true,
+                                        padding: EdgeInsets.zero))),
                           if (active.isNotEmpty) ...[
                             const SliverToBoxAdapter(
                                 child: _SectionLabel('Trabajos confirmados')),
@@ -319,7 +328,7 @@ class MessagesInbox extends StatelessWidget {
                                         child: const Text(
                                             'Ver todas las notificaciones')))),
                           ],
-                          if (!loading && notifications.isEmpty)
+                          if (!loading && notifications.isEmpty && active.isEmpty)
                             SliverToBoxAdapter(
                                 child: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -368,25 +377,24 @@ class MessagesInbox extends StatelessWidget {
   }
 
   Widget _notificationSummary() => ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Material(
-              color: const Color(0xFFEFEAFF).withValues(alpha: 0.82),
+      borderRadius: BorderRadius.circular(18),
+      child: Material(
+              color: AppTheme.colorPrimaryTint,
               child: InkWell(
                   onTap: onNotifications,
                   child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                           border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.85)),
-                          borderRadius: BorderRadius.circular(16)),
+                              color: AppTheme.colorPrimary
+                                  .withValues(alpha: 0.14)),
+                          borderRadius: BorderRadius.circular(18)),
                       child: Row(children: [
                         Container(
                             width: 48,
                             height: 48,
                             decoration: const BoxDecoration(
-                                color: Color(0xFFE5DBFF),
+                                color: Colors.white,
                                 shape: BoxShape.circle),
                             child: const Icon(
                                 Icons.notifications_active_rounded,
@@ -413,45 +421,52 @@ class MessagesInbox extends StatelessWidget {
                             ])),
                         const Icon(Icons.chevron_right_rounded,
                             color: AppTheme.colorPrimary, size: 24),
-                      ]))))));
+                      ])))));
 
   Widget _notificationTile(AppNotification notification) {
-    final (icon, color) = _notificationStyle(notification.type);
     return _tile(
         onTap: () => onNotification(notification),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _activityIcon(icon, color, unread: !notification.isRead),
+          NotificationIcon(
+              type: notification.type, unread: !notification.isRead, size: 42),
           const SizedBox(width: 12),
           Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(
-                      child: Text(notification.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: _ink,
-                              fontSize: 13,
-                              height: 1.3,
-                              fontWeight: notification.isRead
-                                  ? FontWeight.w600
-                                  : FontWeight.w700))),
-                  const SizedBox(width: 8),
-                  Text(_time(notification.createdAt),
-                      style: const TextStyle(color: _muted, fontSize: 10))
-                ]),
-                const SizedBox(height: 5),
+                Text(notification.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: _ink,
+                        fontSize: 13.5,
+                        height: 1.3,
+                        fontWeight: notification.isRead
+                            ? FontWeight.w600
+                            : FontWeight.w700)),
+                const SizedBox(height: 4),
                 Text(notification.body,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        color: _muted, fontSize: 11, height: 1.5))
+                        color: _muted,
+                        fontSize: 12,
+                        height: 1.45,
+                        fontWeight: FontWeight.w400)),
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Icon(Icons.schedule_rounded, size: 12, color: _muted),
+                  const SizedBox(width: 4),
+                  Text(dateTimeLabel(notification.createdAt),
+                      style: const TextStyle(
+                          color: _muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500)),
+                ]),
               ])),
           const SizedBox(width: 6),
           const Padding(
-              padding: EdgeInsets.only(top: 14),
+              padding: EdgeInsets.only(top: 12),
               child: Icon(Icons.chevron_right_rounded,
                   size: 20, color: AppTheme.colorPrimaryLight)),
         ]));
@@ -460,19 +475,35 @@ class MessagesInbox extends StatelessWidget {
   Widget _threadTile(ChatThread thread) => _tile(
       onTap: () => onThread(thread),
       child: Row(children: [
-        ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset('assets/images/chat/default_job.png',
-                width: 46, height: 46, fit: BoxFit.cover)),
+        CategoryIconTile(category: thread.category, size: 46),
         const SizedBox(width: 12),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(thread.jobTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: _ink, fontSize: 13, fontWeight: FontWeight.w700)),
+          Row(children: [
+            Expanded(
+                child: Text(thread.jobTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: _ink,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700))),
+            if ((thread.lastMessageAt ?? thread.createdAt) != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                  compactDateTimeLabel(
+                      (thread.lastMessageAt ?? thread.createdAt)!),
+                  style: TextStyle(
+                      color: thread.unreadCount > 0
+                          ? AppTheme.colorPrimary
+                          : _muted,
+                      fontSize: 11,
+                      fontWeight: thread.unreadCount > 0
+                          ? FontWeight.w700
+                          : FontWeight.w500)),
+            ],
+          ]),
           const SizedBox(height: 4),
           Text('${thread.counterpartName} · ${thread.statusLabel}',
               maxLines: 1,
@@ -503,67 +534,15 @@ class MessagesInbox extends StatelessWidget {
   Widget _tile({required VoidCallback onTap, required Widget child}) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Material(
-          color: Colors.white.withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppTheme.colorGlassBorder)),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
               child:
                   Padding(padding: const EdgeInsets.all(14), child: child))));
-  Widget _activityIcon(IconData icon, Color color, {bool unread = false}) =>
-      Stack(clipBehavior: Clip.none, children: [
-        Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 23)),
-        if (unread)
-          Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5)))),
-      ]);
-  (IconData, Color) _notificationStyle(String type) => switch (type) {
-        'offer_new' || 'counter_offer' || 'offer_client_counter' => (
-            Icons.receipt_long_rounded,
-            AppTheme.colorPrimary
-          ),
-        'offer_accepted' || 'arrival_confirmed' => (
-            Icons.check_circle_rounded,
-            const Color(0xFF42B68E)
-          ),
-        'job_starting_soon' || 'worker_arrived' => (
-            Icons.calendar_month_rounded,
-            const Color(0xFF6096F5)
-          ),
-        'job_cancelled' || 'request_timeout' || 'offer_rejected' => (
-            Icons.warning_rounded,
-            const Color(0xFFEE6B82)
-          ),
-        'request_new' => (Icons.person_pin_rounded, AppTheme.colorPrimary),
-        'message_new' || 'chat_message' || 'support_message' => (
-            Icons.chat_bubble_outline_rounded,
-            const Color(0xFF6096F5)
-          ),
-        _ => (Icons.stars_rounded, const Color(0xFFF4B84D)),
-      };
-  String _time(DateTime value) {
-    final date = value.toLocal();
-    final days = DateUtils.dateOnly(DateTime.now())
-        .difference(DateUtils.dateOnly(date))
-        .inDays;
-    if (days == 0)
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    if (days == 1) return 'Ayer';
-    return '${date.day}/${date.month}';
-  }
 }
 
 class NotificationBell extends StatelessWidget {
@@ -576,13 +555,10 @@ class NotificationBell extends StatelessWidget {
       width: 46,
       height: 46,
       decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.8),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFECE5FF)),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x0D8B5CF6), blurRadius: 12, offset: Offset(0, 4))
-          ]),
+          border: Border.all(color: AppTheme.colorGlassBorder),
+          boxShadow: AppTheme.shadowSm),
       child: IconButton(
           tooltip: unread == 0
               ? 'Notificaciones'
@@ -590,7 +566,7 @@ class NotificationBell extends StatelessWidget {
           onPressed: onPressed,
           icon: Badge(
               isLabelVisible: unread > 0,
-              backgroundColor: AppTheme.colorPrimary,
+              backgroundColor: AppTheme.colorError,
               child: const Icon(Icons.notifications_none_rounded,
                   color: AppTheme.colorPrimary, size: 24))));
 }
@@ -603,7 +579,8 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
       child: Text(label,
           style: const TextStyle(
-              color: Color(0xFF878099),
+              color: AppTheme.colorMuted,
               fontSize: 12,
-              fontWeight: FontWeight.w600)));
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2)));
 }

@@ -245,6 +245,11 @@ class ApiService {
       if (lower.contains('credencial')) {
         return 'Correo/teléfono o contraseña incorrectos.';
       }
+      // Errores de inicio de sesión (Google, cuenta bloqueada): el motivo del
+      // backend es más útil que "sesión expirada", que aquí confunde.
+      if (lower.contains('google') || lower.contains('bloqueada')) {
+        return 'No se pudo iniciar sesión: $message';
+      }
       return 'Tu sesión expiró o no tienes permisos. Inicia sesión nuevamente.';
     }
 

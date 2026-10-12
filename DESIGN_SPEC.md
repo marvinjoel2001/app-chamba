@@ -4,6 +4,8 @@
 
 ---
 
+> **Actualización 2026-10-12 — la app pasó a modo claro.** Los nombres de tokens se mantienen, pero los valores vigentes están en `lib/core/theme/app_theme.dart` (fondo `#F7F6FC`, texto `#17132D`, secundario `#6B6584`, primario `#7C3AED`, superficies blancas con borde `#E9E5F3`). Las tablas de abajo describen la versión oscura anterior.
+
 ## 1. PALETA DE COLORES
 
 ### Colores Primarios
@@ -60,7 +62,7 @@
 ## 2. TIPOGRAFÍA
 
 **Fuente**: Plus Jakarta Sans (Google Fonts)  
-**Tema**: Solo dark mode
+**Tema**: Solo modo claro (desde 2026-10-12)
 
 ### Escala Tipográfica
 | Estilo | Tamaño | Peso | Line Height | Color | Letter Spacing |

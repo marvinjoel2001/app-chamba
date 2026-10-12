@@ -172,7 +172,7 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
                     ),
                     const Spacer(),
                     Text(

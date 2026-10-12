@@ -87,18 +87,18 @@ class ToastService {
       case ToastType.error:
         primaryColor = const Color(0xFFD32F2F);
         bgColor = const Color(0xFFFFEBEE);
-        iconData = Icons.error_outline;
+        iconData = Icons.error_outline_rounded;
         break;
       case ToastType.success:
         primaryColor = const Color(0xFF388E3C);
         bgColor = const Color(0xFFE8F5E9);
-        iconData = Icons.check_circle_outline;
+        iconData = Icons.check_circle_outline_rounded;
         break;
       case ToastType.info:
       default:
         primaryColor = const Color(0xFF1976D2);
         bgColor = const Color(0xFFE3F2FD);
-        iconData = Icons.info_outline;
+        iconData = Icons.info_outline_rounded;
         break;
     }
 
@@ -106,9 +106,10 @@ class ToastService {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: const Color(0xFFE9E5F3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: const Color(0xFF1E1B4B).withValues(alpha: 0.12),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -139,7 +140,7 @@ class ToastService {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Color(0xFF1A1A1A),
+                    color: Color(0xFF17132D),
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -165,7 +166,7 @@ class ToastService {
               padding: EdgeInsets.all(4.0),
               child: Icon(
                 Icons.close,
-                color: Color(0xFF9E9E9E),
+                color: Color(0xFF6B6584),
                 size: 20,
               ),
             ),

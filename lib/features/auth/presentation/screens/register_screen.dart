@@ -9,8 +9,6 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
-import '../../../worker/presentation/state/worker_dependencies.dart';
-import '../../../worker/presentation/screens/skills_selection_screen.dart';
 import '../controllers/auth_controller.dart';
 import 'terms_and_conditions_screen.dart';
 
@@ -55,27 +53,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       role: SessionStore.currentUser?.type ?? _selectedRole,
     );
 
-    if (user.type == 'worker') {
-      final result = await WorkerDependencies.getWorkerSkills(
-        workerUserId: user.id,
-      );
-      result.fold(
-        onSuccess: (skills) {
-          if (skills.isEmpty) {
-            nextScreen = const SkillsSelectionScreen(
-              forceToHomeAfterSave: true,
-            );
-          }
-        },
-        onFailure: (_) {},
-      );
-    }
-
     if (!mounted) return;
 
     RealtimeService.instance.connect(userId: user.id);
 
-    final allPermissionsGranted =
+    final allPermissionsGranted = user.needsWorkerVerification ||
         await AppPermissionsService.areAllRequiredPermissionsGranted(user.type);
     if (!mounted) return;
 
@@ -222,7 +204,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               icon: Icons.badge_outlined,
                             ),
                             validator: (value) {
-                              if (_selectedRole == 'worker' && (value == null || value.trim().isEmpty)) {
+                              if (_selectedRole == 'worker' &&
+                                  (value == null || value.trim().isEmpty)) {
                                 return 'Ingresa tu número de carnet';
                               }
                               return null;
@@ -278,7 +261,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 padding: const EdgeInsets.only(top: 10),
                                 child: Text(
                                   'Acepto los Términos y Condiciones de Chamba',
-                                  style: Theme.of(context).textTheme.bodyMedium
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
                                       ?.copyWith(
                                         color: AppTheme.colorText,
                                         fontWeight: FontWeight.w600,
@@ -327,7 +312,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                         email: _emailController.text,
                                         phone: _phoneController.text,
                                         countryCode: _countryCode,
-                                        ciNumber: _selectedRole == 'worker' ? _ciController.text : null,
+                                        ciNumber: _selectedRole == 'worker'
+                                            ? _ciController.text
+                                            : null,
                                         firstName: _firstNameController.text,
                                         lastName: _lastNameController.text,
                                         password: _passwordController.text,

@@ -315,7 +315,7 @@ class _RadarScreenState extends State<RadarScreen> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
                   ),
                   Text(
                     'Radar de Trabajo',
@@ -418,7 +418,7 @@ class _RadarScreenState extends State<RadarScreen> {
                                   children: [
                                     TileLayer(
                                       urlTemplate:
-                                          'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                          'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                                       userAgentPackageName:
                                           'com.chambatrabajo.app',
                                       additionalOptions: {

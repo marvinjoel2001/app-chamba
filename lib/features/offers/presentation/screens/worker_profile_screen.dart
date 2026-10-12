@@ -113,7 +113,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                 ),
                 Expanded(
                   child: _loading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const SkeletonProfile()
                       : _error != null
                           ? Center(child: Text(_error!))
                           : RefreshIndicator(

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Fondo claro de la app (AppTheme.colorBackground) -->
+    <color name="chamba_background">#F7F6FC</color>
 </resources>

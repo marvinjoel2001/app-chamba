@@ -31,4 +31,19 @@ void main() {
     await AuthRepositoryImpl(_Remote()).login(identifier: 'ana@example.com', password: 'secret123');
     expect(SessionCredentials.headers['Authorization'], 'Bearer signed-server-token');
   });
+  test('an unverified worker can sign in and keep a usable session', () async {
+    final remote = _Remote();
+    remote.response['user'] = {
+      'id': 'new-worker', 'type': 'worker', 'firstName': 'Juana',
+      'email': 'juana@example.com', 'verificationStatus': 'not_verified',
+      'isAvailable': false,
+    };
+    final result = await AuthRepositoryImpl(remote).login(
+      identifier: 'juana@example.com', password: 'secret123');
+    expect(result.isSuccess, isTrue);
+    expect(SessionStore.isLoggedIn, isTrue);
+    expect(SessionStore.currentUser?.needsWorkerVerification, isTrue);
+    expect(SessionCredentials.headers['Authorization'], 'Bearer signed-server-token');
+    expect(SessionStore.currentUser?.isAvailable, isFalse);
+  });
 }

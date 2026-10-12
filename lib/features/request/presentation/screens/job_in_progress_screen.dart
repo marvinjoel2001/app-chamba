@@ -745,7 +745,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                         children: [
                           TileLayer(
                             urlTemplate:
-                                'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                                'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                             userAgentPackageName: 'com.chambatrabajo.app',
                             additionalOptions: {
                               'accessToken': AppConfig.mapboxAccessToken,
@@ -786,7 +786,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                 child: Container(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.blue.shade600,
+                                    color: AppTheme.colorInfo,
                                     border: Border.all(
                                       color: Colors.white,
                                       width: 3,
@@ -794,7 +794,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                     boxShadow: [
                                       BoxShadow(
                                         color:
-                                            Colors.blue.withValues(alpha: 0.5),
+                                            AppTheme.colorInfo.withValues(alpha: 0.5),
                                         blurRadius: 14,
                                         spreadRadius: 2,
                                       ),
@@ -856,7 +856,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A2A1A),
+                          color: AppTheme.colorSuccessSoft,
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
                             color: AppTheme.colorSuccess.withValues(alpha: 0.3),
@@ -912,6 +912,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                       icon: const Icon(Icons.arrow_back),
                       style: IconButton.styleFrom(
                         backgroundColor: AppTheme.colorGlassDarkSoft,
+                        elevation: 2,
+                        shadowColor: const Color(0x401E1B4B),
                       ),
                     ),
                   ),
@@ -989,12 +991,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                 builder: (context, scrollController) {
                   return Container(
                     decoration: const BoxDecoration(
-                      color: Color(0xFF0D1728),
+                      color: Colors.white,
                       borderRadius:
                           BorderRadius.vertical(top: Radius.circular(28)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black54,
+                          color: Color(0x1F1E1B4B),
                           blurRadius: 10,
                           offset: Offset(0, -2),
                         ),
@@ -1017,9 +1019,11 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                           ),
                         ),
                         if (_loading)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: CircularProgressIndicator()),
+                          const SkeletonList(
+                            count: 3,
+                            lines: 3,
+                            shrinkWrap: true,
+                            padding: EdgeInsets.only(top: 4),
                           )
                         else if (_error != null && _tracking == null)
                           Padding(
@@ -1031,17 +1035,17 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.12),
+                                    color: AppTheme.colorError.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.cloud_off_rounded,
-                                      color: Colors.redAccent, size: 36),
+                                      color: AppTheme.colorError, size: 36),
                                 ),
                                 const SizedBox(height: 14),
                                 const Text(
                                   'Error de conexión',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppTheme.colorText,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1051,7 +1055,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                   _error!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
+                                    color: AppTheme.colorText.withValues(alpha: 0.7),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -1074,22 +1078,22 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                   margin: const EdgeInsets.only(bottom: 16),
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.12),
+                                    color: AppTheme.colorError.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                         color:
-                                            Colors.red.withValues(alpha: 0.35)),
+                                            AppTheme.colorError.withValues(alpha: 0.35)),
                                   ),
                                   child: Row(
                                     children: [
                                       const Icon(Icons.warning_amber_rounded,
-                                          color: Colors.orangeAccent, size: 20),
+                                          color: AppTheme.colorWarning, size: 20),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           _error!,
                                           style: const TextStyle(
-                                              color: Colors.white,
+                                              color: AppTheme.colorText,
                                               fontSize: 13),
                                         ),
                                       ),

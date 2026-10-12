@@ -12,6 +12,7 @@ import '../../../../core/session/session_credentials.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../data/models/chat_message_model.dart';
 import '../../domain/entities/chat_message.dart';
@@ -490,7 +491,7 @@ class _ChatScreenState extends State<ChatScreen>
                       ])),
                 Expanded(
                     child: _loading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? const SkeletonChat()
                         : _thread == null
                             ? const Center(
                                 child: Icon(Icons.lock_outline_rounded,
@@ -835,9 +836,7 @@ class _ChatScreenState extends State<ChatScreen>
                   Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                          date == null
-                              ? ''
-                              : '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
+                          date == null ? '' : messageTimeLabel(date),
                           style: TextStyle(
                               color: mine ? Colors.white70 : _muted,
                               fontSize: 10))),

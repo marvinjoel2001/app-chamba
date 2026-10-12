@@ -22,13 +22,13 @@ class VerificationCheckpointScreen extends StatelessWidget {
                 Icon(
                   isPending ? Icons.search : Icons.verified_user_outlined,
                   size: 80,
-                  color: isPending ? Colors.orange : AppTheme.colorPrimary,
+                  color: isPending ? AppTheme.colorWarning : AppTheme.colorPrimary,
                 ),
                 const SizedBox(height: 24),
                 Text(
                   isPending ? 'Verificación en proceso' : 'Verificación de Identidad',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: isPending ? Colors.orange : Colors.white,
+                    color: isPending ? AppTheme.colorWarning : AppTheme.colorText,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
@@ -39,7 +39,7 @@ class VerificationCheckpointScreen extends StatelessWidget {
                       ? 'Tu verificación se encuentra en proceso. Te notificaremos cuando sea aprobada.'
                       : 'Si quieres empezar a trabajar o agarrar trabajos, debes verificar tu identidad',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.white70,
+                    color: AppTheme.colorMuted,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -65,12 +65,12 @@ class VerificationCheckpointScreen extends StatelessWidget {
                           },
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Colors.white),
+                            side: const BorderSide(color: AppTheme.colorGlassBorderSoft),
                           ),
                           child: Text(
                             'Omitir / Luego',
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.white,
+                              color: AppTheme.colorText,
                             ),
                           ),
                         ),

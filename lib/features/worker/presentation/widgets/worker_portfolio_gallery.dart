@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/chamba_widgets.dart';
 import '../../domain/entities/worker_portfolio_photo.dart';
 
 class WorkerPortfolioGallery extends StatelessWidget {
@@ -64,7 +65,7 @@ class WorkerPortfolioGallery extends StatelessWidget {
                         onPressed: () => onDelete!(photo),
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: Colors.red.shade700,
+                          foregroundColor: AppTheme.colorError,
                         ),
                         icon: const Icon(Icons.delete_outline, size: 20),
                       ),
@@ -172,7 +173,8 @@ class _WorkPhoto extends StatelessWidget {
       fit: fit,
       loadingBuilder: (_, child, progress) => progress == null
           ? child
-          : const Center(child: CircularProgressIndicator()),
+          : const ChambaShimmer(
+              child: SkeletonBox(height: double.infinity, radius: 0)),
       errorBuilder: (_, __, ___) => const Center(
         child: Icon(Icons.broken_image_outlined, color: AppTheme.colorMuted),
       ),

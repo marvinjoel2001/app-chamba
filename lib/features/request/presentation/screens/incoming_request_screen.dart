@@ -316,6 +316,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   Future<void> _toggleAvailability(bool value) async {
     final user = SessionStore.currentUser;
     if (user == null || _togglingAvailability) return;
+    if (value && !_isVerified) {
+      _showVerificationRequired();
+      return;
+    }
     setState(() {
       _togglingAvailability = true;
       _available = value;
@@ -363,7 +367,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             builder: (context, scrollController) {
               return Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFF0D1728),
+                  color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
                 child: ListView(
@@ -377,7 +381,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         height: 4,
                         margin: const EdgeInsets.only(bottom: 20),
                         decoration: BoxDecoration(
-                          color: AppTheme.colorMuted.withOpacity(0.3),
+                          color: AppTheme.colorMuted.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -440,7 +444,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             setModalState(() => _selectedCategory = value);
                             setState(() => _selectedCategory = value);
                           },
-                          selectedColor: AppTheme.colorPrimary.withOpacity(0.3),
+                          selectedColor: AppTheme.colorPrimary.withValues(alpha: 0.3),
                           backgroundColor: AppTheme.colorSurfaceSoft,
                           labelStyle: TextStyle(
                             color: isSelected
@@ -481,7 +485,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                             setState(() => _selectedModality = v);
                           },
                           selectedColor:
-                              AppTheme.colorHighlight.withOpacity(0.3),
+                              AppTheme.colorHighlight.withValues(alpha: 0.3),
                           backgroundColor: AppTheme.colorSurfaceSoft,
                           labelStyle: TextStyle(
                             color: isSelected
@@ -864,7 +868,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     children: [
                       TileLayer(
                         urlTemplate:
-                            'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
+                            'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={accessToken}',
                         userAgentPackageName: 'com.chambatrabajo.app',
                         additionalOptions: {
                           'accessToken': AppConfig.mapboxAccessToken,
@@ -881,14 +885,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.blue.shade600,
+                                  color: AppTheme.colorInfo,
                                   border: Border.all(
                                     color: Colors.white,
                                     width: 3,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.blue.withValues(alpha: 0.5),
+                                      color: AppTheme.colorInfo.withValues(alpha: 0.5),
                                       blurRadius: 12,
                                     ),
                                   ],
@@ -925,8 +929,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       child: Material(
                         color: (_selectedCategory != null ||
                                 _selectedModality != null)
-                            ? AppTheme.colorPrimary.withOpacity(0.3)
+                            ? AppTheme.colorPrimary.withValues(alpha: 0.3)
                             : AppTheme.colorGlassDarkSoft,
+                        elevation: 2,
+                        shadowColor: const Color(0x401E1B4B),
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
                           onTap: _showFilterModal,
@@ -966,7 +972,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   92.0 + MediaQuery.viewPaddingOf(context).bottom;
               return Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFF0D1728),
+                  color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 // Un único ListView con el scrollController del sheet.
@@ -990,9 +996,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ),
                     // ── Contenido ────────────────────────────────────
                     if (_loading && _requests.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: CircularProgressIndicator()),
+                      const SkeletonList(
+                        count: 3,
+                        lines: 3,
+                        trailing: true,
+                        shrinkWrap: true,
+                        padding: EdgeInsets.only(top: 4),
                       )
                     else if (_error != null && _requests.isEmpty)
                       Padding(
@@ -1005,17 +1014,17 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                               Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.12),
+                                  color: AppTheme.colorError.withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.cloud_off_rounded,
-                                    color: Colors.redAccent, size: 40),
+                                    color: AppTheme.colorError, size: 40),
                               ),
                               const SizedBox(height: 14),
                               const Text(
                                 'Error de conexión',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppTheme.colorText,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -1025,7 +1034,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                 _error!,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: AppTheme.colorText.withValues(alpha: 0.7),
                                   fontSize: 13,
                                 ),
                               ),
@@ -1053,22 +1062,22 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     horizontal: 20, vertical: 8),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.12),
+                                  color: AppTheme.colorError.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                       color:
-                                          Colors.red.withValues(alpha: 0.35)),
+                                          AppTheme.colorError.withValues(alpha: 0.35)),
                                 ),
                                 child: Row(
                                   children: [
                                     const Icon(Icons.warning_amber_rounded,
-                                        color: Colors.orangeAccent, size: 20),
+                                        color: AppTheme.colorWarning, size: 20),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         _error!,
                                         style: const TextStyle(
-                                            color: Colors.white, fontSize: 13),
+                                            color: AppTheme.colorText, fontSize: 13),
                                       ),
                                     ),
                                     TextButton(
@@ -1090,7 +1099,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                     const Text(
                                       'Solicitudes disponibles',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: AppTheme.colorText,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 16,
                                       ),
@@ -1331,7 +1340,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   Text(
                                     'El cliente aceptó tu oferta. Dirígete a la ubicación.',
                                     style: TextStyle(
-                                      color: Colors.white70,
+                                      color: AppTheme.colorMuted,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1429,10 +1438,10 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.colorPrimary.withOpacity(0.15),
+          color: AppTheme.colorPrimary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppTheme.colorPrimary.withOpacity(0.4),
+            color: AppTheme.colorPrimary.withValues(alpha: 0.4),
           ),
         ),
         child: Row(
@@ -1440,7 +1449,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.colorPrimary.withOpacity(0.2),
+                color: AppTheme.colorPrimary.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.handyman,
@@ -1521,13 +1530,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isNew
-              ? AppTheme.colorSuccess.withOpacity(0.5)
+              ? AppTheme.colorSuccess.withValues(alpha: 0.5)
               : AppTheme.colorGlassBorderSoft,
         ),
         gradient: isNew
             ? LinearGradient(
                 colors: [
-                  AppTheme.colorSuccess.withOpacity(0.15),
+                  AppTheme.colorSuccess.withValues(alpha: 0.15),
                   AppTheme.colorSurfaceSoft,
                 ],
                 begin: Alignment.topLeft,
@@ -1580,7 +1589,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
+                        const Icon(Icons.star, color: AppTheme.colorHighlight, size: 14),
                         const SizedBox(width: 4),
                         Text(
                           '$clientRating ($clientReviews)',
@@ -1647,7 +1656,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       const PopupMenuItem(
                         value: 'report',
                         child: Text('Reportar publicación',
-                            style: TextStyle(color: Colors.redAccent)),
+                            style: TextStyle(color: AppTheme.colorError)),
                       ),
                     ],
                   ),
@@ -1689,7 +1698,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppTheme.colorPrimary.withOpacity(0.15),
+                          color: AppTheme.colorPrimary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -1849,7 +1858,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         backgroundColor: AppTheme.colorSurfaceSoft,
                         valueColor: AlwaysStoppedAnimation<Color>(
                           offerProgress < 0.2
-                              ? Colors.red
+                              ? AppTheme.colorError
                               : AppTheme.colorPrimary,
                         ),
                       ),
@@ -1860,13 +1869,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: AppTheme.colorError.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border: Border.all(color: AppTheme.colorError.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cancel, color: Colors.red),
+                    const Icon(Icons.cancel, color: AppTheme.colorError),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -1874,7 +1883,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         children: [
                           const Text('Oferta declinada',
                               style: TextStyle(
-                                  color: Colors.red,
+                                  color: AppTheme.colorError,
                                   fontWeight: FontWeight.bold)),
                           Text(
                               'El cliente declinó tu oferta de Bs. $myOfferAmount',
@@ -1924,8 +1933,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     child: OutlinedButton(
                       onPressed: () => _dismissRequest(req['id'].toString()),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        side: const BorderSide(color: Colors.redAccent),
+                        foregroundColor: AppTheme.colorError,
+                        side: const BorderSide(color: AppTheme.colorError),
                       ),
                       child: const Text('No me interesa'),
                     ),
@@ -1952,7 +1961,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTheme.colorHighlight,
-                    foregroundColor: Colors.black,
+                    foregroundColor: AppTheme.colorText,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -2039,7 +2048,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 style: TextStyle(color: AppTheme.colorMuted)),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.colorError),
             onPressed: () async {
               Navigator.of(ctx).pop();
               final user = SessionStore.currentUser;
@@ -2214,7 +2223,7 @@ class _JobDetailsSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0D1728),
+            color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: ListView(
@@ -2599,13 +2608,13 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
                   boxShadow: isOcupado
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF00E676)
+                            color: AppTheme.colorSuccess
                                 .withValues(alpha: glow * 0.5),
                             blurRadius: 14 * glow,
                             spreadRadius: 2 * glow,
                           ),
                           BoxShadow(
-                            color: Colors.amber.withValues(alpha: glow * 0.3),
+                            color: AppTheme.colorHighlight.withValues(alpha: glow * 0.3),
                             blurRadius: 8 * glow,
                           ),
                         ]
@@ -2622,7 +2631,7 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
                 color: isOcupado
-                    ? const Color(0xFF00E676).withValues(alpha: 0.7)
+                    ? AppTheme.colorSuccess.withValues(alpha: 0.7)
                     : AppTheme.colorGlassBorderSoft,
                 width: isOcupado ? 1.5 : 1.0,
               ),
@@ -2686,12 +2695,12 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
                 color: AppTheme.colorGlassDarkSoft,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFF00E676).withValues(alpha: 0.6),
+                  color: AppTheme.colorSuccess.withValues(alpha: 0.6),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: const Color(0x1A1E1B4B),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -2701,12 +2710,12 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.touch_app_rounded,
-                      color: Color(0xFF00E676), size: 15),
+                      color: AppTheme.colorSuccess, size: 15),
                   SizedBox(width: 6),
                   Text(
                     'Toca para ponerte DISPONIBLE y ver trabajos',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppTheme.colorText,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.2,

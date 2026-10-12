@@ -163,12 +163,12 @@ class _BannerContent extends StatelessWidget {
         text = 'Sin conexión a internet';
         break;
       case _BannerState.reconnecting:
-        accent = AppTheme.colorHighlight;
+        accent = AppTheme.colorWarning;
         icon = Icons.sync_rounded;
         text = 'Reconectando…';
         break;
       case _BannerState.slow:
-        accent = AppTheme.colorHighlight;
+        accent = AppTheme.colorWarning;
         icon = Icons.network_check_rounded;
         text = 'Conexión lenta, puede tardar un poco';
         break;
@@ -188,7 +188,7 @@ class _BannerContent extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppTheme.colorGlassDarkSoft,
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: accent.withValues(alpha: 0.5)),
+            border: Border.all(color: accent.withValues(alpha: 0.35)),
             boxShadow: AppTheme.shadowMd,
           ),
           child: Row(

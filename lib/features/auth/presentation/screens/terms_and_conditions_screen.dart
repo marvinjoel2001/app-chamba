@@ -84,7 +84,22 @@ class _TermsAndConditionsScreenState extends State<TermsAndConditionsScreen> {
                   future: _contentFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState != ConnectionState.done) {
-                      return const Center(child: CircularProgressIndicator());
+                      return ChambaShimmer(
+                        child: ListView(
+                          padding: const EdgeInsets.all(20),
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            for (var i = 0; i < 14; i++) ...[
+                              FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: i % 5 == 4 ? 0.55 : 1,
+                                child: SkeletonBox(height: i % 5 == 0 ? 16 : 11),
+                              ),
+                              SizedBox(height: i % 5 == 4 ? 22 : 10),
+                            ],
+                          ],
+                        ),
+                      );
                     }
 
                     if (snapshot.hasError) {
