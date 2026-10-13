@@ -107,7 +107,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final pages = isWorker
         ? [
             IncomingRequestScreen(isActive: currentIndex == 0),
-            WalletScreen(onFindJobs: () => setState(() => currentIndex = 0)),
+            WalletScreen(
+                isActive: currentIndex == 1,
+                onFindJobs: () => setState(() => currentIndex = 0)),
             MessagesScreen(isActive: currentIndex == _messagesTabIndex),
             const ProfileMenuScreen(),
           ]

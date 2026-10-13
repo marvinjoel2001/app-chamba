@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/errors/result.dart';
 import 'package:mobile/core/session/session_store.dart';
+import 'package:mobile/core/network/realtime_service.dart';
 import 'package:mobile/features/worker/data/models/worker_job_model.dart';
 import 'package:mobile/features/worker/domain/entities/worker_job.dart';
 import 'package:mobile/features/worker/domain/repositories/worker_repository.dart';
@@ -10,11 +11,14 @@ import 'package:mobile/features/worker/presentation/screens/wallet_screen.dart';
 
 class _Repository extends Fake implements WorkerRepository {
   _Repository(this.jobs);
-  final List<WorkerJob> jobs;
+  List<WorkerJob> jobs;
+  int calls = 0;
   @override
   Future<Result<List<WorkerJob>>> workerHistory(
-          {required String workerUserId}) async =>
-      Success(jobs);
+      {required String workerUserId}) async {
+    calls++;
+    return Success(jobs);
+  }
 }
 
 WorkerJobModel job(String offerStatus, String requestStatus, double amount) =>
@@ -62,6 +66,45 @@ void main() {
     expect(job('accepted', 'completed', 125).isEarned, isTrue);
     expect(WorkerJobModel.fromJson({'requestStatus': 'completed'}).isEarned,
         isFalse);
+  });
+
+  testWidgets(
+      'returning to wallet refreshes completed work without pressing refresh',
+      (tester) async {
+    final repo = _Repository([]);
+    final useCase = GetWorkerHistoryUseCase(repo);
+    Widget screen(bool active) => MaterialApp(
+        home: WalletScreen(isActive: active, getWorkerHistoryUseCase: useCase));
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    await tester.pumpWidget(screen(false));
+    repo.jobs = [job('accepted', 'completed', 110)];
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    expect(find.text('Bs 110.00'), findsWidgets);
+    expect(repo.calls, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('reconnect refreshes visible wallet but not an inactive tab',
+      (tester) async {
+    final repo = _Repository([]);
+    final useCase = GetWorkerHistoryUseCase(repo);
+    Widget screen(bool active) => MaterialApp(
+        home: WalletScreen(isActive: active, getWorkerHistoryUseCase: useCase));
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    repo.jobs = [job('accepted', 'completed', 220)];
+    RealtimeService.instance.reconnectCount.value++;
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.text('Bs 220.00'), findsWidgets);
+    await tester.pumpWidget(screen(false));
+    final calls = repo.calls;
+    RealtimeService.instance.reconnectCount.value++;
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repo.calls, calls);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('empty wallet can return to requests', (tester) async {
