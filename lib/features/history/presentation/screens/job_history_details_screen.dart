@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../messages/domain/entities/chat_thread.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
+import '../../../request/presentation/widgets/retry_cancelled_request_button.dart';
 
 class JobHistoryDetailsScreen extends StatelessWidget {
   const JobHistoryDetailsScreen({
@@ -10,11 +11,13 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     required this.job,
     required this.isClient,
     this.customRequestId,
+    this.onBack,
   });
 
   final Map<String, dynamic> job;
   final bool isClient;
   final String? customRequestId;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +164,7 @@ class JobHistoryDetailsScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: onBack ?? () => Navigator.of(context).maybePop(),
         ),
         title: const Text(
           'Detalles del Trabajo',
@@ -267,6 +270,8 @@ class JobHistoryDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 1. Tarjeta Resumen / Encabezado
+            if (isClient && isCancelled && (customRequestId ?? job['requestId']) != null)
+              RetryCancelledRequestButton(requestId: (customRequestId ?? job['requestId']).toString()),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: _cardDecoration(),

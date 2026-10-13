@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../history/presentation/screens/job_history_details_screen.dart';
@@ -41,7 +42,7 @@ class _RequestOutcomeScreenState extends State<RequestOutcomeScreen> {
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
         future: _context,
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return Scaffold(
                 appBar: AppBar(title: const Text('Resultado del trabajo')),
                 body: Center(
@@ -51,17 +52,29 @@ class _RequestOutcomeScreenState extends State<RequestOutcomeScreen> {
                   TextButton(
                       onPressed: () => setState(() => _context = _load()),
                       child: const Text('Reintentar')),
+                  TextButton(
+                      onPressed: AppFlows.goHome,
+                      child: const Text('Volver a Inicio')),
                 ])));
-          if (!snapshot.hasData)
+          }
+          if (!snapshot.hasData) {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
+          }
           final job = snapshot.data!['request'] as Map<String, dynamic>;
           final isClient = SessionStore.currentUser?.type == 'client';
-          return JobHistoryDetailsScreen(
-            job: job,
-            isClient: isClient,
-            customRequestId: widget.requestId,
-          );
+          final canPop = Navigator.of(context).canPop();
+          return PopScope(
+              canPop: canPop,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop && !canPop) AppFlows.goHome();
+              },
+              child: JobHistoryDetailsScreen(
+                job: job,
+                isClient: isClient,
+                customRequestId: widget.requestId,
+                onBack: canPop ? null : AppFlows.goHome,
+              ));
         },
       );
 }

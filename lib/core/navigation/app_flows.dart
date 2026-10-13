@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app.dart';
 import '../../features/review/presentation/screens/rating_screen.dart';
 import '../../features/shell/presentation/screens/main_shell_screen.dart';
+import '../../features/request/presentation/screens/request_outcome_screen.dart';
 import '../services/toast_service.dart';
 import '../session/session_store.dart';
 
@@ -22,6 +23,7 @@ class AppFlows {
 
   static DateTime? _lastRatingNav;
   static DateTime? _lastCancelNav;
+  static String? _lastCancelRequestId;
 
   /// Cliente: el trabajo terminó → ir a calificar (una sola vez).
   static void goToRating({String? requestId}) {
@@ -31,7 +33,8 @@ class AppFlows {
     final nav = ChambaApp.navigatorKey.currentState;
     if (nav == null) return;
     nav.pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => RatingScreen(requestId: requestId)),
+      MaterialPageRoute<void>(
+          builder: (_) => RatingScreen(requestId: requestId)),
       (route) => false,
     );
   }
@@ -45,27 +48,33 @@ class AppFlows {
   }) {
     SessionStore.clearActiveJob(requestId: requestId);
 
-    if (_isDuplicate(_lastCancelNav)) return;
+    if (_lastCancelRequestId == requestId && _isDuplicate(_lastCancelNav)) {
+      return;
+    }
     _lastCancelNav = DateTime.now();
+    _lastCancelRequestId = requestId;
 
     final nav = ChambaApp.navigatorKey.currentState;
     if (nav == null) return;
-    
-    // Volver al inicio asegurando que se carga la pantalla principal
+
+    // Clientes ven el resultado y pueden preparar otra solicitud; workers vuelven al inicio.
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => MainShellScreen(
-          role: SessionStore.currentUser?.type ?? 'client',
-        ),
+        builder: (_) => SessionStore.currentUser?.type == 'client' &&
+                requestId != null
+            ? RequestOutcomeScreen(requestId: requestId)
+            : MainShellScreen(role: SessionStore.currentUser?.type ?? 'client'),
       ),
       (route) => false,
     );
-    
-    if (showNotice) ToastService.show(
-      title: 'Trabajo cancelado',
-      body: message,
-      type: ToastType.error,
-    );
+
+    if (showNotice) {
+      ToastService.show(
+        title: 'Trabajo cancelado',
+        body: message,
+        type: ToastType.error,
+      );
+    }
   }
 
   /// Volver al inicio sin avisos (p. ej. desde una pantalla de una solicitud

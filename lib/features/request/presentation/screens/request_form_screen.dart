@@ -33,6 +33,12 @@ class RequestFormScreen extends StatefulWidget {
     this.initialAddress,
     this.preselectedCategory,
     this.preselectedWorkerId,
+    this.initialBudget,
+    this.initialEstimatedHours,
+    this.initialHourlyRate,
+    this.initialDays,
+    this.initialDailyRate,
+    this.isRetry = false,
     super.key,
   });
 
@@ -46,6 +52,9 @@ class RequestFormScreen extends StatefulWidget {
   final String? initialAddress;
   final String? preselectedCategory;
   final String? preselectedWorkerId;
+  final double? initialBudget, initialHourlyRate, initialDailyRate;
+  final int? initialEstimatedHours, initialDays;
+  final bool isRetry;
 
   @override
   State<RequestFormScreen> createState() => _RequestFormScreenState();
@@ -98,6 +107,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialBudget != null) {
+      _budgetController.text = widget.initialBudget!.toString();
+    }
+    if (widget.initialEstimatedHours != null) {
+      _estimatedHoursController.text = widget.initialEstimatedHours!.toString();
+    }
+    if (widget.initialHourlyRate != null) {
+      _hourlyRateController.text = widget.initialHourlyRate!.toString();
+    }
+    if (widget.initialDays != null) {
+      _daysController.text = widget.initialDays!.toString();
+    }
+    if (widget.initialDailyRate != null) {
+      _dailyRateController.text = widget.initialDailyRate!.toString();
+    }
     if (widget.modality == 'hourly') {
       priceType = 'Por hora';
     } else if (widget.modality == 'daily') {
@@ -1129,10 +1153,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                             height: 1.2, color: requestMuted))),
                               ...choices.values.map((item) => ListTile(
                                   leading: RequestIconTile(
-                                      icon: CategoryVisual.of(
-                                              item['name']?.toString(),
-                                              iconHint:
-                                                  item['icon']?.toString())
+                                      icon: CategoryVisual.of(item['name']?.toString(), iconHint: item['icon']?.toString())
                                           .icon,
                                       color: CategoryVisual.of(
                                               item['name']?.toString(),
@@ -1144,11 +1165,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                       style: const TextStyle(
                                           height: 1.2, color: requestInk)),
                                   trailing: item['name'] == _primaryCategoryName
-                                      ? const Icon(Icons.check_circle_rounded,
-                                          color: requestPurple)
+                                      ? const Icon(Icons.check_circle_rounded, color: requestPurple)
                                       : null,
-                                  onTap: () =>
-                                      Navigator.pop(sheetContext, item))),
+                                  onTap: () => Navigator.pop(sheetContext, item))),
                             ]);
                           })),
                 ]))));
@@ -1226,19 +1245,22 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                         icon: const Icon(Icons.arrow_back_rounded,
                             color: requestInk, size: 25))),
                 const SizedBox(width: 16),
-                const Expanded(
+                Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text('Nueva solicitud',
-                          style: TextStyle(
+                      Text(
+                          widget.isRetry
+                              ? 'Buscar otro trabajador'
+                              : 'Nueva solicitud',
+                          style: const TextStyle(
                               height: 1.2,
                               fontSize: 23,
                               fontWeight: FontWeight.w800,
                               color: requestInk,
                               letterSpacing: -.5)),
-                      SizedBox(height: 3),
-                      Text('Cuéntanos los detalles de tu solicitud',
+                      const SizedBox(height: 3),
+                      const Text('Cuéntanos los detalles de tu solicitud',
                           style: TextStyle(
                               height: 1.2,
                               fontSize: 12,
