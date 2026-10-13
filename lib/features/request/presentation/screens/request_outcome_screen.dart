@@ -3,6 +3,7 @@ import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../history/presentation/screens/job_history_details_screen.dart';
+import '../../domain/entities/request_history_context.dart';
 
 /// Always reads the current server state; opening an old push never replaces the active job.
 class RequestOutcomeScreen extends StatefulWidget {
@@ -27,13 +28,10 @@ class _RequestOutcomeScreenState extends State<RequestOutcomeScreen> {
               .getClientHistory(clientUserId: user.id)
           : await MobileBackendService.instance
               .getWorkerHistory(workerUserId: user.id);
-      for (final item in history['jobs'] as List? ?? []) {
-        if (item is Map && item['requestId'] == widget.requestId) {
-          return {
-            'request': {...job, ...Map<String, dynamic>.from(item)}
-          };
-        }
-      }
+      return {
+        'request': withAcceptedRequestHistory(
+            job, history['jobs'] as List? ?? [], widget.requestId)
+      };
     }
     return result;
   }
