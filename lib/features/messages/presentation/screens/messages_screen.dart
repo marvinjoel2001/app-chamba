@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/network/realtime_service.dart';
-import '../../../../core/push/notification_router.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
-import '../../../../core/session/unread_notifications_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_visuals.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../history/presentation/screens/job_history_details_screen.dart';
-import '../../../notifications/data/notifications_service.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../notifications/domain/models/app_notification.dart';
 import '../../../notifications/presentation/notification_style.dart';
 import '../../../request/presentation/screens/job_in_progress_screen.dart';
@@ -19,11 +17,14 @@ import '../../domain/entities/chat_thread.dart';
 import '../state/messages_dependencies.dart';
 
 class MessagesScreen extends StatefulWidget {
-  const MessagesScreen({this.isActive = true, super.key});
-
-  /// `true` mientras la pestaña está a la vista: los avisos mostrados se
-  /// marcan como leídos (antes lo hacía la pantalla de notificaciones aparte).
+  const MessagesScreen(
+      {this.isActive = true,
+      this.loadThreads,
+      this.previewNotifications,
+      super.key});
   final bool isActive;
+  final Future<List<ChatThread>> Function()? loadThreads;
+  final List<AppNotification>? previewNotifications;
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
 }
@@ -32,55 +33,9 @@ class _MessagesScreenState extends State<MessagesScreen>
     with WidgetsBindingObserver {
   final _realtime = RealtimeService.instance;
   List<ChatThread> _threads = [];
-  List<AppNotification> _notifications = [];
   bool _loading = true, _fetching = false, _again = false;
-  bool _hasMore = false, _loadingMore = false;
-  int _page = 1;
+  String? _error;
 
-  /// Avisos que estaban sin leer cuando se mostraron en esta visita: siguen
-  /// destacados aunque el servidor ya los tenga como leídos.
-  final Set<String> _sessionUnread = {};
-  final Set<String> _markingRead = {};
-
-  @override
-  void didUpdateWidget(covariant MessagesScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) {
-      _markShownAsRead();
-    } else if (!widget.isActive && oldWidget.isActive) {
-      setState(_sessionUnread.clear);
-    }
-  }
-
-  void _markShownAsRead() {
-    if (!widget.isActive) return;
-    final ids = _notifications
-        .where((n) => !n.isRead && !_markingRead.contains(n.id))
-        .map((n) => n.id)
-        .toList();
-    if (ids.isEmpty) return;
-    _sessionUnread.addAll(ids);
-    _markingRead.addAll(ids);
-    unawaited(NotificationsService.markAsRead(ids: ids)
-        .then((_) => UnreadNotificationsNotifier.instance.refresh())
-        .catchError((_) {/* Se reintenta en la próxima carga. */})
-        .whenComplete(() => _markingRead.removeAll(ids)));
-  }
-
-  List<AppNotification> get _displayedNotifications => [
-        for (final n in _notifications)
-          n.isRead && _sessionUnread.contains(n.id)
-              ? AppNotification(
-                  id: n.id,
-                  title: n.title,
-                  body: n.body,
-                  type: n.type,
-                  isRead: false,
-                  createdAt: n.createdAt,
-                  data: n.data)
-              : n,
-      ];
-  String? _error, _notificationError;
   @override
   void initState() {
     super.initState();
@@ -88,7 +43,6 @@ class _MessagesScreenState extends State<MessagesScreen>
     _realtime.connect(userId: SessionStore.currentUser?.id);
     for (final event in [
       'message.new',
-      'notification.new',
       'offer.accepted',
       'job.completed',
       'job.cancelled'
@@ -96,8 +50,13 @@ class _MessagesScreenState extends State<MessagesScreen>
       _realtime.on(event, _onEvent);
     }
     _realtime.reconnectCount.addListener(_reload);
-    UnreadNotificationsNotifier.instance.addListener(_reload);
-    _reload();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) _load();
   }
 
   @override
@@ -105,7 +64,6 @@ class _MessagesScreenState extends State<MessagesScreen>
     WidgetsBinding.instance.removeObserver(this);
     for (final event in [
       'message.new',
-      'notification.new',
       'offer.accepted',
       'job.completed',
       'job.cancelled'
@@ -113,7 +71,6 @@ class _MessagesScreenState extends State<MessagesScreen>
       _realtime.off(event, _onEvent);
     }
     _realtime.reconnectCount.removeListener(_reload);
-    UnreadNotificationsNotifier.instance.removeListener(_reload);
     super.dispose();
   }
 
@@ -123,105 +80,49 @@ class _MessagesScreenState extends State<MessagesScreen>
   }
 
   void _onEvent(dynamic _) => _reload();
-  void _reload() => unawaited(_load());
+  void _reload() {
+    if (widget.isActive) unawaited(_load());
+  }
+
   Future<void> _load() async {
     if (_fetching) {
       _again = true;
       return;
     }
-    final user = SessionStore.currentUser;
-    if (user == null) {
-      if (mounted)
-        setState(() {
-          _loading = false;
-          _error = 'Inicia sesión para ver tus notificaciones.';
-        });
-      return;
-    }
+    final userId = SessionStore.currentUser?.id;
+    if (userId == null) return;
     _fetching = true;
-    await Future.wait([
-      _loadThreads(user.id),
-      _loadNotifications(),
-    ]);
-    if (!mounted) return;
-    setState(() => _loading = false);
-    _fetching = false;
-    _markShownAsRead();
-    if (_again) {
-      _again = false;
-      _reload();
-    }
-  }
-
-  Future<void> _loadThreads(String userId) async {
-    final result = await MessagesDependencies.getActiveThreads(userId: userId);
-    if (!mounted) return;
-    result.fold(
-        onSuccess: (threads) {
-          setState(() {
-            _threads = threads.toList()
-              ..sort((a, b) => (b.lastMessageAt ?? b.createdAt ?? DateTime(0))
-                  .compareTo(a.lastMessageAt ?? a.createdAt ?? DateTime(0)));
-            _error = null;
-          });
-          UnreadMessagesNotifier.instance.refresh();
-        },
-        onFailure: (failure) => setState(() => _error = failure.message));
-  }
-
-  static const _pageSize = 20;
-
-  Future<void> _loadNotifications() async {
     try {
-      final result =
-          await NotificationsService.getNotifications(page: 1, limit: _pageSize);
-      if (mounted)
-        setState(() {
-          _notifications = result.items;
-          _hasMore = result.hasMore;
-          _page = 1;
-          _notificationError = null;
-        });
-    } catch (_) {
-      if (mounted)
-        setState(() =>
-            _notificationError = 'No pudimos actualizar las notificaciones.');
-    }
-  }
-
-  Future<void> _loadMoreNotifications() async {
-    if (_loadingMore || !_hasMore || _fetching) return;
-    setState(() => _loadingMore = true);
-    try {
-      final result = await NotificationsService.getNotifications(
-          page: _page + 1, limit: _pageSize);
-      if (!mounted) return;
+      final threads = widget.loadThreads != null
+          ? await widget.loadThreads!()
+          : (await MessagesDependencies.getActiveThreads(userId: userId)).fold(
+              onSuccess: (value) => value,
+              onFailure: (failure) => throw Exception(failure.message));
+      if (!mounted || SessionStore.currentUser?.id != userId) return;
       setState(() {
-        final seen = _notifications.map((n) => n.id).toSet();
-        _notifications = [
-          ..._notifications,
-          ...result.items.where((n) => !seen.contains(n.id)),
-        ];
-        _hasMore = result.hasMore;
-        _page++;
+        _threads = threads.toList()
+          ..sort((a, b) => (b.lastMessageAt ?? b.createdAt ?? DateTime(0))
+              .compareTo(a.lastMessageAt ?? a.createdAt ?? DateTime(0)));
+        _error = null;
+        _loading = false;
       });
-      _markShownAsRead();
+      if (widget.loadThreads == null) {
+        unawaited(UnreadMessagesNotifier.instance.refresh());
+      }
     } catch (_) {
-      // Se reintenta al volver a llegar al final de la lista.
+      if (mounted && SessionStore.currentUser?.id == userId) {
+        setState(() {
+          _error = 'No pudimos actualizar las conversaciones.';
+          _loading = false;
+        });
+      }
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      _fetching = false;
+      if (_again) {
+        _again = false;
+        if (mounted && widget.isActive) unawaited(_load());
+      }
     }
-  }
-
-  Future<void> _openNotification(AppNotification notification) async {
-    try {
-      await NotificationsService.markAsRead(ids: [notification.id]);
-      await UnreadNotificationsNotifier.instance.refresh();
-    } catch (_) {/* Keep navigation available when marking read fails. */}
-    if (!mounted) return;
-    NotificationRouter.openFromData(
-        {'type': notification.type, ...?notification.data},
-        fromNotificationCenter: true);
   }
 
   Future<void> _openThread(ChatThread thread) async {
@@ -245,7 +146,7 @@ class _MessagesScreenState extends State<MessagesScreen>
         isWorker ? 'client' : 'worker': {
           'firstName': thread.counterpartFirstName ?? thread.counterpartName,
           'lastName': thread.counterpartLastName ?? '',
-          'profilePhotoUrl': thread.counterpartProfilePhotoUrl
+          'profilePhotoUrl': thread.counterpartProfilePhotoUrl,
         },
       });
     }
@@ -255,18 +156,20 @@ class _MessagesScreenState extends State<MessagesScreen>
   }
 
   @override
-  Widget build(BuildContext context) => MessagesInbox(
-      threads: _threads,
-      notifications: _displayedNotifications,
-      loading: _loading,
-      error: _error,
-      notificationError: _notificationError,
-      hasMore: _hasMore,
-      loadingMore: _loadingMore,
-      onRefresh: _load,
-      onLoadMore: _loadMoreNotifications,
-      onNotification: _openNotification,
-      onThread: _openThread);
+  Widget build(BuildContext context) => NotificationsScreen(
+        isActive: widget.isActive,
+        previewItems: widget.previewNotifications,
+        onRefreshHeader: _load,
+        header: MessagesInbox(
+          threads: _threads,
+          notifications: const [],
+          loading: _loading,
+          error: _error,
+          onRefresh: _load,
+          onNotification: (_) {},
+          onThread: _openThread,
+        ).conversations,
+      );
 }
 
 /// Pestaña "Notificaciones": chats de trabajos en curso arriba y, debajo, todos
@@ -295,6 +198,30 @@ class MessagesInbox extends StatelessWidget {
   final ValueChanged<AppNotification> onNotification;
   final ValueChanged<ChatThread> onThread;
   static const _ink = AppTheme.colorText, _muted = AppTheme.colorMuted;
+
+  /// Shared conversation section inside the visual notification center.
+  Widget get conversations {
+    final confirmed = threads.where((thread) => thread.chatEnabled).toList();
+    final active = confirmed.where((thread) => thread.isActive).toList();
+    final archived = confirmed.where((thread) => !thread.isActive).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (error != null)
+        Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(error!, style: const TextStyle(color: _muted))),
+      if (loading && threads.isEmpty) const SkeletonListTile(lines: 2),
+      if (active.isNotEmpty) ...[
+        const _SectionLabel('Trabajos en curso'),
+        ...active.map(_threadTile),
+      ],
+      if (archived.isNotEmpty)
+        ExpansionTile(
+          title: const Text('Historial de trabajos'),
+          subtitle: Text('${archived.length} conversaciones conservadas'),
+          children: archived.map(_threadTile).toList(),
+        ),
+    ]);
+  }
 
   /// Avisos con encabezados de día intercalados ("Hoy", "Ayer", …).
   List<Object> _grouped() {
@@ -358,8 +285,8 @@ class MessagesInbox extends StatelessWidget {
                           if (error != null || notificationError != null)
                             SliverToBoxAdapter(
                                 child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        20, 8, 20, 0),
+                                    padding:
+                                        const EdgeInsets.fromLTRB(20, 8, 20, 0),
                                     child: Text(
                                         [
                                           if (error != null) error!,
@@ -402,7 +329,9 @@ class MessagesInbox extends StatelessWidget {
                             const SliverToBoxAdapter(
                                 child: SkeletonListTile(
                                     lines: 3, circleLeading: false)),
-                          if (!loading && notifications.isEmpty && active.isEmpty)
+                          if (!loading &&
+                              notifications.isEmpty &&
+                              active.isEmpty)
                             SliverToBoxAdapter(
                                 child: Padding(
                                     padding: const EdgeInsets.only(top: 40),

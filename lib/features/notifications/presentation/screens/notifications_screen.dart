@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/network/realtime_service.dart';
 import '../../../../core/push/notification_router.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_notifications_notifier.dart';
@@ -23,7 +24,10 @@ class NotificationsScreen extends StatefulWidget {
       this.loadPage,
       this.loadCounts,
       this.markRead,
-      this.onOpenNotification});
+      this.onOpenNotification,
+      this.isActive = true,
+      this.header,
+      this.onRefreshHeader});
 
   /// In-memory preview and injected boundaries keep QA isolated from real accounts.
   final List<AppNotification>? previewItems;
@@ -31,11 +35,15 @@ class NotificationsScreen extends StatefulWidget {
   final Future<NotificationTypeCounts> Function()? loadCounts;
   final Future<void> Function(List<String> ids)? markRead;
   final bool Function(AppNotification notification)? onOpenNotification;
+  final bool isActive;
+  final Widget? header;
+  final Future<void> Function()? onRefreshHeader;
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with WidgetsBindingObserver {
   List<AppNotification> _notifications = [];
   bool _isLoading = true,
       _isLoadingMore = false,
@@ -50,6 +58,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _countsFailed = false;
   final _scrollController = ScrollController();
   final _pendingReadIds = <String>{};
+  final _realtime = RealtimeService.instance;
+  Timer? _refreshDebounce;
 
   List<AppNotification> get _visible => _notifications
       .where((n) =>
@@ -114,14 +124,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _realtime.on('notification.new', _onNotificationEvent);
+    _realtime.on('notifications.changed', _onNotificationEvent);
+    _realtime.reconnectCount.addListener(_refreshWhenActive);
     _scrollController.addListener(_onScroll);
     _loadNotifications();
+  }
+
+  void _onNotificationEvent(dynamic _) => _refreshWhenActive();
+
+  void _refreshWhenActive() {
+    if (!widget.isActive) return;
+    _refreshDebounce?.cancel();
+    _refreshDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted && widget.isActive) _loadNotifications();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant NotificationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((!oldWidget.isActive && widget.isActive) ||
+        oldWidget.previewItems != widget.previewItems) {
+      _loadNotifications();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshWhenActive();
   }
 
   @override
   void dispose() {
     _generation++;
     _countGeneration++;
+    _refreshDebounce?.cancel();
+    _realtime.off('notification.new', _onNotificationEvent);
+    _realtime.off('notifications.changed', _onNotificationEvent);
+    _realtime.reconnectCount.removeListener(_refreshWhenActive);
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
   }
@@ -338,12 +381,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ? _counts.read
             : _counts.unread + _counts.read;
     return RefreshIndicator(
-        onRefresh: _loadNotifications,
+        onRefresh: () async {
+          await Future.wait([
+            _loadNotifications(),
+            if (widget.onRefreshHeader != null) widget.onRefreshHeader!(),
+          ]);
+        },
         child: ListView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             children: [
+              if (widget.header != null &&
+                  _readFilter == NotificationReadFilter.all &&
+                  (_category == NotificationCategory.all ||
+                      _category == NotificationCategory.messages))
+                widget.header!,
               if (_error != null)
                 Padding(
                     padding: const EdgeInsets.only(bottom: 12),
