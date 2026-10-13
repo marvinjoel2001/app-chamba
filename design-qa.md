@@ -152,3 +152,52 @@ con datos aislados; sigue pendiente la comprobación manual con sesión real en
 un dispositivo. No se desplegaron los cambios durante esta tarea.
 
 final result: passed
+
+## 2026-10-13 — Barra inferior con onda por rol
+
+Referencia: docs/bottom-nav-design/reference.png, imagen seleccionada por el usuario.
+Implementación: ChambaWaveBottomNav, consumida por las dos clases públicas de navegación existentes. No se modificaron las rutas del shell ni la carga de sus pantallas.
+
+Evidencia: docs/bottom-nav-design/comparison.png reúne la referencia y las capturas reales de Flutter, además de los estados Billetera seleccionada y Notificaciones seleccionada con contadores. client-worker.png es la vista compacta final.
+
+Captura: viewport lógico 390 px; superficies de 366 × 84 px; PNG de componente a densidad 3, normalizado a 390 × 94 px para comparar. Se recortó solo la región de navegación de la referencia y se normalizó a 366 × 84 px. El teléfono, el indicador de inicio y el texto editorial no pertenecen al componente. Se verificó la barra nativa de forma aislada; no se afirma una prueba de sesión real en teléfono.
+
+Hallazgos y correcciones:
+- P1, accesibilidad: el nodo de navegación ocultaba la acción del hijo al excluir semántica. Se añadió la acción de pulsación al nodo que anuncia la pestaña, su estado seleccionado y el total exacto sin leer. Las pruebas validan la acción y cada callback.
+- P2, iconos: se redujeron los tamaños a 32 px en el botón activo y 28 px en los inactivos para acercarse a la referencia.
+- P2, legibilidad: el texto amarillo activo y las etiquetas inactivas usan tonos algo más oscuros que la referencia para facilitar la lectura. El círculo activo conserva el amarillo vivo.
+- Artefacto de captura: Flutter Test desactivaba el desenfoque de sombras y la captura tenía exterior transparente. Se habilitaron sombras reales y el fondo de la app antes de comparar. No se confundió ese artefacto con un borde real.
+
+Superficies de fidelidad:
+- Tipografía: se conserva Plus Jakarta Sans del producto; 11 px, pesos 500/600, etiquetas completas. El área crece con el tamaño de texto y admite varias líneas.
+- Espaciado: tres pestañas para clientes y cuatro para trabajadores; círculos de 56 px, radios de 28 px y área segura inferior. Targets mayores de 48 px incluso a 320 px y escala de texto 2.
+- Color: cliente morado; trabajador amarillo/ámbar; iconos secundarios lavanda, contador rojo. La pequeña diferencia de tono en etiquetas es intencional por legibilidad.
+- Imágenes y onda: cinco iconos PNG independientes con alfa y dos fondos generados con ImageGen. Una curva amplia en el tercio superior, valle central y subida a la derecha; se verificó la curva en la comparación. BoxFit.fill conserva ambos extremos. La referencia representa una onda decorativa estática; no se añadió desplazamiento repetido.
+- Contenido: Inicio, Billetera, Notificaciones y Perfil mantienen sus nombres y orden. Billetera solo aparece para trabajadores. El contador se conserva y muestra 99+ sin perder el total accesible.
+
+Validación: 41 pruebas pasaron (barra, callbacks por rol, estados, contadores, mensajes y política de notificaciones); tras el ajuste final de color se repitieron las 7 pruebas de la barra y se recapturó la comparación. Análisis estático de los tres archivos modificados sin incidencias. git diff --check correcto.
+La compilación del APK fue cancelada a petición del usuario. No se entrega ni se publica un APK en esta iteración.
+
+Sin P0/P1/P2 pendientes dentro del componente revisado. Diferencias aceptadas: tipografía existente del producto, tono accesible de etiquetas, proporciones discretamente ajustadas a 390 px y separación adicional de área segura.
+final result: passed
+
+## 2026-10-13 — Transición de selección de la barra
+
+El círculo destacado se desliza durante 260 ms con easeInOutCubic. El icono viaja dentro del círculo y cambia con un fundido y escala de 130 ms; las etiquetas cambian suavemente de color. La acción de navegación se ejecuta de inmediato. No hay temporizadores, reproducción continua ni espera para aceptar otro toque. La preferencia del sistema de reducir movimiento pone las duraciones a cero.
+
+Primera revisión visual: P2, los iconos blancos estacionarios perdían legibilidad cuando el círculo pasaba por debajo. Se corrigió colocando el icono activo dentro del círculo que se mueve. Se recapturaron los estados inicial, 80 ms, 160 ms y final para ambos roles. El contador se pinta por encima del círculo y la capa animada ignora eventos de puntero.
+
+Evidencia final: docs/bottom-nav-design/motion-comparison.png, comparison.png y selection-animation.gif. Fotogramas capturados del componente Flutter real a densidad 2, normalizados a 390 × 94 px para la vista de movimiento. El GIF repite esos fotogramas como demostración; la app anima una sola vez por cambio de selección.
+
+Fidelidad:
+- Tipografía y contenido: mismas etiquetas, Plus Jakarta Sans y tamaños; solo transiciona el color.
+- Espaciado: mismos radios, círculo, orden, área segura y targets.
+- Colores: mismos morados y amarillos, fondo con onda intacto.
+- Imágenes: mismos PNG generados; sin nuevos recortes, dibujos o imágenes sustitutas. Icono activo legible dentro del círculo durante toda la trayectoria.
+- Estados: selección final y contadores correctos, también al tocar varias pestañas en 30 ms y recibir un cambio del badge durante el movimiento.
+
+Validación final: 46 pruebas pasaron. Incluyen movimiento intermedio y posición final en ambos roles, navegación inmediata, toques rápidos, actualización del contador, eliminación del widget, movimiento reducido y ausencia de fotogramas programados al terminar. El selector alcanza el destino dentro de 260 ms; la respuesta visual nativa de InkWell puede durar algo más y también se detiene. Análisis estático de los dos archivos editados sin incidencias.
+
+Esta verificación usa el componente nativo aislado, no una medición de rendimiento de un teléfono real. Se conserva la instrucción del usuario de no generar APK.
+Sin P0/P1/P2 pendientes en la transición revisada.
+final result: passed

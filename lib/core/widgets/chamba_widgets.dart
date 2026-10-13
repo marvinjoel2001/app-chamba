@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import 'chamba_wave_bottom_nav.dart';
 
 /// Devuelve la inicial de [value] en mayúscula, o [fallback] si está vacío.
 /// Evita crashes de `substring` sobre strings vacíos.
@@ -385,26 +386,15 @@ class ChambaBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  static const _clientItems = [
-    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.notifications_rounded, label: 'Notificaciones'),
-    _NavItemData(icon: Icons.person, label: 'Perfil'),
-  ];
-  static const _workerItems = [
-    _NavItemData(icon: Icons.home_filled, label: 'Inicio'),
-    _NavItemData(icon: Icons.account_balance_wallet, label: 'Billetera'),
-    _NavItemData(icon: Icons.notifications_rounded, label: 'Notificaciones'),
-    _NavItemData(icon: Icons.person, label: 'Perfil'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final items = role == 'worker' ? _workerItems : _clientItems;
-    return _buildNav(context, items, currentIndex, onTap, 0, null);
-  }
+  Widget build(BuildContext context) => ChambaWaveBottomNav(
+        role: role,
+        currentIndex: currentIndex,
+        onTap: onTap,
+      );
 }
 
-/// Bottom nav con badge de mensajes no leídos
+/// Navigation badge counts unread notices and enabled chat messages.
 class ChambaBottomNavWithBadge extends StatelessWidget {
   const ChambaBottomNavWithBadge({
     required this.role,
@@ -421,178 +411,14 @@ class ChambaBottomNavWithBadge extends StatelessWidget {
   final int messagesTabIndex;
   final ValueChanged<int> onTap;
 
-  static const _clientItems = [
-    _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
-    _NavItemData(icon: Icons.notifications_rounded, label: 'Notificaciones'),
-    _NavItemData(icon: Icons.person_rounded, label: 'Perfil'),
-  ];
-  static const _workerItems = [
-    _NavItemData(icon: Icons.home_rounded, label: 'Inicio'),
-    _NavItemData(
-        icon: Icons.account_balance_wallet_rounded, label: 'Billetera'),
-    _NavItemData(icon: Icons.notifications_rounded, label: 'Notificaciones'),
-    _NavItemData(icon: Icons.person_rounded, label: 'Perfil'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final items = role == 'worker' ? _workerItems : _clientItems;
-    return _buildNav(
-      context,
-      items,
-      currentIndex,
-      onTap,
-      messagesTabIndex,
-      unreadCount,
-    );
-  }
-}
-
-Widget _buildNav(
-  BuildContext context,
-  List<_NavItemData> items,
-  int currentIndex,
-  ValueChanged<int> onTap,
-  int badgeIndex,
-  int? badgeCount,
-) {
-  return RepaintBoundary(
-    child: SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-      child: Container(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.colorGlassBorder),
-          boxShadow: AppTheme.shadowMd,
-        ),
-        child: Row(
-          children: List.generate(items.length, (index) {
-            final item = items[index];
-            final selected = index == currentIndex;
-            final showBadge = index == badgeIndex && (badgeCount ?? 0) > 0;
-            return Expanded(
-              child: _BottomNavItem(
-                icon: item.icon,
-                label: item.label,
-                selected: selected,
-                badgeCount: showBadge ? badgeCount : null,
-                onTap: () => onTap(index),
-              ),
-            );
-          }),
-        ),
-      ),
-    ),
-  );
-}
-
-class _NavItemData {
-  const _NavItemData({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-}
-
-class _BottomNavItem extends StatelessWidget {
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.badgeCount,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final int? badgeCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppTheme.colorPrimary : AppTheme.colorMuted;
-
-    return Semantics(
-      selected: selected,
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+  Widget build(BuildContext context) => ChambaWaveBottomNav(
+        role: role,
+        currentIndex: currentIndex,
         onTap: onTap,
-        child: SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                padding: EdgeInsets.symmetric(
-                  horizontal: selected ? 18 : 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppTheme.colorPrimaryTint
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(icon, size: 24, color: color),
-                    if (badgeCount != null && badgeCount! > 0)
-                      Positioned(
-                        top: -6,
-                        right: -10,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          constraints: const BoxConstraints(
-                            minWidth: 18,
-                            minHeight: 18,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.colorError,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: Text(
-                            badgeCount! > 99 ? '99+' : '$badgeCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: color,
-                ),
-                child: Text(label, textAlign: TextAlign.center),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+        badgeIndex: messagesTabIndex,
+        unreadCount: unreadCount,
+      );
 }
 
 class _GlowCircle extends StatelessWidget {
