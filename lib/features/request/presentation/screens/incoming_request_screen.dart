@@ -808,6 +808,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
           _clientCountered = false;
           _loading = false;
+          _error = null;
         });
       }
     } catch (error) {
