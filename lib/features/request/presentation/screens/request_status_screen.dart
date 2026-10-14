@@ -41,6 +41,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
   bool _loading = true;
   bool _updatingBudget = false;
   bool _acceptingOffer = false;
+  /// Ya se mostró la celebración de esta aceptación; evita repetirla cuando
+  /// llega el evento `offer.accepted` del servidor por la misma acción.
+  bool _acceptCelebrated = false;
   String? _error;
   String? _infoMessage;
 
@@ -247,7 +250,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   void _onOfferAcceptedByServer(dynamic payload) {
     if (payload is Map && payload['requestId'] != _requestId) return;
-    if (mounted) {
+    // Si la aceptación salió de esta pantalla, _acceptOffer ya celebra (con el
+    // nombre del trabajador). El evento llega a la vez o justo después.
+    if (mounted && !_acceptingOffer && !_acceptCelebrated) {
+      _acceptCelebrated = true;
       ConfettiCelebration.show(
         context,
         title: '🎉 ¡TRABAJO CONFIRMADO!',
@@ -581,6 +587,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
       if (!mounted) return;
 
+      _acceptCelebrated = true;
       ConfettiCelebration.show(
         context,
         title: '🎉 ¡OFERTA ACEPTADA!',

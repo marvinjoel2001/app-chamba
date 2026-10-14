@@ -5,7 +5,11 @@ import '../services/sound_effect_service.dart';
 class ConfettiCelebration {
   ConfettiCelebration._();
 
+  /// Celebración visible ahora mismo; nunca se apilan dos.
+  static OverlayEntry? _current;
+
   /// Muestra una lluvia de confetis en pantalla completa con animación y sonido.
+  /// Si ya hay una en pantalla, no hace nada.
   static void show(
     BuildContext context, {
     String title = '🎉 ¡OFERTA ACEPTADA!',
@@ -13,12 +17,15 @@ class ConfettiCelebration {
     Duration duration = const Duration(milliseconds: 3800),
     bool playSound = true,
   }) {
-    if (playSound) {
-      SoundEffectService.playAcceptedSound();
-    }
+    // `mounted` cubre el caso de un overlay que se desmontó sin terminar la animación.
+    if (_current?.mounted ?? false) return;
 
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
+
+    if (playSound) {
+      SoundEffectService.playAcceptedSound();
+    }
 
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -28,10 +35,12 @@ class ConfettiCelebration {
         duration: duration,
         onFinished: () {
           entry.remove();
+          if (identical(_current, entry)) _current = null;
         },
       ),
     );
 
+    _current = entry;
     overlay.insert(entry);
   }
 }
