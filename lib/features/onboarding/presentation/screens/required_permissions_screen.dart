@@ -151,9 +151,9 @@ class _RequiredPermissionsScreenState extends State<RequiredPermissionsScreen>
             ? 'Requerida para trabajadores: recibir nuevas solicitudes y cambios de oferta.'
             : 'Recomendada: te avisamos cuando lleguen ofertas, mensajes y cuando el trabajador llegue, aunque tengas la app cerrada.';
       case RequiredAppPermission.fullScreenIntent:
-        return 'Requerida para trabajadores: permite que una solicitud nueva suene y encienda la pantalla como una llamada.';
+        return 'Recomendada: una solicitud nueva enciende la pantalla como una llamada, aunque el teléfono esté bloqueado.';
       case RequiredAppPermission.batteryUnrestricted:
-        return 'Requerida para trabajadores: evita que el sistema bloquee los avisos con la app cerrada.';
+        return 'Recomendada: evita que el sistema retrase o bloquee los avisos de trabajo con la app cerrada.';
     }
   }
 

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 
 import 'volume_service.dart';
 
@@ -28,6 +27,22 @@ class NewRequestAlert {
   /// Cuánto destella la card recién llegada.
   static const Duration highlightDuration = Duration(seconds: 10);
 
+  /// Cuánto suena y vibra como llamada si nadie toca la pantalla.
+  static const Duration ringDuration = Duration(seconds: 30);
+
+  /// El timbre suena en el canal de llamadas (el mismo cuyo volumen sube
+  /// [VolumeService]) y no en el de música: así se oye aunque el volumen
+  /// multimedia esté bajo, y respeta el modo silencio del teléfono.
+  static final AudioContext _ringContext = AudioContext(
+    android: const AudioContextAndroid(
+      stayAwake: true,
+      contentType: AndroidContentType.sonification,
+      usageType: AndroidUsageType.notificationRingtone,
+      audioFocus: AndroidAudioFocus.gainTransient,
+    ),
+    iOS: AudioContextIOS(category: AVAudioSessionCategory.playback),
+  );
+
   static const Duration _dedupeWindow = Duration(seconds: 15);
 
   /// Último aviso emitido. El shell lo escucha para mostrar el banner una vez.
@@ -42,6 +57,10 @@ class NewRequestAlert {
   final Set<String> _highlighted = {};
 
   AudioPlayer? _audioPlayer;
+  Timer? _ringTimer;
+
+  /// `true` mientras el aviso suena y vibra.
+  bool get isRinging => _ringTimer != null;
 
   bool isHighlighted(String? requestId) =>
       requestId != null && _highlighted.contains(requestId);
@@ -84,9 +103,7 @@ class NewRequestAlert {
       _startHighlight(id);
     }
 
-    // Reproducir patrón de vibración + sonido de notificación real
-    _triggerVibration();
-    _playAlertSound();
+    _startRinging();
 
     lastEvent.value = NewRequestEvent(
       requestId: id.isEmpty ? null : id,
@@ -95,24 +112,39 @@ class NewRequestAlert {
     );
   }
 
-  void _triggerVibration() async {
-    HapticFeedback.heavyImpact();
-    await Future.delayed(const Duration(milliseconds: 250));
-    HapticFeedback.heavyImpact();
-    await Future.delayed(const Duration(milliseconds: 250));
-    HapticFeedback.vibrate();
+  /// Suena y vibra como una llamada: el trabajador tiene que enterarse aunque
+  /// tenga el teléfono en el bolsillo. Se calla con [silence] (al tocar la
+  /// pantalla o abrir la solicitud) o sola tras [ringDuration].
+  void _startRinging() {
+    _ringTimer?.cancel();
+    _ringTimer = Timer(ringDuration, silence);
+    VolumeService.startRampingVolume();
+    VolumeService.startAlertVibration();
+    _playRingtone();
   }
 
-  Future<void> _playAlertSound() async {
+  Future<void> _playRingtone() async {
     try {
-      _audioPlayer ??= AudioPlayer();
-      await _audioPlayer?.stop();
-      await _audioPlayer?.play(
-        AssetSource('sounds/mic_start.wav'),
+      final player = _audioPlayer ??= AudioPlayer();
+      await player.stop();
+      await player.setAudioContext(_ringContext);
+      await player.setReleaseMode(ReleaseMode.loop);
+      await player.play(
+        AssetSource('sounds/universfield-ringtone-091-496417.mp3'),
       );
     } catch (e) {
       debugPrint('[NewRequestAlert] Error reproduciendo audio: $e');
     }
+  }
+
+  /// Apaga timbre y vibración. El resaltado de la card sigue su curso.
+  void silence() {
+    if (_ringTimer == null) return;
+    _ringTimer!.cancel();
+    _ringTimer = null;
+    _stopAlertSound();
+    VolumeService.stopAlertVibration();
+    VolumeService.restoreVolume();
   }
 
   Future<void> _stopAlertSound() async {
@@ -134,8 +166,7 @@ class NewRequestAlert {
       highlightRevision.value++;
     }
     lastEvent.value = null;
-    _stopAlertSound();
-    VolumeService.restoreVolume();
+    silence();
   }
 
   void _startHighlight(String requestId) {
@@ -147,10 +178,6 @@ class NewRequestAlert {
       _highlightTimers.remove(requestId);
       if (_highlighted.remove(requestId)) {
         highlightRevision.value++;
-      }
-      if (_highlighted.isEmpty) {
-        _stopAlertSound();
-        VolumeService.restoreVolume();
       }
     });
   }

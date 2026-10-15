@@ -3,11 +3,16 @@ package com.chambatrabajo.app
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -40,6 +45,14 @@ class MainActivity : FlutterActivity() {
                     }
                     "restoreVolume" -> {
                         restoreVolume()
+                        result.success(null)
+                    }
+                    "startAlertVibration" -> {
+                        startAlertVibration()
+                        result.success(null)
+                    }
+                    "stopAlertVibration" -> {
+                        vibrator()?.cancel()
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -115,6 +128,43 @@ class MainActivity : FlutterActivity() {
         originalNotificationVolume = null
     }
 
+    private fun vibrator(): Vibrator? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+
+    /** Vibra como una llamada entrante hasta que se cancele. */
+    private fun startAlertVibration() {
+        val vibrator = vibrator() ?: return
+        if (!vibrator.hasVibrator()) return
+        vibrator.cancel()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(ALERT_VIBRATION_PATTERN, ALERT_VIBRATION_REPEAT)
+            return
+        }
+        val effect = VibrationEffect.createWaveform(ALERT_VIBRATION_PATTERN, ALERT_VIBRATION_REPEAT)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Uso "ringtone": el sistema la trata como llamada y no la recorta.
+            vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_RINGTONE))
+        } else {
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(effect, attributes)
+        }
+    }
+
+    override fun onDestroy() {
+        vibrator()?.cancel()
+        super.onDestroy()
+    }
+
     private fun canUseFullScreenIntent(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             return true
@@ -145,5 +195,10 @@ class MainActivity : FlutterActivity() {
         const val RAMP_STEP_PERCENT = 0.30f
         /** Espera entre pasos. Con estos valores llega al 100% en ~1.6 s. */
         const val RAMP_STEP_MS = 800L
+
+        /** Igual que el canal de llamadas: pausa, 1 s vibrando, 0.5 s quieto... */
+        val ALERT_VIBRATION_PATTERN = longArrayOf(0, 1000, 500, 1000, 500)
+        /** Repite desde el primer buzz, sin la pausa inicial. */
+        const val ALERT_VIBRATION_REPEAT = 1
     }
 }

@@ -48,7 +48,13 @@ class AppPermissionsService {
   ) {
     final normalized = role.trim().toLowerCase();
     if (normalized == 'worker') {
-      return const [];
+      // Sin pantalla completa la alerta de trabajo nuevo igual suena y vibra,
+      // pero no enciende la pantalla; sin batería sin restricción algunos
+      // fabricantes (MIUI, EMUI...) retrasan el push con la app cerrada.
+      return const [
+        RequiredAppPermission.fullScreenIntent,
+        RequiredAppPermission.batteryUnrestricted,
+      ];
     }
     return const [RequiredAppPermission.notifications];
   }

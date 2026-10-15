@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/network/realtime_service.dart';
+import 'core/services/new_request_alert.dart';
 import 'core/session/session_credentials.dart';
 import 'core/session/session_store.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
@@ -71,8 +72,13 @@ class _ChambaAppState extends State<ChambaApp> {
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.light,
       theme: AppTheme.light(),
-      builder: (context, child) =>
-          OfflineBannerHost(child: child ?? const SizedBox.shrink()),
+      // Cualquier toque en la pantalla calla el aviso de solicitud nueva: el
+      // trabajador ya se enteró. El toque sigue llegando normal a la app.
+      builder: (context, child) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => NewRequestAlert.instance.silence(),
+        child: OfflineBannerHost(child: child ?? const SizedBox.shrink()),
+      ),
       home: const SplashScreen(),
     );
   }
