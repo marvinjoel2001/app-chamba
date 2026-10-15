@@ -399,6 +399,18 @@ class MobileBackendService {
     );
   }
 
+  /// Personas que [userId] bloqueó: `{data: [{userId, fullName, profilePhotoUrl, blockedAt}]}`.
+  Future<Map<String, dynamic>> blockedUsers({required String userId}) {
+    return _api.get('/mobile/users/$userId/blocks');
+  }
+
+  Future<Map<String, dynamic>> unblockUser({
+    required String userId,
+    required String blockedUserId,
+  }) {
+    return _api.delete('/mobile/users/$userId/blocks/$blockedUserId');
+  }
+
   Future<Map<String, dynamic>> reportRequest({
     required String requestId,
     required String reporterUserId,

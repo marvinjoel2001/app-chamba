@@ -15,8 +15,6 @@ import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/category_visuals.dart';
-import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
@@ -783,33 +781,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           color: requestPurple,
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              const Expanded(
-                  child: Text('Descripción del servicio',
-                      style: TextStyle(
-                          height: 1.2,
-                          color: requestInk,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700))),
-              TextButton.icon(
-                  onPressed: _loading ? null : _pickImages,
-                  style: TextButton.styleFrom(
-                      foregroundColor: requestPurple,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 0),
-                      minimumSize: const Size(0, 23),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                  icon:
-                      const Icon(Icons.add_photo_alternate_outlined, size: 17),
-                  label: Text(
-                      _pendingImages.isEmpty
-                          ? 'Fotos'
-                          : '${_pendingImages.length}/5',
-                      style: const TextStyle(
-                          height: 1.2,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600))),
-            ]),
+            const Text('Descripción del servicio',
+                style: TextStyle(
+                    height: 1.2,
+                    color: requestInk,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700)),
             const SizedBox(height: 5),
             Container(
                 padding: const EdgeInsets.all(7),
@@ -858,43 +835,22 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                                     color: requestMuted)),
                           ])),
                     ])),
-            if (_pendingImages.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                  height: 65,
-                  child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _pendingImages.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, index) => Stack(children: [
-                            ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.memory(_pendingImages[index].bytes,
-                                    width: 65, height: 65, fit: BoxFit.cover)),
-                            Positioned(
-                                top: 0,
-                                right: 0,
-                                child: IconButton(
-                                    tooltip: 'Quitar foto ${index + 1}',
-                                    visualDensity: VisualDensity.compact,
-                                    style: IconButton.styleFrom(
-                                        backgroundColor: Colors.black54,
-                                        minimumSize: const Size(25, 25)),
-                                    onPressed: _loading
-                                        ? null
-                                        : () => setState(() =>
-                                            _pendingImages.removeAt(index)),
-                                    icon: const Icon(Icons.close,
-                                        size: 14, color: Colors.white))),
-                          ]))),
-            ],
+            const SizedBox(height: 14),
+            RequestPhotoPicker(
+              images: [for (final image in _pendingImages) image.bytes],
+              maxImages: 5,
+              enabled: !_loading,
+              onAdd: _pickImages,
+              onRemove: (index) =>
+                  setState(() => _pendingImages.removeAt(index)),
+            ),
           ]),
         ),
         const SizedBox(height: 10),
         RequestStepCard(
           number: 2,
           title: 'Detalles del trabajo',
-          subtitle: 'Define la categoría, ubicación y tiempo',
+          subtitle: 'Dónde es, cuánto dura y cuánto pagas',
           color: requestBlue,
           illustration: SizedBox(
               width: 78,
@@ -904,24 +860,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       fit: BoxFit.contain))),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const RequestFieldLabel(
-                text: 'Categoría del servicio',
-                icon: Icons.calendar_month_rounded,
-                color: requestGreen),
-            const SizedBox(height: 5),
-            Padding(
-                padding: const EdgeInsets.only(left: 30),
-                child: RequestChoiceTile(
-                    title: _primaryCategoryName,
-                    subtitle: _primaryCategoryName == 'General'
-                        ? 'Servicio general y otros'
-                        : 'Categoría del trabajo',
-                    leading: RequestIconTile(
-                        icon: CategoryVisual.of(_primaryCategoryName).icon,
-                        color: CategoryVisual.of(_primaryCategoryName).color,
-                        size: 34),
-                    onTap: _loading ? null : _showCategoryPicker)),
-            const SizedBox(height: 9),
+            // La categoría la elige la IA a partir de la descripción; el cliente
+            // no la ve ni la cambia.
             const RequestFieldLabel(
                 text: 'Ubicación del servicio',
                 icon: Icons.location_on_rounded,
@@ -1100,88 +1040,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             ]))));
     if (method != null && mounted) {
       setState(() => _selectedPaymentMethod = method);
-    }
-  }
-
-  Future<void> _showCategoryPicker() async {
-    final future = MobileBackendService.instance.categories();
-    final category = await showModalBottomSheet<Map<String, dynamic>>(
-        context: context,
-        backgroundColor: Colors.white,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (sheetContext) => SafeArea(
-            child: SizedBox(
-                height: MediaQuery.sizeOf(sheetContext).height * .55,
-                child: Column(children: [
-                  const Text('Categoría del servicio',
-                      style: TextStyle(
-                          height: 1.2,
-                          color: requestInk,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  Expanded(
-                      child: FutureBuilder<Map<String, dynamic>>(
-                          future: future,
-                          builder: (_, snapshot) {
-                            final choices = <String, Map<String, dynamic>>{
-                              'General': {'name': 'General', 'confidence': 1.0},
-                              for (final item in _suggestedCategories)
-                                item['name'].toString(): item,
-                              for (final item
-                                  in (snapshot.data?['categories'] as List? ??
-                                      []))
-                                if (item is Map && item['active'] != false)
-                                  item['name'].toString():
-                                      Map<String, dynamic>.from(item),
-                            };
-                            return ListView(children: [
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting)
-                                Column(children: [
-                                  for (var i = 0; i < 5; i++)
-                                    const SkeletonListTile(
-                                        lines: 1,
-                                        leadingSize: 38,
-                                        circleLeading: false,
-                                        showCard: false,
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 10),
-                                        margin: EdgeInsets.zero),
-                                ]),
-                              if (snapshot.hasError)
-                                const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: Text(
-                                        'No se pudo cargar el catálogo. Puedes elegir una categoría sugerida.',
-                                        style: TextStyle(
-                                            height: 1.2, color: requestMuted))),
-                              ...choices.values.map((item) => ListTile(
-                                  leading: RequestIconTile(
-                                      icon: CategoryVisual.of(item['name']?.toString(), iconHint: item['icon']?.toString())
-                                          .icon,
-                                      color: CategoryVisual.of(
-                                              item['name']?.toString(),
-                                              iconHint:
-                                                  item['icon']?.toString())
-                                          .color,
-                                      size: 38),
-                                  title: Text(item['name'].toString(),
-                                      style: const TextStyle(
-                                          height: 1.2, color: requestInk)),
-                                  trailing: item['name'] == _primaryCategoryName
-                                      ? const Icon(Icons.check_circle_rounded, color: requestPurple)
-                                      : null,
-                                  onTap: () => Navigator.pop(sheetContext, item))),
-                            ]);
-                          })),
-                ]))));
-    if (category != null && mounted) {
-      setState(() {
-        _suggestedCategories.clear();
-        _suggestedCategories.add({...category, 'confidence': 1.0});
-      });
     }
   }
 

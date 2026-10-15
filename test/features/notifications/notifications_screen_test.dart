@@ -136,6 +136,43 @@ void main() {
       ['Dos']
     ]);
   });
+  testWidgets('refreshing marks the new notices already on screen as read',
+      (tester) async {
+    final marked = <String>[];
+    await tester.pumpWidget(screen(NotificationsScreen(
+        loadPage: (_) async => (
+              items: [
+                notice('Uno', 'announcement', read: marked.contains('Uno')),
+                notice('Dos', 'announcement', read: marked.contains('Dos')),
+              ],
+              hasMore: false
+            ),
+        markRead: (ids) async => marked.addAll(ids))));
+    await tester.pumpAndSettle();
+    expect(marked, isEmpty, reason: 'mirar la lista no marca nada todavía');
+    await tester.tap(find.byTooltip('Opciones de notificaciones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Actualizar'));
+    await tester.pumpAndSettle();
+    expect(marked, unorderedEquals(['Uno', 'Dos']));
+    expect(find.text('Nuevas 0'), findsOneWidget);
+  });
+  testWidgets('leaving the notifications tab marks the seen notices as read',
+      (tester) async {
+    final marked = <String>[];
+    Widget tab(bool active) => screen(NotificationsScreen(
+        isActive: active,
+        previewItems: [
+          notice('Uno', 'announcement'),
+          notice('Leída', 'announcement', read: true)
+        ],
+        markRead: (ids) async => marked.addAll(ids)));
+    await tester.pumpWidget(tab(true));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(tab(false));
+    await tester.pumpAndSettle();
+    expect(marked, ['Uno']);
+  });
   testWidgets('options mark only the visible category as read', (tester) async {
     final marked = <String>[];
     await tester.pumpWidget(screen(NotificationsScreen(previewItems: [

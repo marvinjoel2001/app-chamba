@@ -58,6 +58,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   bool _countsFailed = false;
   final _scrollController = ScrollController();
   final _pendingReadIds = <String>{};
+
+  /// Avisos nuevos que el usuario ya tuvo en pantalla. Se ven como "nuevos"
+  /// durante la visita y pasan a leídos al salir, al ir a segundo plano o al
+  /// recargar, como en cualquier bandeja de avisos.
+  final _seenUnreadIds = <String>{};
   final _realtime = RealtimeService.instance;
   Timer? _refreshDebounce;
 
@@ -145,6 +150,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void didUpdateWidget(covariant NotificationsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) unawaited(_flushSeen());
     if ((!oldWidget.isActive && widget.isActive) ||
         oldWidget.previewItems != widget.previewItems) {
       _loadNotifications();
@@ -154,10 +160,39 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _refreshWhenActive();
+    if (state == AppLifecycleState.paused) unawaited(_flushSeen());
+  }
+
+  /// Marca como leídos los avisos nuevos que el usuario ya vio.
+  Future<void> _flushSeen() async {
+    if (_seenUnreadIds.isEmpty) return;
+    final seen = _notifications
+        .where((n) => !n.isRead && _seenUnreadIds.contains(n.id))
+        .toList();
+    _seenUnreadIds.clear();
+    if (seen.isNotEmpty) await _markRead(seen);
+  }
+
+  /// Recargar = "ya los vi": primero se guardan como leídos, luego se recarga.
+  Future<void> _reload() async {
+    await _flushSeen();
+    await _loadNotifications();
   }
 
   @override
   void dispose() {
+    // Salir de la pantalla también cuenta como haberlos visto.
+    if (_seenUnreadIds.isNotEmpty) {
+      final ids = _seenUnreadIds.toList();
+      _seenUnreadIds.clear();
+      if (widget.markRead != null) {
+        unawaited(widget.markRead!(ids).catchError((_) {}));
+      } else if (widget.previewItems == null && widget.loadPage == null) {
+        unawaited(NotificationsService.markAsRead(ids: ids)
+            .then((_) => UnreadNotificationsNotifier.instance.refresh())
+            .catchError((_) {}));
+      }
+    }
     _generation++;
     _countGeneration++;
     _refreshDebounce?.cancel();
@@ -269,7 +304,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         _pendingReadIds.removeAll(batch);
         if (widget.markRead != null) {
           await widget.markRead!(batch);
-        } else if (widget.previewItems == null) {
+        } else if (widget.previewItems == null && widget.loadPage == null) {
           await NotificationsService.markAsRead(ids: batch);
         }
         if (!mounted || SessionStore.currentUser?.id != account) {
@@ -304,7 +339,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               .toList();
         });
       }
-      if (widget.previewItems == null && widget.markRead == null) {
+      if (widget.previewItems == null &&
+          widget.loadPage == null &&
+          widget.markRead == null) {
         unawaited(UnreadNotificationsNotifier.instance.refresh());
       }
       unawaited(_refreshCounts());
@@ -375,6 +412,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               onAction: _loadNotifications));
     }
     final visible = _visible;
+    if (widget.isActive) {
+      _seenUnreadIds.addAll(visible.where((n) => !n.isRead).map((n) => n.id));
+    }
     final matchingCount = _readFilter == NotificationReadFilter.unread
         ? _counts.unread
         : _readFilter == NotificationReadFilter.read
@@ -383,7 +423,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
-            _loadNotifications(),
+            _reload(),
             if (widget.onRefreshHeader != null) widget.onRefreshHeader!(),
           ]);
         },
@@ -453,7 +493,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   icon: const Icon(Icons.tune_rounded),
                   onSelected: (value) {
                     if (value == 'refresh') {
-                      _loadNotifications();
+                      _reload();
                     } else {
                       _markRead(_visible);
                     }

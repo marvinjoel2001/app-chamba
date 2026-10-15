@@ -11,8 +11,7 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
-import '../../../review/presentation/screens/rating_screen.dart';
-import '../../../tracking/presentation/screens/tracking_screen.dart';
+import 'blocked_users_screen.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 import 'skills_selection_screen.dart';
@@ -563,13 +562,13 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                   },
                 ),
                 _NavTile(
-                  title: 'Seguimiento activo',
-                  subtitle: 'Ve el estado del servicio en curso',
-                  icon: Icons.location_searching,
+                  title: 'Clientes bloqueados',
+                  subtitle: 'Mira a quién bloqueaste y desbloquéalo',
+                  icon: Icons.block_rounded,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const TrackingScreen(),
+                        builder: (_) => const BlockedUsersScreen(),
                       ),
                     );
                   },
@@ -611,18 +610,6 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const SupportScreen(),
-                    ),
-                  );
-                },
-              ),
-              _NavTile(
-                title: 'Calificar servicio',
-                subtitle: 'Registro rápido de una evaluación',
-                icon: Icons.star_rate_outlined,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const RatingScreen(),
                     ),
                   );
                 },

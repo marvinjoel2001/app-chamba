@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/new_request_alert.dart';
 import '../../../../core/services/volume_service.dart';
@@ -2013,7 +2014,21 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cliente bloqueado')),
+          SnackBar(
+            content: const Text(
+                'Cliente bloqueado. Puedes desbloquearlo desde tu perfil.'),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Deshacer',
+              onPressed: () async {
+                try {
+                  await MobileBackendService.instance.unblockUser(
+                      userId: user.id, blockedUserId: clientUserId);
+                  if (mounted) _load(silent: true);
+                } catch (_) {}
+              },
+            ),
+          ),
         );
       }
     } catch (e) {

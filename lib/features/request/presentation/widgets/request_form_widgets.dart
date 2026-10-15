@@ -330,7 +330,9 @@ class RequestQuantityField extends StatelessWidget {
       );
 }
 
-class RequestAmountField extends StatelessWidget {
+/// Monto que pone el cliente. Se ve como un campo para escribir (borde,
+/// lápiz y "Toca para cambiar") y todo el recuadro abre el teclado.
+class RequestAmountField extends StatefulWidget {
   const RequestAmountField(
       {super.key,
       required this.label,
@@ -339,63 +341,255 @@ class RequestAmountField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final bool enabled;
+
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-      builder: (context, constraints) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-            decoration: BoxDecoration(
-                color: const Color(0xFFEFFCF3),
-                borderRadius: BorderRadius.circular(12)),
-            child: Row(children: [
-              if (constraints.maxWidth >= 150) ...[
-                const RequestIconTile(
-                    icon: Icons.savings_rounded, color: requestGreen, size: 34),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(label,
-                        style: const TextStyle(
-                            height: 1.2,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF575C70))),
-                    const SizedBox(height: 3),
-                    Row(children: [
-                      const Text('Bs ',
-                          style: TextStyle(
-                              height: 1.2,
-                              color: requestGreen,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800)),
-                      Expanded(
-                          child: TextField(
-                              controller: controller,
-                              enabled: enabled,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                    RegExp(r'[0-9.]'))
-                              ],
-                              style: const TextStyle(
+  State<RequestAmountField> createState() => _RequestAmountFieldState();
+}
+
+class _RequestAmountFieldState extends State<RequestAmountField> {
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() {});
+    // Al entrar se selecciona todo: escribir reemplaza el monto sugerido.
+    if (_focus.hasFocus) {
+      widget.controller.selection = TextSelection(
+          baseOffset: 0, extentOffset: widget.controller.text.length);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus
+      ..removeListener(_onFocusChange)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = _focus.hasFocus;
+    return LayoutBuilder(
+        builder: (context, constraints) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.enabled ? _focus.requestFocus : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+                decoration: BoxDecoration(
+                    color: focused ? Colors.white : const Color(0xFFEFFCF3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: focused
+                            ? requestGreen
+                            : requestGreen.withValues(alpha: .35),
+                        width: focused ? 1.6 : 1.1)),
+                child: Row(children: [
+                  if (constraints.maxWidth >= 190) ...[
+                    const RequestIconTile(
+                        icon: Icons.savings_rounded,
+                        color: requestGreen,
+                        size: 34),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(widget.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                height: 1.2,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF575C70))),
+                        const SizedBox(height: 3),
+                        Row(children: [
+                          const Text('Bs ',
+                              style: TextStyle(
                                   height: 1.2,
                                   color: requestGreen,
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w800),
-                              decoration: InputDecoration(
-                                  isDense: true,
-                                  filled: false,
-                                  contentPadding: EdgeInsets.zero,
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  semanticCounterText: label))),
-                    ]),
-                  ])),
-            ]),
-          ));
+                                  fontWeight: FontWeight.w800)),
+                          Expanded(
+                              child: TextField(
+                                  controller: widget.controller,
+                                  focusNode: _focus,
+                                  enabled: widget.enabled,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                        RegExp(r'[0-9.]'))
+                                  ],
+                                  cursorColor: requestGreen,
+                                  style: const TextStyle(
+                                      height: 1.2,
+                                      color: requestGreen,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800),
+                                  decoration: InputDecoration(
+                                      isDense: true,
+                                      filled: false,
+                                      hintText: '0',
+                                      contentPadding: EdgeInsets.zero,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      semanticCounterText: widget.label))),
+                        ]),
+                        if (!focused) ...[
+                          const SizedBox(height: 2),
+                          const Text('Toca para cambiar',
+                              style: TextStyle(
+                                  height: 1.2,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: requestGreen)),
+                        ],
+                      ])),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                        color: focused
+                            ? requestGreen
+                            : requestGreen.withValues(alpha: .12),
+                        shape: BoxShape.circle),
+                    child: Icon(
+                        focused ? Icons.check_rounded : Icons.edit_rounded,
+                        size: 16,
+                        color: focused ? Colors.white : requestGreen),
+                  ),
+                ]),
+              ),
+            ));
+  }
+}
+
+/// Fotos del trabajo: un recuadro grande para agregar y las miniaturas al
+/// lado. Las fotos ayudan al trabajador a entender el trabajo y ofertar mejor.
+class RequestPhotoPicker extends StatelessWidget {
+  const RequestPhotoPicker({
+    super.key,
+    required this.images,
+    required this.maxImages,
+    required this.onAdd,
+    required this.onRemove,
+    this.enabled = true,
+  });
+
+  final List<Uint8List> images;
+  final int maxImages;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+  final bool enabled;
+
+  static const double _tile = 76;
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = enabled && images.length < maxImages;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        const Expanded(
+            child: Text('Fotos del trabajo',
+                style: TextStyle(
+                    height: 1.2,
+                    color: requestInk,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700))),
+        Text('${images.length}/$maxImages',
+            style: const TextStyle(
+                height: 1.2,
+                color: requestMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+      ]),
+      const SizedBox(height: 3),
+      const Text('Con una foto los trabajadores entienden mejor y te ofertan más rápido.',
+          style: TextStyle(height: 1.3, color: requestMuted, fontSize: 11)),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: _tile,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            if (images.length < maxImages)
+              Semantics(
+                button: true,
+                label: 'Agregar foto del trabajo',
+                child: InkWell(
+                  onTap: canAdd ? onAdd : null,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Ink(
+                    width: images.isEmpty ? 150 : _tile,
+                    height: _tile,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6F0FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: requestPurple.withValues(alpha: .45),
+                          width: 1.4),
+                    ),
+                    child: images.isEmpty
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                                Icon(Icons.add_a_photo_rounded,
+                                    color: requestPurple, size: 24),
+                                SizedBox(width: 8),
+                                Text('Agregar\nfoto',
+                                    style: TextStyle(
+                                        height: 1.15,
+                                        color: requestPurple,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700)),
+                              ])
+                        : const Icon(Icons.add_rounded,
+                            color: requestPurple, size: 28),
+                  ),
+                ),
+              ),
+            for (var index = 0; index < images.length; index++) ...[
+              const SizedBox(width: 8),
+              Stack(children: [
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.memory(images[index],
+                        width: _tile, height: _tile, fit: BoxFit.cover)),
+                Positioned(
+                    top: 3,
+                    right: 3,
+                    child: Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: enabled ? () => onRemove(index) : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(Icons.close_rounded,
+                              size: 14,
+                              color: Colors.white,
+                              semanticLabel: 'Quitar foto ${index + 1}'),
+                        ),
+                      ),
+                    )),
+              ]),
+            ],
+          ],
+        ),
+      ),
+    ]);
+  }
 }

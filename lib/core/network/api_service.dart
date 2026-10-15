@@ -133,6 +133,21 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    Map<String, String>? headers,
+  }) {
+    final requestHeaders = _jsonHeaders(headers);
+    return _send(
+      (candidate) => client.delete(
+        _buildUri(candidate, path),
+        headers: requestHeaders,
+      ),
+      timeoutMessage: _timeoutPostMessage,
+      sessionToken: _bearerToken(requestHeaders),
+    );
+  }
+
   Future<Map<String, dynamic>> _send(
     Future<http.Response> Function(String candidateBaseUrl) request, {
     required String timeoutMessage,
