@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/errors/result.dart';
@@ -8,6 +10,19 @@ import 'package:mobile/features/worker/domain/entities/worker_job.dart';
 import 'package:mobile/features/worker/domain/repositories/worker_repository.dart';
 import 'package:mobile/features/worker/domain/usecases/worker_usecases.dart';
 import 'package:mobile/features/worker/presentation/screens/wallet_screen.dart';
+
+class _SlowRepository extends Fake implements WorkerRepository {
+  _SlowRepository(this.jobs);
+  List<WorkerJob> jobs;
+  Completer<void>? gate;
+  @override
+  Future<Result<List<WorkerJob>>> workerHistory(
+      {required String workerUserId}) async {
+    final pending = gate;
+    if (pending != null) await pending.future;
+    return Success(jobs);
+  }
+}
 
 class _Repository extends Fake implements WorkerRepository {
   _Repository(this.jobs);
@@ -104,6 +119,31 @@ void main() {
     RealtimeService.instance.reconnectCount.value++;
     await tester.pump(const Duration(milliseconds: 300));
     expect(repo.calls, calls);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('reloading keeps the previous balance visible until new data',
+      (tester) async {
+    final repo = _SlowRepository([job('accepted', 'completed', 125)]);
+    final useCase = GetWorkerHistoryUseCase(repo);
+    Widget screen(bool active) => MaterialApp(
+        home: WalletScreen(isActive: active, getWorkerHistoryUseCase: useCase));
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    expect(find.text('Bs 125.00'), findsWidgets);
+
+    repo.gate = Completer<void>();
+    repo.jobs = [job('accepted', 'completed', 300)];
+    await tester.pumpWidget(screen(false));
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    // Mientras la recarga está en curso, el saldo anterior no desaparece.
+    expect(find.text('Bs 125.00'), findsWidgets);
+
+    repo.gate!.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Bs 300.00'), findsWidgets);
     await tester.pumpWidget(const SizedBox());
   });
 

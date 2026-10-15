@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/request/domain/entities/request_retry_draft.dart';
+import 'package:mobile/features/request/presentation/screens/request_form_screen.dart';
 
 void main() {
   final base = <String, dynamic>{
@@ -64,5 +65,11 @@ void main() {
       'hourlyRate': 20
     });
     expect(draft.modality, 'hourly');
+  });
+
+  test('precarga montos sin .0 sobrante', () {
+    expect(formatInitialAmount(100), '100');
+    expect(formatInitialAmount(24.5), '24.5');
+    expect(formatInitialAmount(0.41), '0.41');
   });
 }

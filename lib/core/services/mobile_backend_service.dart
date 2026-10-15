@@ -128,6 +128,7 @@ class MobileBackendService {
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
     String? paymentMethod,
+    String? paymentMethodCode,
     String? modality,
     int? estimatedHours,
     double? hourlyRate,
@@ -148,6 +149,7 @@ class MobileBackendService {
       'photosBase64': photosBase64,
       'photos': photos,
       'paymentMethod': paymentMethod,
+      'paymentMethodCode': paymentMethodCode,
       'modality': modality,
       'estimatedHours': estimatedHours,
       'hourlyRate': hourlyRate,
@@ -179,6 +181,18 @@ class MobileBackendService {
   Future<Map<String, dynamic>> categories() {
     return _api.get('/mobile/categories');
   }
+
+  // ── Eliminación de cuenta (espera de 30 días). El servidor toma el usuario
+  //    del token de sesión, por eso no se envía userId.
+  Future<Map<String, dynamic>> accountDeletionStatus() =>
+      _api.get('/mobile/account/deletion');
+
+  Future<Map<String, dynamic>> requestAccountDeletion(
+          {required String email}) =>
+      _api.post('/mobile/account/deletion', body: {'email': email});
+
+  Future<Map<String, dynamic>> cancelAccountDeletion() =>
+      _api.post('/mobile/account/deletion/cancel', body: const {});
 
   Future<Map<String, dynamic>> createCategory({
     required String name,
@@ -588,7 +602,8 @@ class MobileBackendService {
   }
 
   Future<Map<String, dynamic>> uploadRequestPhoto(String imageBase64) {
-    return _api.post('/mobile/requests/photos/upload', body: {'imageBase64': imageBase64});
+    return _api.post('/mobile/requests/photos/upload',
+        body: {'imageBase64': imageBase64});
   }
 
   // Worker descarta su oferta pendiente → vuelve al estado sin oferta
@@ -705,20 +720,17 @@ class MobileBackendService {
     return _api.get('/mobile/stripe/config');
   }
 
-  Future<Map<String, dynamic>> createPaymentIntent({
-    required double amount,
-    String? currency,
-    String? customerId,
-  }) {
-    // Si no se envía currency, el backend usa la moneda configurada en
-    // stripe_config (switch centralizado del admin).
-    return _api.post(
-      '/mobile/stripe/payment-intent',
-      body: {
-        'amount': amount,
-        if (currency != null) 'currency': currency,
-        if (customerId != null) 'customerId': customerId,
-      },
-    );
+  // Pagos: el backend decide el proveedor (QR, tarjeta, enlace…); la app solo
+  // dibuja la acción que recibe. Ver features/payment/domain/payment_checkout.
+  Future<Map<String, dynamic>> paymentCheckout({required String offerId}) {
+    return _api.post('/mobile/payments/checkout', body: {'offerId': offerId});
+  }
+
+  Future<Map<String, dynamic>> paymentStatus(String paymentId) {
+    return _api.get('/mobile/payments/$paymentId');
+  }
+
+  Future<Map<String, dynamic>> reportPaymentPaid(String paymentId) {
+    return _api.post('/mobile/payments/$paymentId/report', body: const {});
   }
 }

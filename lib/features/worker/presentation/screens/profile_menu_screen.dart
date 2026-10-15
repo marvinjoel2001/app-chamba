@@ -22,6 +22,9 @@ import '../../../history/presentation/screens/job_history_screen.dart';
 import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../../core/services/mobile_backend_service.dart';
+import '../../../account/domain/account_deletion.dart';
+import '../../../account/presentation/account_settings_screen.dart';
+import '../../../account/presentation/pending_deletion_banner.dart';
 
 class ProfileMenuScreen extends ConsumerStatefulWidget {
   const ProfileMenuScreen({
@@ -48,11 +51,40 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   bool _updatingPhoto = false;
   int _unreadSupportCount = 0;
+  AccountDeletionStatus _deletion = const AccountDeletionStatus.none();
+  bool _cancellingDeletion = false;
 
   @override
   void initState() {
     super.initState();
     _loadUnreadSupportCount();
+    _loadDeletionStatus();
+  }
+
+  /// Si la cuenta tiene una eliminación programada, se avisa arriba del perfil.
+  Future<void> _loadDeletionStatus() async {
+    try {
+      final status = await const AccountDeletionApi().status();
+      if (mounted) setState(() => _deletion = status);
+    } catch (_) {/* Sin red no se muestra el aviso; se reintenta al refrescar. */}
+  }
+
+  Future<void> _cancelDeletion() async {
+    setState(() => _cancellingDeletion = true);
+    try {
+      final status = await const AccountDeletionApi().cancel();
+      if (!mounted) return;
+      setState(() => _deletion = status);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listo, tu cuenta ya no se eliminará.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No pudimos cancelar. Revisa tu conexión e inténtalo de nuevo.')));
+    } finally {
+      if (mounted) setState(() => _cancellingDeletion = false);
+    }
   }
 
   Future<void> _loadUnreadSupportCount() async {
@@ -323,7 +355,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
-              await _loadUnreadSupportCount();
+              await Future.wait([_loadUnreadSupportCount(), _loadDeletionStatus()]);
               // Refresca los datos de sesión mostrados (foto, verificación).
               if (mounted) setState(() {});
             },
@@ -338,6 +370,14 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                 ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
+              if (_deletion.pending) ...[
+                PendingDeletionBanner(
+                  status: _deletion,
+                  onCancel: _cancelDeletion,
+                  cancelling: _cancellingDeletion,
+                ),
+                const SizedBox(height: 12),
+              ],
               _ProfileCard(
                 child: Column(
                   children: [
@@ -585,6 +625,19 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                       builder: (_) => const RatingScreen(),
                     ),
                   );
+                },
+              ),
+              _NavTile(
+                title: 'Configuración de la cuenta',
+                subtitle: 'Tus datos, términos y opciones de la cuenta',
+                icon: Icons.manage_accounts_outlined,
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AccountSettingsScreen(),
+                    ),
+                  );
+                  if (mounted) _loadDeletionStatus();
                 },
               ),
               _NavTile(

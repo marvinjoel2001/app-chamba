@@ -41,10 +41,14 @@ class AppFlows {
 
   /// El trabajo fue cancelado → limpiar sesión, avisar y volver al inicio
   /// (una sola vez aunque varias pantallas reciban el evento).
+  ///
+  /// [offerRetry]: el cliente ve el resultado con "Buscar otro trabajador".
+  /// Se apaga cuando el propio cliente canceló: ahí vuelve directo a Inicio.
   static void goHomeAfterCancellation({
     String? requestId,
     bool showNotice = false,
     String message = 'El trabajo fue cancelado.',
+    bool offerRetry = true,
   }) {
     SessionStore.clearActiveJob(requestId: requestId);
 
@@ -60,7 +64,8 @@ class AppFlows {
     // Clientes ven el resultado y pueden preparar otra solicitud; workers vuelven al inicio.
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => SessionStore.currentUser?.type == 'client' &&
+        builder: (_) => offerRetry &&
+                SessionStore.currentUser?.type == 'client' &&
                 requestId != null
             ? RequestOutcomeScreen(requestId: requestId)
             : MainShellScreen(role: SessionStore.currentUser?.type ?? 'client'),

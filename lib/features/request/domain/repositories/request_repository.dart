@@ -17,6 +17,7 @@ abstract class RequestRepository {
     List<String>? photosBase64,
     List<Map<String, String>>? photos,
     String? paymentMethod,
+    String? paymentMethodCode,
     String? modality,
     int? estimatedHours,
     double? hourlyRate,

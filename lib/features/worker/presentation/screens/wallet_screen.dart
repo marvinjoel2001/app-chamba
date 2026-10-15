@@ -53,6 +53,7 @@ class _WalletScreenState extends State<WalletScreen>
       widget.getWorkerHistoryUseCase ?? WorkerDependencies.getWorkerHistory;
 
   bool _loading = true;
+  bool _hasLoaded = false;
   String? _error;
   List<WorkerJob> _allJobs = const [];
   _DateFilter _filter = _DateFilter.thisWeek;
@@ -120,7 +121,9 @@ class _WalletScreenState extends State<WalletScreen>
     }
     _fetching = true;
     setState(() {
-      _loading = true;
+      // Solo la primera carga muestra el placeholder; las recargas al volver
+      // a la pestaña mantienen el saldo visible hasta tener datos nuevos.
+      _loading = !_hasLoaded;
       _error = null;
     });
     try {
@@ -132,6 +135,7 @@ class _WalletScreenState extends State<WalletScreen>
           }
           setState(() {
             _allJobs = jobs;
+            _hasLoaded = true;
             _loading = false;
           });
         },

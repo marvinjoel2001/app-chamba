@@ -22,6 +22,11 @@ import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
 import '../widgets/request_form_widgets.dart';
 
+/// Monto precargado sin ".0" sobrante: 100.0 → "100", 24.5 → "24.5".
+@visibleForTesting
+String formatInitialAmount(double value) =>
+    value == value.truncateToDouble() ? value.toInt().toString() : value.toString();
+
 class RequestFormScreen extends StatefulWidget {
   const RequestFormScreen({
     required this.initialPrompt,
@@ -108,19 +113,19 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   void initState() {
     super.initState();
     if (widget.initialBudget != null) {
-      _budgetController.text = widget.initialBudget!.toString();
+      _budgetController.text = formatInitialAmount(widget.initialBudget!);
     }
     if (widget.initialEstimatedHours != null) {
       _estimatedHoursController.text = widget.initialEstimatedHours!.toString();
     }
     if (widget.initialHourlyRate != null) {
-      _hourlyRateController.text = widget.initialHourlyRate!.toString();
+      _hourlyRateController.text = formatInitialAmount(widget.initialHourlyRate!);
     }
     if (widget.initialDays != null) {
       _daysController.text = widget.initialDays!.toString();
     }
     if (widget.initialDailyRate != null) {
-      _dailyRateController.text = widget.initialDailyRate!.toString();
+      _dailyRateController.text = formatInitialAmount(widget.initialDailyRate!);
     }
     if (widget.modality == 'hourly') {
       priceType = 'Por hora';
@@ -643,6 +648,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         longitude: _longitude!,
         photos: uploadedPhotos,
         paymentMethod: _selectedPaymentMethod?.name ?? 'Efectivo',
+        paymentMethodCode: _selectedPaymentMethod?.code,
         modality: widget.modality,
         estimatedHours: estimatedHours,
         hourlyRate: hourlyRate,

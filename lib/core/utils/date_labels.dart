@@ -105,6 +105,12 @@ String dayHeaderLabel(DateTime value, {DateTime? now}) {
   return '$dayMonth de ${local.year}';
 }
 
+/// Fecha larga sin hora: `13 de noviembre de 2026`.
+String longDateLabel(DateTime value) {
+  final local = value.toLocal();
+  return '${local.day} de ${_monthsLong[local.month - 1]} de ${local.year}';
+}
+
 /// Fecha completa para detalles: `lunes 6 oct 2026 · 14:05`.
 String fullDateTimeLabel(DateTime value) {
   final local = value.toLocal();

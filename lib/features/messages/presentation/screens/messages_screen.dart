@@ -90,7 +90,10 @@ class _MessagesScreenState extends State<MessagesScreen>
       return;
     }
     final userId = SessionStore.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      if (mounted && _loading) setState(() => _loading = false);
+      return;
+    }
     _fetching = true;
     try {
       final threads = widget.loadThreads != null
@@ -201,7 +204,10 @@ class MessagesInbox extends StatelessWidget {
 
   /// Shared conversation section inside the visual notification center.
   Widget get conversations {
-    final confirmed = threads.where((thread) => thread.chatEnabled).toList();
+    // Sin jobId no hay pantalla de trabajo que abrir: esos hilos no se listan.
+    final confirmed = threads
+        .where((thread) => thread.chatEnabled && thread.jobId.isNotEmpty)
+        .toList();
     final active = confirmed.where((thread) => thread.isActive).toList();
     final archived = confirmed.where((thread) => !thread.isActive).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

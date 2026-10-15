@@ -420,7 +420,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
       AppFlows.goHomeAfterCancellation(
           requestId: _requestId,
           showNotice: true,
-          message: 'Trabajo cancelado exitosamente');
+          message: 'Trabajo cancelado exitosamente',
+          offerRetry: false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
