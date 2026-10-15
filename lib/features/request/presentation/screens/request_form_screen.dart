@@ -201,7 +201,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         }
         setState(() {
           _locationBlockMessage =
-              'Activa la ubicacion del telefono para crear una solicitud.';
+              'Activa la ubicación del teléfono para crear una solicitud.';
           _locationBlockType = 'disabled';
           _checkingLocation = false;
         });
@@ -230,8 +230,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         }
         setState(() {
           _locationBlockMessage = permission == LocationPermission.deniedForever
-              ? 'El permiso de ubicacion esta bloqueado. Habilitalo en ajustes.'
-              : 'Debes permitir ubicacion para continuar.';
+              ? 'El permiso de ubicación está bloqueado. Habilítalo en ajustes.'
+              : 'Debes permitir ubicación para continuar.';
           _locationBlockType = permission == LocationPermission.deniedForever
               ? 'deniedForever'
               : 'denied';
@@ -265,7 +265,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         return;
       }
       setState(() {
-        _locationBlockMessage = 'No se pudo obtener tu ubicacion actual.';
+        _locationBlockMessage = 'No se pudo obtener tu ubicación actual.';
         _checkingLocation = false;
       });
     }
@@ -274,7 +274,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   Future<String> _reverseGeocode(double latitude, double longitude) async {
     final token = AppConfig.mapboxAccessToken.trim();
     if (token.isEmpty) {
-      return 'Ubicacion actual';
+      return 'Ubicación actual';
     }
 
     try {
@@ -287,7 +287,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       final response =
           await _client.get(endpoint).timeout(const Duration(seconds: 8));
       if (response.statusCode >= 400) {
-        return 'Ubicacion actual';
+        return 'Ubicación actual';
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -304,7 +304,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       }
     } catch (_) {}
 
-    return 'Ubicacion actual';
+    return 'Ubicación actual';
   }
 
   Future<void> _showLocationMap() async {
@@ -495,7 +495,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   Future<void> _pickImages() async {
     if (_pendingImages.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximo 5 fotos por solicitud')),
+        const SnackBar(content: Text('Máximo 5 fotos por solicitud')),
       );
       return;
     }
@@ -536,7 +536,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al seleccionar imagenes: $e')),
+          SnackBar(content: Text('Error al seleccionar imágenes: $e')),
         );
       }
       return;
@@ -561,7 +561,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         _longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Necesitamos tu ubicacion actual para continuar.'),
+          content: Text('Necesitamos tu ubicación actual para continuar.'),
         ),
       );
       return;
@@ -571,7 +571,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     if (user == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Sesion expirada.')));
+      ).showSnackBar(const SnackBar(content: Text('Sesión expirada.')));
       return;
     }
 
@@ -641,7 +641,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         aiCategories: _suggestedCategories,
         budget: budget,
         priceType: priceType,
-        address: _resolvedAddress ?? 'Ubicacion actual',
+        address: _resolvedAddress ?? 'Ubicación actual',
         latitude: _latitude!,
         longitude: _longitude!,
         photos: uploadedPhotos,
@@ -756,10 +756,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   ),
                   child: Text(
                     _locationBlockType == 'disabled'
-                        ? 'Activar ubicacion'
+                        ? 'Activar ubicación'
                         : _locationBlockType == 'deniedForever'
                             ? 'Abrir Ajustes'
-                            : 'Permitir ubicacion',
+                            : 'Permitir ubicación',
                     style: const TextStyle(height: 1.2, color: Colors.white),
                   ),
                 ),

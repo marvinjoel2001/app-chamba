@@ -36,7 +36,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
       final userJson = response['user'];
       if (userJson is! Map<String, dynamic>) {
-        return const Error(ServerFailure('Respuesta de login invalida.'));
+        return const Error(ServerFailure('Respuesta de login inválida.'));
       }
 
       await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);
@@ -107,7 +107,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
       final userJson = response['user'];
       if (userJson is! Map<String, dynamic>) {
-        return const Error(ServerFailure('Respuesta de registro invalida.'));
+        return const Error(ServerFailure('Respuesta de registro inválida.'));
       }
 
       await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);

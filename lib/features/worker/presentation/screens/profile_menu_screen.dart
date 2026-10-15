@@ -10,7 +10,6 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../request/presentation/screens/request_status_screen.dart';
 import 'blocked_users_screen.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
@@ -306,8 +305,8 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cerrar sesion'),
-        content: const Text('Quieres cerrar tu sesion actual?'),
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Quieres cerrar tu sesión actual?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -315,7 +314,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Cerrar sesion'),
+            child: const Text('Cerrar sesión'),
           ),
         ],
       ),
@@ -526,8 +525,8 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                   },
                 ),
                 _NavTile(
-                  title: 'Historial y pagos',
-                  subtitle: 'Revisa trabajos cerrados y montos',
+                  title: 'Historial de trabajos',
+                  subtitle: 'Trabajos cerrados, chat y detalles',
                   icon: Icons.payments_outlined,
                   onTap: () {
                     Navigator.of(context).push(
@@ -574,18 +573,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                   },
                 ),
               ] else ...[
-                _NavTile(
-                  title: 'Mis solicitudes',
-                  subtitle: 'Estado actual de tu solicitud publicada',
-                  icon: Icons.assignment_outlined,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const RequestStatusScreen(),
-                      ),
-                    );
-                  },
-                ),
+                // La solicitud activa ya se ve y se abre desde el inicio.
                 _NavTile(
                   title: 'Historial de trabajos',
                   subtitle: 'Revisa tus trabajos finalizados o cancelados',
@@ -628,7 +616,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                 },
               ),
               _NavTile(
-                title: 'Cerrar sesion',
+                title: 'Cerrar sesión',
                 subtitle: 'Salir de esta cuenta en tu teléfono',
                 icon: Icons.logout,
                 onTap: _logout,

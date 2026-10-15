@@ -54,7 +54,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _requests = [];
-  int _offerLifetimeSeconds = 120;
   Timer? _ticker;
   Timer? _pollTimer;
   LatLng? _workerLocation;
@@ -66,7 +65,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   bool _locatingMe = false;
 
   // El cliente hizo una contraoferta al worker
-  bool _clientCountered = false;
 
   // Animación banner oferta aceptada
   bool _showAcceptedBanner = false;
@@ -92,16 +90,42 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     return false;
   }
 
-  final List<String> _categories = [
-    'Limpieza',
-    'Jardinería',
-    'Plomería',
-    'Electricidad',
-    'Pintura',
-    'Mudanza',
-    'Carpintería',
-    'Albañilería'
-  ];
+  /// Categorías de las solicitudes que el trabajador tiene en la lista. Así el
+  /// filtro solo ofrece lo que existe (una lista fija no coincidía con el
+  /// catálogo: "Plomería" vs "Plomeria" dejaba la lista vacía).
+  List<String> get _categories {
+    final byKey = <String, String>{};
+    for (final req in _requests) {
+      final name = req['category']?.toString().trim() ?? '';
+      if (name.isNotEmpty) byKey.putIfAbsent(_categoryKey(name), () => name);
+    }
+    return byKey.values.toList()..sort();
+  }
+
+  /// Precio de la tarjeta: en "por hora" / "por día" la tarifa sale del
+  /// presupuesto actual (el cliente pudo subirlo) dividido por horas o días.
+  static String _unitPriceLabel(Map<String, dynamic> req, double budget) {
+    String bs(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    final hours = (req['estimatedHours'] as num?)?.toDouble() ?? 0;
+    final days = (req['days'] as num?)?.toDouble() ?? 0;
+    if (req['modality'] == 'hourly' && hours > 0) {
+      return 'Bs. ${bs(budget / hours)}/h';
+    }
+    if (req['modality'] == 'daily' && days > 0) {
+      return 'Bs. ${bs(budget / days)}/día';
+    }
+    return 'Bs. ${bs(budget)}';
+  }
+
+  static String _categoryKey(String? value) => (value ?? '')
+      .trim()
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u');
   final List<Map<String, String>> _modalities = [
     {'value': 'hourly', 'label': 'Por hora'},
     {'value': 'daily', 'label': 'Por día'},
@@ -327,7 +351,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       if (!value) {
         // Al marcar OCUPADO ocultamos inmediatamente solicitudes/ofertas.
         _requests = [];
-        _clientCountered = false;
         _showAcceptedBanner = false;
         _error = null;
       }
@@ -432,6 +455,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
+                    if (_categories.isEmpty)
+                      const Text(
+                        'Cuando tengas solicitudes podrás filtrarlas por categoría.',
+                        style: TextStyle(
+                            color: AppTheme.colorMuted, fontSize: 13),
+                      )
+                    else
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -603,7 +633,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
     if (mounted) {
       setState(() {
-        _clientCountered = true;
         final currentIdx =
             _requests.indexWhere((r) => r['id']?.toString() == eventRequestId);
         if (currentIdx != -1) {
@@ -744,7 +773,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         if (mounted) {
           setState(() {
             _requests = [];
-            _clientCountered = false;
             _loading = false;
             _error = null;
           });
@@ -804,10 +832,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             _requests.sort((a, b) =>
                 (b['id'] == widget.focusRequestId ? 1 : 0) -
                 (a['id'] == widget.focusRequestId ? 1 : 0));
-          _offerLifetimeSeconds =
-              (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
-          // _clientCountered logic has to be more specific, keeping it false here for simplicity unless handled by event
-          _clientCountered = false;
           _loading = false;
           _error = null;
         });
@@ -838,7 +862,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
   @override
   Widget build(BuildContext context) {
-    final mapCenter = _workerLocation ?? const LatLng(-16.5002, -68.1342);
+    final mapCenter = _workerLocation ?? const LatLng(-17.7834, -63.1821);
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -851,7 +875,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     color: AppTheme.colorBackgroundAccent,
                     child: const Center(
                       child: Text(
-                        'Configura MAPBOX_ACCESS_TOKEN\npara ver el mapa',
+                        'El mapa no está disponible\nen este momento',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppTheme.colorMuted),
                       ),
@@ -1111,8 +1135,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                       final filtered = _requests.where((req) {
                                         if (_selectedCategory != null &&
                                             _selectedCategory!.isNotEmpty) {
-                                          if (req['category']?.toString() !=
-                                              _selectedCategory) return false;
+                                          if (_categoryKey(
+                                                  req['category']?.toString()) !=
+                                              _categoryKey(_selectedCategory)) {
+                                            return false;
+                                          }
                                         }
                                         if (_selectedModality != null &&
                                             _selectedModality!.isNotEmpty) {
@@ -1732,11 +1759,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    req['modality'] == 'hourly' && req['hourlyRate'] != null
-                        ? 'Bs. ${req['hourlyRate']}/h'
-                        : req['modality'] == 'daily' && req['dailyRate'] != null
-                            ? 'Bs. ${req['dailyRate']}/día'
-                            : 'Bs. $currentBudget',
+                    _unitPriceLabel(req, currentBudget),
                     style: const TextStyle(
                       color: AppTheme.colorPrimary,
                       fontSize: 18,
@@ -2150,7 +2173,6 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       ),
     );
     if (sent == true && mounted) {
-      setState(() => _clientCountered = false);
       await _load(silent: true);
     }
   }

@@ -33,6 +33,28 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
 
   double get _base => widget.originalBudget ?? 100;
 
+  /// Horas que el cliente pidió (solo trabajos por hora).
+  int? get _hours {
+    final hours = (widget.requestData?['estimatedHours'] as num?)?.toInt();
+    return hours != null && hours > 0 ? hours : null;
+  }
+
+  /// En "por hora" se negocia la tarifa por hora; el total es tarifa × horas.
+  bool get _perHour => _modality() == 'hourly' && _hours != null;
+
+  /// Lo que se negocia en pantalla: tarifa por hora o precio total.
+  double get _baseUnit => _perHour ? _base / _hours! : _base;
+
+  /// Total que se envía como oferta (lo que paga el cliente al aceptar).
+  double get _selectedTotal =>
+      _perHour ? _selectedAmount * _hours! : _selectedAmount;
+
+  String get _unitSuffix => _perHour ? '/h' : '';
+
+  static String _bs(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
+
   /// Devuelve la modalidad normalizada: 'hourly' | 'daily' | 'fixed'.
   String _modality() {
     final raw = (widget.requestData?['modality']?.toString() ??
@@ -47,17 +69,14 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
     return 'fixed';
   }
 
-  /// Detalle bajo el monto: aclara que la negociación es sobre el TOTAL del
-  /// trabajo y muestra el desglose (horas/días × tarifa) cuando está disponible.
+  /// Detalle bajo la oferta original: qué se está negociando y su desglose.
   String? _totalBreakdown() {
     final data = widget.requestData;
     if (data == null) return null;
     switch (_modality()) {
       case 'hourly':
-        final hours = (data['estimatedHours'] as num?)?.toInt();
-        final rate = (data['hourlyRate'] as num?)?.toInt();
-        if (hours != null && hours > 0 && rate != null && rate > 0) {
-          return '$hours h × Bs $rate/h';
+        if (_perHour) {
+          return '$_hours h × Bs ${_bs(_baseUnit)}/h = Bs ${_bs(_base)}';
         }
         return 'Precio total por las horas trabajadas';
       case 'daily':
@@ -72,12 +91,14 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
     }
   }
 
-  String _priceLabel() => 'Oferta original: Bs ${_base.toInt()}';
+  String _priceLabel() => _perHour
+      ? 'Tarifa del cliente: Bs ${_bs(_baseUnit)}/h'
+      : 'Oferta original: Bs ${_bs(_base)}';
 
   @override
   void initState() {
     super.initState();
-    _selectedAmount = _base;
+    _selectedAmount = _baseUnit;
   }
 
   @override
@@ -88,7 +109,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
   }
 
   double _pct(double pct) {
-    final v = _base * (1 + pct / 100);
+    final v = _baseUnit * (1 + pct / 100);
     return double.parse(v.toStringAsFixed(0));
   }
 
@@ -165,7 +186,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       (await OffersDependencies.counterOffer(
         requestId: requestId,
         workerUserId: widget.workerId ?? user.id,
-        amount: _selectedAmount,
+        amount: _selectedTotal,
       ))
           .fold(
         onSuccess: (value) => value,
@@ -257,7 +278,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Aclara que la negociación es sobre el total del trabajo.
+                // Aclara qué se negocia y cómo se arma el total.
                 if (_totalBreakdown() != null)
                   Center(
                     child: Text(
@@ -273,7 +294,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
 
                 // ── Precio propuesto ─────────────────────────────────────
                 Text(
-                  'Tu precio total propuesto',
+                  _perHour ? 'Tu tarifa por hora' : 'Tu precio total propuesto',
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
@@ -301,6 +322,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                             ?.copyWith(fontWeight: FontWeight.w800),
                         decoration: InputDecoration(
                           prefixText: 'Bs ',
+                          suffixText: _perHour ? '/h' : null,
                           prefixStyle: Theme.of(context)
                               .textTheme
                               .headlineMedium
@@ -327,12 +349,24 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   )
                 else
                   Text(
-                    'Bs ${_selectedAmount.toInt()}',
+                    'Bs ${_bs(_selectedAmount)}$_unitSuffix',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                   ),
+                if (_perHour) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Total: Bs ${_bs(_selectedTotal)} por $_hours h',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppTheme.colorMuted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 28),
 
@@ -340,19 +374,19 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                 Row(
                   children: [
                     _PresetButton(
-                      label: 'Bs ${p5.toInt()}',
+                      label: 'Bs ${p5.toInt()}$_unitSuffix',
                       selected: !_editingManually && _selectedAmount == p5,
                       onTap: () => _selectPreset(p5),
                     ),
                     const SizedBox(width: 8),
                     _PresetButton(
-                      label: 'Bs ${p10.toInt()}',
+                      label: 'Bs ${p10.toInt()}$_unitSuffix',
                       selected: !_editingManually && _selectedAmount == p10,
                       onTap: () => _selectPreset(p10),
                     ),
                     const SizedBox(width: 8),
                     _PresetButton(
-                      label: 'Bs ${p20.toInt()}',
+                      label: 'Bs ${p20.toInt()}$_unitSuffix',
                       selected: !_editingManually && _selectedAmount == p20,
                       onTap: () => _selectPreset(p20),
                     ),

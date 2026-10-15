@@ -164,10 +164,10 @@ class RequestModalityScreen extends StatelessWidget {
                 cardBgColor: const Color(0xFFF0F9FF),
                 borderColor: const Color(0xFFBAE6FD),
                 title: 'Por hora',
-                badgeText: 'Pagas por horas trabajadas',
+                badgeText: 'Tarifa por hora',
                 badgeBgColor: const Color(0xFF0284C7),
                 description:
-                    'El tiempo se registra en la app y pagas solo por las horas trabajadas.',
+                    'Pones tu tarifa por hora y cuántas horas necesitas. Pagas tarifa × horas.',
                 tagBgColor: const Color(0xFFE0F2FE),
                 tagTextColor: const Color(0xFF0284C7),
                 tags: const ['Trabajos flexibles', 'Sin alcance definido'],

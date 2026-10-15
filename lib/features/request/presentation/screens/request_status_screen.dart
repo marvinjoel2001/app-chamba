@@ -1,14 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
+import '../../../../core/network/api_service.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -21,7 +20,6 @@ import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../offers/presentation/screens/worker_profile_screen.dart';
 import '../../../payment/presentation/payment_flow.dart';
-import 'request_form_screen.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen(
@@ -49,7 +47,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   Map<String, dynamic>? _request;
   List<dynamic> _offers = const [];
-  int _offerLifetimeSeconds = 120;
 
   double _currentBudget = 0;
   double _draftBudget = 0;
@@ -61,19 +58,13 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   Timer? _ticker;
 
-  // Animación de ruta ping
-  late final AnimationController _routeCtrl;
-  int _currentWorkerIndex = 0;
-  bool _isWorkerThinking = false;
-  bool _isSimulating = true;
+  // Trabajadores que ofertaron, para mostrarlos en el mapa.
   List<LatLng> _workerLocations = [];
   List<String?> _workerAvatars = [];
-  List<LatLng> _currentRoutePoints = [];
   bool _isCancelling = false;
   bool _showImproveOfferBtn = false;
   Timer? _btnTimer;
   late final AnimationController _pulseCtrl;
-  final Map<String, List<LatLng>> _routeCache = {};
 
   @override
   void initState() {
@@ -122,17 +113,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
 
-    _routeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
     _workerLocations = [];
     _workerAvatars = [];
 
     _realtime.reconnectCount.addListener(_onReconnect);
 
-    _startPingLoop();
     _load();
   }
 
@@ -152,75 +137,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     _realtime.off('job.cancelled', _onJobCancelled);
     _realtime.off('job.reminder', _onJobReminder);
     _radarCtrl.dispose();
-    _routeCtrl.dispose();
     _pulseCtrl.dispose();
     _ticker?.cancel();
     _btnTimer?.cancel();
     super.dispose();
-  }
-
-  Future<List<LatLng>> _fetchRoute(LatLng start, LatLng end) async {
-    final cacheKey =
-        '${start.latitude},${start.longitude}-${end.latitude},${end.longitude}';
-    if (_routeCache.containsKey(cacheKey)) {
-      return _routeCache[cacheKey]!;
-    }
-    final token = AppConfig.mapboxAccessToken;
-    if (token.isEmpty) return [start, end];
-    try {
-      final url =
-          'https://api.mapbox.com/directions/v5/mapbox/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?geometries=geojson&access_token=$token';
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final routes = data['routes'] as List<dynamic>?;
-        if (routes != null && routes.isNotEmpty) {
-          final geometry = routes[0]['geometry'];
-          final coordinates = geometry['coordinates'] as List<dynamic>?;
-          if (coordinates != null) {
-            final route = coordinates
-                .map((c) => LatLng(c[1] as double, c[0] as double))
-                .toList();
-            _routeCache[cacheKey] = route;
-            return route;
-          }
-        }
-      }
-    } catch (_) {}
-    _routeCache[cacheKey] = [start, end];
-    return [start, end];
-  }
-
-  Future<void> _startPingLoop() async {
-    while (mounted) {
-      if (_workerLocations.isEmpty || !_isSimulating) {
-        await Future.delayed(const Duration(seconds: 2));
-        continue;
-      }
-
-      final lat = widget.latitude ?? -16.5002;
-      final lng = widget.longitude ?? -68.1342;
-      final mapCenter = LatLng(lat, lng);
-
-      _currentRoutePoints =
-          await _fetchRoute(mapCenter, _workerLocations[_currentWorkerIndex]);
-      if (!mounted) return;
-
-      _routeCtrl.reset();
-      await _routeCtrl.forward();
-      if (!mounted) return;
-      setState(() {
-        _isWorkerThinking = true;
-      });
-      await Future.delayed(const Duration(seconds: 4));
-      if (!mounted) return;
-      setState(() {
-        _isWorkerThinking = false;
-        _currentRoutePoints = [];
-        _currentWorkerIndex =
-            (_currentWorkerIndex + 1) % _workerLocations.length;
-      });
-    }
   }
 
   String? get _requestId =>
@@ -328,6 +248,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     final normalized = message.toLowerCase();
     return normalized.contains('no request found') ||
         normalized.contains('requestid or clientuserid is required') ||
+        normalized
+            .contains(ApiService.noActiveRequestMessage.toLowerCase()) ||
         normalized.contains('no se encontró la información solicitada');
   }
 
@@ -355,7 +277,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
-        _error = 'Sesion expirada';
+        _error = 'Sesión expirada';
         _loading = false;
       });
       return;
@@ -482,20 +404,14 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           _request = request;
           _offers = offersList;
           if (uniqueMarkers.isNotEmpty) {
-            _isSimulating = false;
             _workerLocations =
                 uniqueMarkers.map((m) => m['location'] as LatLng).toList();
             _workerAvatars =
                 uniqueMarkers.map((m) => m['avatar'] as String?).toList();
-            _currentRoutePoints = [];
           } else {
-            _isSimulating = false;
             _workerLocations = [];
             _workerAvatars = [];
-            _currentRoutePoints = [];
           }
-          _offerLifetimeSeconds =
-              (response['offerLifetimeSeconds'] as num?)?.toInt() ?? 120;
           _currentBudget = currentBudget;
           if (shouldResetDraft) {
             _draftBudget = currentBudget;
@@ -510,7 +426,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           setState(() {
             _loading = false;
             _error = null;
-            _infoMessage = 'Aun no tienes una solicitud activa.';
+            _infoMessage = 'Aún no tienes una solicitud activa.';
             _request = null;
             _offers = const [];
             SessionStore.clearActiveJob(requestId: widget.requestId);
@@ -753,9 +669,18 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     String formatRate(double rate) =>
         rate % 1 == 0 ? rate.toStringAsFixed(0) : rate.toStringAsFixed(2);
 
-    final suggested = _draftBudget > _currentBudget
+    // En "por hora" se negocia la tarifa: el cliente escribe Bs por hora y el
+    // total (lo que paga) es tarifa × horas.
+    final perHour = modality == 'hourly' && units > 0;
+    final currentRate = perHour ? _currentBudget / units : _currentBudget;
+    double toTotal(double typed) => perHour ? typed * units : typed;
+
+    final suggestedTotal = _draftBudget > _currentBudget
         ? _draftBudget
         : (_currentBudget > 0 ? _currentBudget + 10 : 50.0);
+    final suggested = perHour
+        ? (suggestedTotal / units).ceilToDouble()
+        : suggestedTotal;
     final controller = TextEditingController(
       text: suggested.toInt().toString(),
     );
@@ -784,10 +709,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           content: StatefulBuilder(
             builder: (context, setDialogState) {
               final parsed = double.tryParse(controller.text.trim());
+              final newTotal = parsed == null ? null : toTotal(parsed);
               final newRate = (parsed != null && parsed > 0 && units > 0)
-                  ? parsed / units
+                  ? (perHour ? parsed : parsed / units)
                   : null;
-              final isInvalid = parsed == null || parsed <= _currentBudget;
+              final isInvalid = newTotal == null || newTotal <= _currentBudget;
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -837,19 +763,24 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
                       prefixText: 'Bs ',
+                      suffixText: perHour ? 'por hora' : null,
                       prefixStyle: const TextStyle(
                           color: AppTheme.colorSuccess,
                           fontSize: 18,
                           fontWeight: FontWeight.bold),
-                      labelText: units > 0
-                          ? 'Nuevo monto TOTAL del trabajo'
-                          : 'Nueva oferta',
+                      labelText: perHour
+                          ? 'Nueva tarifa por hora'
+                          : units > 0
+                              ? 'Nuevo monto TOTAL del trabajo'
+                              : 'Nueva oferta',
                       labelStyle: const TextStyle(color: AppTheme.colorMuted),
-                      hintText: 'Ej. ${(suggested + 10).toInt()}',
+                      hintText:
+                          'Ej. ${(suggested + (perHour ? 5 : 10)).toInt()}',
                       hintStyle: TextStyle(
                           color: AppTheme.colorText.withValues(alpha: 0.3)),
-                      helperText:
-                          'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(2)}',
+                      helperText: perHour
+                          ? 'Debe ser mayor a Bs ${formatRate(currentRate)} por hora'
+                          : 'Debe ser mayor a Bs ${_currentBudget.toStringAsFixed(2)}',
                       helperStyle: TextStyle(
                           color: isInvalid
                               ? AppTheme.colorWarning
@@ -870,7 +801,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Text(
-                        '= Bs ${formatRate(newRate)} por $unitLabel',
+                        perHour
+                            ? '= Bs ${formatRate(newTotal!)} en total por '
+                                '${units.toStringAsFixed(0)} $unitsLabel'
+                            : '= Bs ${formatRate(newRate)} por $unitLabel',
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppTheme.colorSuccess,
@@ -897,13 +831,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
               ),
               onPressed: () {
                 final parsed = double.tryParse(controller.text.trim());
-                if (parsed != null && parsed > _currentBudget) {
-                  Navigator.of(context).pop(parsed);
+                final total = parsed == null ? null : toTotal(parsed);
+                if (total != null && total > _currentBudget) {
+                  Navigator.of(context).pop(total);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                          'Ingresa un monto mayor a Bs ${_currentBudget.toStringAsFixed(2)}'),
+                      content: Text(perHour
+                          ? 'Ingresa una tarifa mayor a Bs ${formatRate(currentRate)} por hora'
+                          : 'Ingresa un monto mayor a Bs ${_currentBudget.toStringAsFixed(2)}'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -1118,8 +1054,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             child: CircularProgressIndicator(color: AppTheme.colorError)),
       );
     }
-    final lat = widget.latitude ?? -16.5002;
-    final lng = widget.longitude ?? -68.1342;
+    final lat = widget.latitude ?? -17.7834;
+    final lng = widget.longitude ?? -63.1821;
     final mapCenter = LatLng(lat, lng);
     final offers = _visibleOffers();
 
@@ -1149,37 +1085,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                         userAgentPackageName: 'com.chambatrabajo.app',
                         additionalOptions: {
                           'accessToken': AppConfig.mapboxAccessToken,
-                        },
-                      ),
-                      AnimatedBuilder(
-                        animation: _routeCtrl,
-                        builder: (context, child) {
-                          if (_currentRoutePoints.isEmpty)
-                            return const SizedBox.shrink();
-
-                          final pointCount =
-                              (_currentRoutePoints.length * _routeCtrl.value)
-                                  .ceil();
-                          if (pointCount < 2) return const SizedBox.shrink();
-
-                          final visiblePoints =
-                              _currentRoutePoints.sublist(0, pointCount);
-
-                          return PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: visiblePoints,
-                                color: AppTheme.colorPrimary
-                                    .withValues(alpha: 0.3),
-                                strokeWidth: 12.0, // Glow
-                              ),
-                              Polyline(
-                                points: visiblePoints,
-                                color: AppTheme.colorPrimary,
-                                strokeWidth: 3.0,
-                              ),
-                            ],
-                          );
                         },
                       ),
                       MarkerLayer(
@@ -1222,12 +1127,9 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                               ),
                             ),
                           ),
-                          // Fake or real worker avatars
+                          // Trabajadores que ofertaron, en su ubicación real.
                           if (_workerLocations.isNotEmpty)
                             ...List.generate(_workerLocations.length, (index) {
-                              final isThisWorkerThinking = _isSimulating &&
-                                  _isWorkerThinking &&
-                                  _currentWorkerIndex == index;
                               final avatarUrl = _workerAvatars.length > index
                                   ? _workerAvatars[index]
                                   : null;
@@ -1235,8 +1137,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
                                 point: _workerLocations[index],
                                 width: 44,
                                 height: 44,
-                                child: _buildMapAvatar(
-                                    avatarUrl, isThisWorkerThinking),
+                                child: _buildMapAvatar(avatarUrl, false),
                               );
                             }),
                         ],
@@ -1943,6 +1844,31 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
     return '$total\n${units.toStringAsFixed(0)}$unitLabel × Bs $rateText';
   }
 
+  /// Precio de una oferta. En "por hora" lo que se negocia es la tarifa, así
+  /// que se muestra Bs/h grande y el total (lo que se paga) debajo.
+  List<Widget> _offerPriceLines(String amountText) {
+    final total = double.tryParse(amountText) ?? 0;
+    final hours =
+        double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0;
+    String bs(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+    const big = TextStyle(
+      color: AppTheme.colorText,
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+    );
+    if (_request?['modality']?.toString() != 'hourly' || hours <= 0) {
+      return [Text('Bs ${bs(total)}', style: big)];
+    }
+    return [
+      Text('Bs ${bs(total / hours)}/h', style: big),
+      Text(
+        'Total Bs ${bs(total)}',
+        style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11.5),
+      ),
+    ];
+  }
+
   Widget _buildOfferItem(dynamic offerData) {
     final offer = offerData as Map<String, dynamic>;
     final worker = offer['worker'] as Map<String, dynamic>? ?? {};
@@ -2063,14 +1989,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'Bs $amount',
-                style: const TextStyle(
-                  color: AppTheme.colorText,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              ..._offerPriceLines(amount),
               const SizedBox(height: 12),
               Row(
                 children: [

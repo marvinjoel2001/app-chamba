@@ -16,16 +16,14 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/explore_dependencies.dart';
-import '../../../request/presentation/screens/incoming_request_screen.dart';
-import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 
+/// Inicio del cliente: mapa y caja para pedir un servicio por voz o texto.
+/// El trabajador tiene su propio inicio (IncomingRequestScreen).
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({required this.role, super.key});
-
-  final String role;
+  const ExploreScreen({super.key});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -60,21 +58,10 @@ class _ExploreScreenState extends State<ExploreScreen>
   late AnimationController _micPulseController;
   final AudioPlayer _micSoundPlayer = AudioPlayer();
   double _micSoundLevel = 0;
-  List<dynamic> _workers = const [];
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
   LatLng? _currentUserLocation;
   double _currentZoom = 13;
-  static const double _workerPanelBottomOffset = 84;
-
-  bool get _isClient => widget.role == 'client';
-
-  bool get _isVerified {
-    final user = SessionStore.currentUser;
-    if (user == null) return false;
-    return user.verificationStatus == 'verified' ||
-        (user.idPhotoVerified == true && user.facePhotoVerified == true);
-  }
 
   @override
   void initState() {
@@ -137,7 +124,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     final user = SessionStore.currentUser;
     if (user == null) {
       setState(() {
-        _error = 'Sesion expirada. Inicia sesion de nuevo.';
+        _error = 'Sesión expirada. Inicia sesión de nuevo.';
         _loading = false;
       });
       return;
@@ -164,7 +151,6 @@ class _ExploreScreenState extends State<ExploreScreen>
       final currentLocation = await _resolveCurrentLocationRequired();
       if (currentLocation == null) {
         setState(() {
-          _workers = const [];
           _categories = const [];
           _activeRequest = null;
           _currentUserLocation = null;
@@ -202,7 +188,6 @@ class _ExploreScreenState extends State<ExploreScreen>
 
       setState(() {
         _currentUserLocation = currentLocation;
-        _workers = (response['nearbyWorkers'] as List<dynamic>? ?? const []);
         _categories = (response['categories'] as List<dynamic>? ?? const []);
         _activeRequest = cleanedRequest;
         _loading = false;
@@ -228,7 +213,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       final isEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isEnabled) {
         _locationBlockMessage =
-            'Activa la ubicacion del telefono para buscar trabajadores cercanos.';
+            'Activa la ubicación del teléfono para buscar trabajadores cercanos.';
         _locationBlockType = 'disabled';
         return null;
       }
@@ -238,7 +223,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         try {
           permission = await Geolocator.requestPermission();
         } catch (_) {
-          _locationBlockMessage = 'Debes activar el GPS para pedir permisos de ubicacion.';
+          _locationBlockMessage = 'Debes activar el GPS para pedir permisos de ubicación.';
           _locationBlockType = 'denied';
           return null;
         }
@@ -246,8 +231,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         _locationBlockMessage = permission == LocationPermission.deniedForever
-            ? 'El permiso de ubicacion esta bloqueado. Debes habilitarlo en ajustes para continuar.'
-            : 'Debes permitir la ubicacion para usar esta pantalla.';
+            ? 'El permiso de ubicación está bloqueado. Debes habilitarlo en ajustes para continuar.'
+            : 'Debes permitir la ubicación para usar esta pantalla.';
         _locationBlockType =
             permission == LocationPermission.deniedForever ? 'deniedForever' : 'denied';
         return null;
@@ -262,46 +247,14 @@ class _ExploreScreenState extends State<ExploreScreen>
       return LatLng(position.latitude, position.longitude);
     } catch (_) {
       _locationBlockMessage =
-          'No se pudo obtener tu ubicacion actual. Intenta nuevamente.';
+          'No se pudo obtener tu ubicación actual. Intenta nuevamente.';
       return null;
     }
   }
 
   LatLng get _mapCenter {
-    if (_currentUserLocation != null) {
-      return _currentUserLocation!;
-    }
-
-    if (_workers.isNotEmpty) {
-      final first = _workers.first as Map<String, dynamic>;
-      final lat = (first['latitude'] as num?)?.toDouble();
-      final lng = (first['longitude'] as num?)?.toDouble();
-      if (lat != null && lng != null) {
-        return LatLng(lat, lng);
-      }
-    }
-
-    return const LatLng(-16.5002, -68.1342);
-  }
-
-  List<Marker> get _workerMarkers {
-    return _workers.expand<Marker>((raw) {
-      final worker = raw as Map<String, dynamic>;
-      final lat = (worker['latitude'] as num?)?.toDouble();
-      final lng = (worker['longitude'] as num?)?.toDouble();
-      // Sin ubicación real no se dibuja: antes aparecían todos en La Paz.
-      if (lat == null || lng == null) return const <Marker>[];
-      return [Marker(
-        point: LatLng(lat, lng),
-        width: 54,
-        height: 54,
-        child: CircleAvatar(
-          radius: 22,
-          backgroundColor: AppTheme.colorPrimary,
-          child: const Icon(Icons.handyman_rounded, color: Colors.white, size: 22),
-        ),
-      )];
-    }).toList();
+    // Sin ubicación todavía: centro de Santa Cruz de la Sierra.
+    return _currentUserLocation ?? const LatLng(-17.7834, -63.1821);
   }
 
   Future<void> _centerOnMyLocation() async {
@@ -315,7 +268,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           SnackBar(
             content: Text(
               _locationBlockMessage ??
-                  'No se pudo obtener tu ubicacion actual.',
+                  'No se pudo obtener tu ubicación actual.',
             ),
           ),
         );
@@ -399,7 +352,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Describe primero lo que estas buscando.'),
+          content: Text('Describe primero lo que estás buscando.'),
         ),
       );
       return;
@@ -423,7 +376,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           SnackBar(
             content: Text(
               _locationBlockMessage ??
-                  'Necesitamos tu ubicacion para crear la solicitud.',
+                  'Necesitamos tu ubicación para crear la solicitud.',
             ),
           ),
         );
@@ -494,7 +447,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Como pedir ayuda',
+                  'Cómo pedir ayuda',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 12),
@@ -504,7 +457,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'La app analizara tu texto, sugerira categorias y luego te llevara al formulario para completar presupuesto y fotos.',
+                  'La app analizará tu texto, sugerirá categorías y luego te llevará al formulario para completar presupuesto y fotos.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
@@ -537,10 +490,10 @@ class _ExploreScreenState extends State<ExploreScreen>
               const SizedBox(height: 14),
               ChambaPrimaryButton(
                 label: _locationBlockType == 'disabled'
-                    ? 'Activar ubicacion'
+                    ? 'Activar ubicación'
                     : _locationBlockType == 'deniedForever'
                         ? 'Abrir Ajustes'
-                        : 'Permitir ubicacion',
+                        : 'Permitir ubicación',
                 onPressed: () async {
                   if (_locationBlockType == 'disabled') {
                     final isEnabled = await Geolocator.isLocationServiceEnabled();
@@ -1109,147 +1062,6 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
-  Widget _buildWorkerPanel(BuildContext context) {
-    final panelContent = GlassCard(
-      borderRadius: 32,
-      child: Column(
-        children: [
-          Container(
-            width: 90,
-            height: 8,
-            decoration: BoxDecoration(
-              color: AppTheme.colorGlassBorderSoft,
-              borderRadius: BorderRadius.circular(30),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _activeRequest == null
-                      ? 'Sin solicitudes activas'
-                      : 'Solicitud activa: ${_activeRequest!['title']}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 48,
-            child: _categories.isEmpty
-                ? const ChambaChip(label: 'Sin categorias', selected: false)
-                : ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _categories.length,
-                    itemBuilder: (context, i) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChambaChip(
-                          label: _categories[i].toString(),
-                          selected: i == 0,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 8),
-          ChambaPrimaryButton(
-            label: 'Ver solicitudes cercanas',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const IncomingRequestScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Trabajadores cercanos: ${_workers.length}'),
-          ),
-        ],
-      ),
-    );
-
-    // Si no está verificado, mostrar blur overlay con botón de verificación
-    if (!_isVerified) {
-      return Stack(
-        children: [
-          // Panel difuminado de fondo
-          ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: panelContent,
-            ),
-          ),
-          // Overlay con mensaje y botón
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.86),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: AppTheme.colorGlassBorder),
-              ),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.verified_user_outlined,
-                        size: 48,
-                        color: AppTheme.colorPrimary,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Verifica tu perfil para ver trabajos',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppTheme.colorText,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Necesitamos verificar tu identidad antes de mostrarte solicitudes disponibles',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppTheme.colorMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ChambaPrimaryButton(
-                        label: 'Verificar mi perfil',
-                        icon: Icons.verified,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  const VerificationCheckpointScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return panelContent;
-  }
-
   Widget _buildMap() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
@@ -1258,7 +1070,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               color: AppTheme.colorSurfaceSoft,
               child: Center(
                 child: Text(
-                  'Falta MAPBOX_ACCESS_TOKEN para mostrar el mapa',
+                  'El mapa no está disponible en este momento',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
@@ -1283,9 +1095,6 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ),
                 MarkerLayer(
                   markers: [
-                    // Solo mostrar workers en el mapa del worker, no del cliente
-                    if (!_isClient) ..._workerMarkers,
-                    // Ubicación del usuario: cliente solo ve su ubicación, worker también
                     if (_currentUserLocation != null)
                       Marker(
                         point: _currentUserLocation!,
@@ -1306,8 +1115,6 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   @override
   Widget build(BuildContext context) {
-    final user = SessionStore.currentUser;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -1317,41 +1124,6 @@ class _ExploreScreenState extends State<ExploreScreen>
               padding: const EdgeInsets.all(14),
               child: Column(
                 children: [
-                  if (!_isClient) ...[
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppTheme.colorPrimary.withValues(
-                            alpha: 0.16,
-                          ),
-                          child: const Icon(Icons.work_history),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          user == null ? 'Chamba' : 'Hola, ${user.firstName}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const Spacer(),
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundImage: user?.profilePhotoUrl == null
-                              ? null
-                              : NetworkImage(user!.profilePhotoUrl!),
-                          child: user?.profilePhotoUrl == null
-                              ? Text(
-                                  chambaInitial(user?.firstName,
-                                      fallback: 'U'),
-                                )
-                              : null,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
                   if (_locationBlockMessage != null)
                     Expanded(child: _buildLocationBlocked(context))
                   else
@@ -1361,7 +1133,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
           if (_loading)
-            Positioned.fill(child: _ExploreSkeleton(isClient: _isClient)),
+            const Positioned.fill(child: _ExploreSkeleton()),
           if (_error != null)
             Positioned(
               left: 20,
@@ -1406,7 +1178,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           if (_locationBlockMessage == null) ...[
             Positioned(
               right: 16,
-              bottom: _isClient ? 280 : 330,
+              bottom: 280,
               child: Column(
                 children: [
                   _MapControl(
@@ -1426,8 +1198,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ],
               ),
             ),
-            if (_isClient)
-              Positioned(
+            Positioned(
                 top: 60,
                 right: 16,
                 child: _MapControl(
@@ -1439,12 +1210,8 @@ class _ExploreScreenState extends State<ExploreScreen>
             Positioned(
               left: 0,
               right: 0,
-              bottom: _isClient
-                  ? MediaQuery.of(context).viewInsets.bottom + 8
-                  : _workerPanelBottomOffset + 8,
-              child: _isClient
-                  ? _buildClientComposer()
-                  : _buildWorkerPanel(context),
+              bottom: MediaQuery.of(context).viewInsets.bottom + 8,
+              child: _buildClientComposer(),
             ),
           ],
         ],
@@ -1497,9 +1264,7 @@ class _MapControl extends StatelessWidget {
 
 /// Skeleton de la pantalla de inicio mientras conecta con el servidor.
 class _ExploreSkeleton extends StatelessWidget {
-  const _ExploreSkeleton({required this.isClient});
-
-  final bool isClient;
+  const _ExploreSkeleton();
 
   @override
   Widget build(BuildContext context) {
@@ -1510,20 +1275,6 @@ class _ExploreSkeleton extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Column(
             children: [
-              if (!isClient) ...[
-                const ChambaShimmer(
-                  child: Row(
-                    children: [
-                      SkeletonBox(height: 48, circle: true),
-                      SizedBox(width: 10),
-                      SkeletonBox(width: 160, height: 22),
-                      Spacer(),
-                      SkeletonBox(height: 48, circle: true),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
               const Expanded(
                 child: ChambaShimmer(
                   child: SkeletonBox(radius: 28, height: double.infinity),

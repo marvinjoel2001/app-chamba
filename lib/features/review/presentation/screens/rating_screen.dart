@@ -120,7 +120,7 @@ class _RatingScreenState extends State<RatingScreen> {
         );
       }
 
-      (await ReviewDependencies.createReview(
+      final result = (await ReviewDependencies.createReview(
         requestId: requestId,
         workerUserId: workerId,
         clientUserId: user.id,
@@ -137,10 +137,14 @@ class _RatingScreenState extends State<RatingScreen> {
 
       SessionStore.clearActiveJob(requestId: requestId);
 
+      // Un trabajo se califica una sola vez: el servidor ignora la segunda.
+      final alreadyReviewed = result.payload['alreadyReviewed'] == true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Calificación enviada: $stars estrellas'),
-          backgroundColor: AppTheme.colorSuccess,
+          content: Text(alreadyReviewed
+              ? 'Ya habías calificado este trabajo.'
+              : 'Calificación enviada: $stars estrellas'),
+          backgroundColor: alreadyReviewed ? null : AppTheme.colorSuccess,
         ),
       );
       Navigator.of(context).pushAndRemoveUntil(
@@ -254,25 +258,25 @@ class _RatingScreenState extends State<RatingScreen> {
                         }),
                       ),
                       const SizedBox(height: 24),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        child: stars <= 2
-                            ? TextField(
-                                controller: _commentController,
-                                maxLines: 4,
-                                decoration: InputDecoration(
-                                  hintText:
-                                      '¿Qué salió mal? Déjanos tu reclamo o comentario (opcional)...',
-                                  filled: true,
-                                  fillColor: AppTheme.colorBackgroundAccent,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+                      // Comentario opcional con cualquier puntaje: los buenos
+                      // también se ven en "Opiniones de clientes" del trabajador.
+                      TextField(
+                        controller: _commentController,
+                        maxLines: 4,
+                        maxLength: 280,
+                        decoration: InputDecoration(
+                          hintText: stars <= 2
+                              ? '¿Qué salió mal? Cuéntanos (opcional)'
+                              : stars == 3
+                                  ? '¿Qué podría mejorar? (opcional)'
+                                  : '¿Qué te gustó del trabajo? (opcional)',
+                          filled: true,
+                          fillColor: AppTheme.colorBackgroundAccent,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       ChambaPrimaryButton(

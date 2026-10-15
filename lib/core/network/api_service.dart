@@ -252,8 +252,36 @@ class ApiService {
     return null;
   }
 
+  /// Mensajes técnicos del servidor (en inglés) no se le muestran tal cual al
+  /// usuario: los conocidos se traducen y el resto cae en un texto genérico.
+  static String? _humanize(String? message) {
+    if (message == null || message.isEmpty) return message;
+    final lower = message.toLowerCase();
+    if (lower.contains('requestid or clientuserid is required') ||
+        lower.contains('no request found')) {
+      return noActiveRequestMessage;
+    }
+    final maxImages = RegExp(r'maximum (\d+) images').firstMatch(lower);
+    if (maxImages != null) {
+      return 'Puedes subir como máximo ${maxImages.group(1)} fotos.';
+    }
+    if (lower.contains('only workers can submit verification')) {
+      return 'Solo los trabajadores pueden verificar su identidad.';
+    }
+    if (lower.contains('no fields to update')) {
+      return 'No hay cambios para guardar.';
+    }
+    final looksEnglish = !RegExp(r'[áéíóúñ¿¡]').hasMatch(lower) &&
+        RegExp(r'\b(required|must|not found|invalid|only|allowed|missing|cannot|is not)\b')
+            .hasMatch(lower);
+    return looksEnglish ? null : message;
+  }
+
+  /// Texto único para "no hay solicitud activa", reconocible por las pantallas.
+  static const noActiveRequestMessage = 'No tienes una solicitud activa.';
+
   String _mapHttpErrorMessage({required int statusCode, String? bodyMessage}) {
-    final message = bodyMessage?.trim();
+    final message = _humanize(bodyMessage?.trim());
 
     if (statusCode == 401) {
       final lower = (message ?? '').toLowerCase();

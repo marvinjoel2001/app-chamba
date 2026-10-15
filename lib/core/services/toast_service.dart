@@ -95,7 +95,6 @@ class ToastService {
         iconData = Icons.check_circle_outline_rounded;
         break;
       case ToastType.info:
-      default:
         primaryColor = const Color(0xFF1976D2);
         bgColor = const Color(0xFFE3F2FD);
         iconData = Icons.info_outline_rounded;

@@ -334,7 +334,7 @@ class _WalletScreenState extends State<WalletScreen>
                                 Row(
                                   children: [
                                     Text(
-                                      'Ganancias disponibles',
+                                      'Ganado en el periodo',
                                       style: TextStyle(
                                         color:
                                             Colors.white.withValues(alpha: 0.8),
@@ -372,7 +372,7 @@ class _WalletScreenState extends State<WalletScreen>
                                       ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Importe de trabajos completados',
+                                  'Suma de tus trabajos completados',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.75),
                                     fontSize: 13,
@@ -397,7 +397,7 @@ class _WalletScreenState extends State<WalletScreen>
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Los importes no confirman el cobro',
+                                      'Cada trabajo lo cobras directo al cliente',
                                       style: TextStyle(
                                         color: total > 0
                                             ? const Color(0xFFBBF7D0)
@@ -407,11 +407,6 @@ class _WalletScreenState extends State<WalletScreen>
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    const Spacer(),
-                                    Icon(Icons.chevron_right,
-                                        color:
-                                            Colors.white.withValues(alpha: 0.7),
-                                        size: 18),
                                   ],
                                 ),
                               ],
@@ -436,7 +431,7 @@ class _WalletScreenState extends State<WalletScreen>
                                   onTap: () => ToastService.show(
                                       title: 'Importes de trabajos',
                                       body:
-                                          'Estos importes no son un saldo retirable. Consulta el estado del pago con tu cliente.',
+                                          'No es un saldo para retirar: cada trabajo lo cobras directo al cliente.',
                                       type: ToastType.info),
                                 ),
                               ),
@@ -1054,11 +1049,16 @@ class _WalletScreenState extends State<WalletScreen>
                       color: AppTheme.colorText,
                       fontSize: 16,
                       fontWeight: FontWeight.bold)),
-              Text('Ver todo',
-                  style: TextStyle(
-                      color: AppTheme.colorPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
+              TextButton(
+                onPressed: _showHistoryModal,
+                style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.colorPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32)),
+                child: const Text('Ver todo',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           const SizedBox(height: 16),

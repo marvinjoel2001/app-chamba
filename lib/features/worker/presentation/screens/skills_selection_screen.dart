@@ -5,9 +5,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/category_visuals.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
-import '../../../shell/presentation/screens/main_shell_screen.dart';
 import 'work_modalities_screen.dart';
-import '../../domain/entities/worker_category.dart';
 import '../../domain/usecases/worker_usecases.dart';
 import '../state/worker_dependencies.dart';
 
@@ -37,9 +35,6 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
       WorkerDependencies.getWorkerCategories;
   GetWorkerSkillsUseCase get _getWorkerSkillsUseCase =>
       widget.getWorkerSkillsUseCase ?? WorkerDependencies.getWorkerSkills;
-  CreateWorkerCategoryUseCase get _createWorkerCategoryUseCase =>
-      widget.createWorkerCategoryUseCase ??
-      WorkerDependencies.createWorkerCategory;
   UpdateWorkerSkillsUseCase get _updateWorkerSkillsUseCase =>
       widget.updateWorkerSkillsUseCase ?? WorkerDependencies.updateWorkerSkills;
 
@@ -121,94 +116,6 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
   }
 
   IconData _resolveIcon(String label) => CategoryVisual.of(label).icon;
-
-  Future<void> _createCategoryFromDialog() async {
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final created = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        var saving = false;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Nueva categoria'),
-              content: Form(
-                key: formKey,
-                child: TextFormField(
-                  controller: controller,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    hintText: 'Ej: Instalacion de paneles',
-                  ),
-                  validator: (value) {
-                    final name = value?.trim() ?? '';
-                    if (name.isEmpty) {
-                      return 'Ingresa un nombre';
-                    }
-                    if (name.length < 3) {
-                      return 'Minimo 3 caracteres';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed:
-                      saving ? null : () => Navigator.of(context).pop(null),
-                  child: const Text('Cancelar'),
-                ),
-                TextButton(
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          if (!(formKey.currentState?.validate() ?? false)) {
-                            return;
-                          }
-                          setDialogState(() => saving = true);
-                          final name = controller.text.trim();
-                          final result = await _createWorkerCategoryUseCase(
-                            name: name,
-                          );
-                          result.fold(
-                            onSuccess: (WorkerCategory category) {
-                              if (!context.mounted) {
-                                return;
-                              }
-                              Navigator.of(context).pop(category.name);
-                            },
-                            onFailure: (failure) {
-                              if (!context.mounted) {
-                                return;
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(failure.message)),
-                              );
-                              setDialogState(() => saving = false);
-                            },
-                          );
-                        },
-                  child: Text(saving ? 'Guardando...' : 'Crear'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    controller.dispose();
-
-    if (created == null || created.isEmpty || !mounted) {
-      return;
-    }
-
-    await _load();
-    setState(() {
-      selected.add(created);
-    });
-  }
 
   Future<void> _save() async {
     final user = SessionStore.currentUser;

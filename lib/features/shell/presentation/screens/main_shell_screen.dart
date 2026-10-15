@@ -114,7 +114,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             const ProfileMenuScreen(),
           ]
         : [
-            ExploreScreen(role: widget.role),
+            const ExploreScreen(),
             MessagesScreen(isActive: currentIndex == _messagesTabIndex),
             const ProfileMenuScreen(),
           ];

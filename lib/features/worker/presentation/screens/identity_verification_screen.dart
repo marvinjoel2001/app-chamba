@@ -323,7 +323,7 @@ class _IdentityVerificationScreenState
     final currentUser = SessionStore.currentUser;
     if (currentUser == null || currentUser.type != 'worker') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se encontro sesion de trabajador')),
+        const SnackBar(content: Text('No se encontró sesión de trabajador')),
       );
       return;
     }
@@ -351,7 +351,7 @@ class _IdentityVerificationScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verificacion enviada correctamente')),
+          const SnackBar(content: Text('Verificación enviada correctamente')),
         );
 
         Navigator.of(context).pushAndRemoveUntil(
@@ -364,7 +364,7 @@ class _IdentityVerificationScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar verificacion: $e')),
+          SnackBar(content: Text('Error al enviar verificación: $e')),
         );
       }
     } finally {

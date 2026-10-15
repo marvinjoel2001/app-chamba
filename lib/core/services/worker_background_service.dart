@@ -17,7 +17,7 @@ class WorkerBackgroundService {
   static const String _channelId = 'worker_tracking_channel';
   static const String _channelName = 'Seguimiento de trabajador';
   static const String _channelDescription =
-      'Mantiene el estado de trabajador disponible y su ubicacion.';
+      'Mantiene el estado de trabajador disponible y su ubicación.';
   static const String _notifTitle = 'Chamba Worker activo';
   static const String _enabledKey = 'worker_bg_enabled';
 

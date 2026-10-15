@@ -12,13 +12,11 @@ import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/sound_effect_service.dart';
-import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
-import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/tracking_dependencies.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 
@@ -43,12 +41,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Timer? _pollTimer;
   bool _confirmingArrival = false;
 
-  Timer? _workLiveTimer;
-  int _workElapsedSeconds = 0;
-  bool _isWorkPaused = false;
-  bool _changingWorkPause = false;
-  int _serverElapsedSeconds = 0;
-  final Stopwatch _clockSinceSync = Stopwatch();
   bool _mapReady = false;
   bool _mapCentered = false;
 
@@ -132,41 +124,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _realtime.off('worker.location.updated', _onWorkerLocation);
     _realtime.off('job.clock.updated', _onWorkerArrived);
     _pollTimer?.cancel();
-    _workLiveTimer?.cancel();
     super.dispose();
-  }
-
-  void _startWorkTimer() {
-    _workLiveTimer?.cancel();
-    _workLiveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!_isWorkPaused && mounted) {
-        setState(() => _workElapsedSeconds =
-            _serverElapsedSeconds + _clockSinceSync.elapsed.inSeconds);
-      }
-    });
-  }
-
-  Future<void> _toggleWorkPause() async {
-    final requestId = _requestId;
-    if (requestId == null || _changingWorkPause) return;
-    setState(() => _changingWorkPause = true);
-    try {
-      await MobileBackendService.instance
-          .setWorkPaused(requestId: requestId, paused: !_isWorkPaused);
-      await _load();
-      if (_isWorkPaused) {
-        SoundEffectService.playTimerStopSound();
-      } else {
-        SoundEffectService.playTimerStartSound();
-      }
-    } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                'No se pudo guardar la pausa. ${error.toString().replaceFirst('Exception: ', '')}')));
-    } finally {
-      if (mounted) setState(() => _changingWorkPause = false);
-    }
   }
 
   void _centerMapOnce() {
@@ -187,7 +145,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (payload is Map && payload['requestId'] != (_requestId)) return;
     if (_finishing || !mounted) return;
     _finishing = true;
-    _workLiveTimer?.cancel();
     _pollTimer?.cancel();
     AppFlows.goToRating(requestId: _requestId);
   }
@@ -196,7 +153,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (payload is Map && payload['requestId'] != (_requestId)) return;
     if (_finishing || !mounted) return;
     _finishing = true;
-    _workLiveTimer?.cancel();
     _pollTimer?.cancel();
     AppFlows.goHomeAfterCancellation(requestId: _requestId);
   }
@@ -285,22 +241,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         }
       }
 
-      final clientConfirmed =
-          _tracking?['clientConfirmedArrival'] as bool? ?? false;
-      _serverElapsedSeconds =
-          (_tracking?['workElapsedSeconds'] as num?)?.toInt() ?? 0;
-      _workElapsedSeconds = _serverElapsedSeconds;
-      _isWorkPaused = _tracking?['workPaused'] == true;
-      _clockSinceSync.reset();
-      if (clientConfirmed && !_isWorkPaused) {
-        _clockSinceSync.start();
-      } else {
-        _clockSinceSync.stop();
-      }
       _centerMapOnce();
-      if (clientConfirmed && _workLiveTimer == null) {
-        _startWorkTimer();
-      }
 
       if (!mounted) return;
       setState(() {
@@ -360,9 +301,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_tracking?['modality'] == 'hourly'
-              ? 'Llegada confirmada. El cronómetro ha iniciado.'
-              : 'Llegada confirmada. El trabajo ha iniciado.'),
+          content: const Text('Llegada confirmada. El trabajo ha iniciado.'),
           backgroundColor: AppTheme.colorSuccess,
         ),
       );
@@ -479,7 +418,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     // Posición del worker (se actualiza con el polling)
     final workerPos = workerLat != null && workerLng != null
         ? LatLng(workerLat, workerLng)
-        : const LatLng(-16.5002, -68.1342);
+        : const LatLng(-17.7834, -63.1821);
 
     // Destino (ubicación del trabajo = donde está el cliente)
     final destPos =
@@ -1002,15 +941,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   ),
                                 ),
 
-                              // Tarjeta de Seguimiento en Vivo por Modalidad (Cronómetro/Jornada)
+                              // Qué se acordó según la modalidad (horas, días o precio fijo).
                               _LiveModalityTrackingCard(
                                 modality: modality,
-                                elapsedSeconds: _workElapsedSeconds,
-                                isPaused: _isWorkPaused,
-                                onTogglePause: _changingWorkPause ||
-                                        _tracking?['workPaused'] == null
-                                    ? null
-                                    : _toggleWorkPause,
                                 totalAmount: totalAmount,
                                 estimatedHours: estimatedHours,
                                 days: days,
@@ -1271,9 +1204,6 @@ class _MapBtn extends StatelessWidget {
 class _LiveModalityTrackingCard extends StatelessWidget {
   const _LiveModalityTrackingCard({
     required this.modality,
-    required this.elapsedSeconds,
-    required this.isPaused,
-    required this.onTogglePause,
     required this.totalAmount,
     required this.estimatedHours,
     required this.days,
@@ -1281,20 +1211,10 @@ class _LiveModalityTrackingCard extends StatelessWidget {
   });
 
   final String modality;
-  final int elapsedSeconds;
-  final bool isPaused;
-  final VoidCallback? onTogglePause;
   final double? totalAmount;
   final double estimatedHours;
   final double days;
   final bool clientConfirmed;
-
-  String _formatTimer(int totalSecs) {
-    final h = totalSecs ~/ 3600;
-    final m = (totalSecs % 3600) ~/ 60;
-    final s = totalSecs % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1303,15 +1223,12 @@ class _LiveModalityTrackingCard extends StatelessWidget {
     }
 
     if (modality == 'hourly') {
-      final hourlyRate = estimatedHours > 0 && totalAmount != null
-          ? totalAmount! / estimatedHours
-          : 40.0;
-      final currentCost = hourlyRate * (elapsedSeconds / 3600.0);
-      final estimatedSecs = (estimatedHours * 3600).toInt();
-      final progress = estimatedSecs > 0
-          ? (elapsedSeconds / estimatedSecs).clamp(0.0, 1.0)
-          : 0.0;
-      final isOvertime = estimatedSecs > 0 && elapsedSeconds > estimatedSecs;
+      // Se pagó al aceptar: tarifa × horas acordadas. El tiempo real no
+      // cambia el monto, así que no hay cronómetro ni pausa.
+      final hours = estimatedHours > 0 ? estimatedHours : 1.0;
+      final hourlyRate = (totalAmount ?? 0) / hours;
+      String bs(double v) =>
+          v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
       return Container(
         margin: const EdgeInsets.only(top: 16, bottom: 8),
@@ -1320,19 +1237,9 @@ class _LiveModalityTrackingCard extends StatelessWidget {
           color: AppTheme.colorSurfaceSoft,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isOvertime
-                ? AppTheme.colorWarning.withValues(alpha: 0.5)
-                : AppTheme.colorPrimary.withValues(alpha: 0.3),
+            color: AppTheme.colorPrimary.withValues(alpha: 0.3),
             width: 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (isOvertime ? AppTheme.colorWarning : AppTheme.colorPrimary)
-                      .withValues(alpha: 0.15),
-              blurRadius: 16,
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1346,9 +1253,9 @@ class _LiveModalityTrackingCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.timer,
+                    Icons.schedule_rounded,
                     color: AppTheme.colorPrimary,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1357,7 +1264,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'CRONÓMETRO EN VIVO',
+                        'TRABAJO POR HORAS',
                         style: TextStyle(
                           color: AppTheme.colorPrimary,
                           fontSize: 10,
@@ -1366,183 +1273,39 @@ class _LiveModalityTrackingCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        isPaused
-                            ? 'En pausa (descanso)'
-                            : 'Trabajando activamente',
-                        style: TextStyle(
-                          color: isPaused
-                              ? AppTheme.colorWarning
-                              : AppTheme.colorSuccess,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        '${bs(hours)} ${hours == 1 ? 'hora acordada' : 'horas acordadas'} · En progreso',
+                        style: const TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Botón Pausar / Reanudar
-                InkWell(
-                  onTap: onTogglePause,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isPaused
-                          ? AppTheme.colorSuccessSoft
-                          : AppTheme.colorWarningSoft,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isPaused
-                            ? AppTheme.colorSuccess.withValues(alpha: 0.4)
-                            : AppTheme.colorWarning.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPaused ? Icons.play_arrow : Icons.pause,
-                          size: 16,
-                          color: isPaused
-                              ? AppTheme.colorSuccess
-                              : AppTheme.colorWarning,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isPaused ? 'Reanudar' : 'Pausar',
-                          style: TextStyle(
-                            color: isPaused
-                                ? AppTheme.colorSuccess
-                                : AppTheme.colorWarning,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorSuccessSoft,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Bs ${bs(hourlyRate)}/h',
+                    style: const TextStyle(
+                      color: AppTheme.colorSuccess,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Contador grande
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'TIEMPO TRANSCURRIDO',
-                      style: TextStyle(
-                        color: AppTheme.colorMuted,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatTimer(elapsedSeconds),
-                      style: const TextStyle(
-                        color: AppTheme.colorText,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'monospace',
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'COSTO ACUMULADO',
-                      style: TextStyle(
-                        color: AppTheme.colorMuted,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Bs ${currentCost.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: AppTheme.colorSuccess,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            // Barra de progreso hacia horas estimadas
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: AppTheme.colorText.withValues(alpha: 0.08),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isOvertime ? AppTheme.colorWarning : AppTheme.colorPrimary,
-                ),
-              ),
+            Text(
+              'Total acordado: Bs ${bs(totalAmount ?? 0)}. No cambia si el trabajo dura más o menos.',
+              style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11),
             ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Tarifa: Bs ${hourlyRate.toStringAsFixed(2)}/hr',
-                  style:
-                      const TextStyle(color: AppTheme.colorMuted, fontSize: 10),
-                ),
-                Text(
-                  estimatedHours > 0
-                      ? 'Estimado: ${estimatedHours.toStringAsFixed(0)}h'
-                      : '',
-                  style: TextStyle(
-                    color: isOvertime
-                        ? AppTheme.colorWarning
-                        : AppTheme.colorMuted,
-                    fontSize: 10,
-                    fontWeight:
-                        isOvertime ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-            if (isOvertime) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.colorWarningSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: AppTheme.colorWarning, size: 14),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Se superó el tiempo estimado. El costo se ajusta por minuto extra.',
-                        style: TextStyle(
-                            color: AppTheme.colorWarning, fontSize: 10),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       );

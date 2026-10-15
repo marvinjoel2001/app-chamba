@@ -11,8 +11,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 
-/// Reason options shown to the user when reporting a problem.
-const _reasons = [
+/// Motivos del cliente al reportar un problema.
+const _clientReasons = [
   _ReasonOption(
     icon: Icons.money_off,
     title: 'Problema con el cobro',
@@ -28,17 +28,42 @@ const _reasons = [
     title: 'Trabajo mal realizado',
     description: 'La calidad del servicio no fue la esperada',
   ),
-  _ReasonOption(
-    icon: Icons.warning_amber,
-    title: 'Comportamiento inadecuado',
-    description: 'Falta de respeto, acoso o conducta inapropiada',
-  ),
-  _ReasonOption(
-    icon: Icons.help_outline,
-    title: 'Otro problema',
-    description: 'Mi problema no aparece en las opciones anteriores',
-  ),
+  _commonBehaviorReason,
+  _otherReason,
 ];
+
+/// Motivos del trabajador: sus problemas son con el cliente o el pago.
+const _workerReasons = [
+  _ReasonOption(
+    icon: Icons.money_off,
+    title: 'No me pagaron',
+    description: 'El cliente no pagó o pagó menos de lo acordado',
+  ),
+  _ReasonOption(
+    icon: Icons.person_off,
+    title: 'El cliente no estaba',
+    description: 'Llegué al lugar y no había nadie o no me atendieron',
+  ),
+  _ReasonOption(
+    icon: Icons.edit_note,
+    title: 'El trabajo no era el descrito',
+    description: 'Me pidieron más o algo distinto a lo publicado',
+  ),
+  _commonBehaviorReason,
+  _otherReason,
+];
+
+const _commonBehaviorReason = _ReasonOption(
+  icon: Icons.warning_amber,
+  title: 'Comportamiento inadecuado',
+  description: 'Falta de respeto, acoso o conducta inapropiada',
+);
+
+const _otherReason = _ReasonOption(
+  icon: Icons.help_outline,
+  title: 'Otro problema',
+  description: 'Mi problema no aparece en las opciones anteriores',
+);
 
 class _ReasonOption {
   const _ReasonOption({
@@ -245,7 +270,10 @@ class _SupportScreenState extends State<SupportScreen> {
                 style: TextStyle(color: AppTheme.colorMuted, fontSize: 14),
               ),
               const SizedBox(height: 20),
-              ..._reasons.map(
+              ...(SessionStore.currentUser?.type == 'worker'
+                      ? _workerReasons
+                      : _clientReasons)
+                  .map(
                 (r) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: GlassCard(

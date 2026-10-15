@@ -648,9 +648,6 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final address = _tracking?['address']?.toString() ?? '';
     final title = _tracking?['title']?.toString() ?? 'Trabajo en curso';
     final amount = _tracking?['agreedAmount'];
-    final priceType = _tracking?['priceType']?.toString();
-    final workElapsedSeconds =
-        (_tracking?['workElapsedSeconds'] as num?)?.toInt();
 
     // Desglose de la modalidad bajo el monto (mismo criterio que la
     // pantalla del cliente): el total manda, el detalle aclara.
@@ -690,7 +687,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final workerPos = _deviceLocation ??
         (workerLat != null && workerLng != null
             ? LatLng(workerLat, workerLng)
-            : const LatLng(-16.5002, -68.1342));
+            : const LatLng(-17.7834, -63.1821));
 
     // Destino (ubicación del trabajo)
     final destPos =
@@ -1260,18 +1257,6 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                     ],
                                   ),
                                 ),
-                              if (clientConfirmed && modality == 'hourly') ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                    '${_tracking?['workPaused'] == true ? 'En pausa' : 'Tiempo trabajado'} · '
-                                    '${Duration(seconds: workElapsedSeconds ?? 0).toString().split('.').first}',
-                                    style: const TextStyle(
-                                        color: AppTheme.colorPrimary)),
-                                Text(
-                                    'Acumulado: Bs ${((_tracking?['currentAmount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                        color: AppTheme.colorSuccess)),
-                              ],
                               const SizedBox(height: 16),
                               Row(
                                 children: [

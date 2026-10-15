@@ -153,8 +153,10 @@ class JobHistoryDetailsScreen extends StatelessWidget {
           'cancelled'
         ].contains(requestStatus.isEmpty ? job['offerStatus'] : requestStatus);
 
-    // Rating eligibility (Client when completed)
-    final canRate = isClient && (isCompleted || requestStatus == 'completed');
+    // Calificar: solo el cliente, con el trabajo terminado y una sola vez.
+    final canRate = isClient &&
+        (isCompleted || requestStatus == 'completed') &&
+        job['reviewed'] != true;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

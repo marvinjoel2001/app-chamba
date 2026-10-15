@@ -597,12 +597,6 @@ class MobileBackendService {
     );
   }
 
-  Future<Map<String, dynamic>> setWorkPaused(
-      {required String requestId, required bool paused}) {
-    return _api.post('/mobile/tracking/clock',
-        body: {'requestId': requestId, 'paused': paused});
-  }
-
   Future<Map<String, dynamic>> cancelJob({
     required String requestId,
     required String userId,
