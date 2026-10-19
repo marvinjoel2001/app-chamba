@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/worker_background_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/session/verification_sync_service.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/session/unread_notifications_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -24,7 +27,8 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class _MainShellScreenState extends State<MainShellScreen>
+    with WidgetsBindingObserver {
   int currentIndex = 0;
   final Set<int> _visitedIndices = {0};
   final RealtimeService _realtime = RealtimeService.instance;
@@ -36,6 +40,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+    SessionStore.userChanges.addListener(_onUserChanged);
+    _realtime.reconnectCount.addListener(_refreshVerification);
+    _refreshVerification();
 
     _realtime.on('user.verification.updated', _onVerificationUpdated);
 
@@ -56,8 +65,24 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    SessionStore.userChanges.removeListener(_onUserChanged);
+    _realtime.reconnectCount.removeListener(_refreshVerification);
     _realtime.off('user.verification.updated', _onVerificationUpdated);
     super.dispose();
+  }
+
+  void _onUserChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _refreshVerification() {
+    unawaited(VerificationSyncService.instance.refreshQuietly());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshVerification();
   }
 
   Future<void> _onVerificationUpdated(dynamic payload) async {
@@ -156,6 +181,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
                   UnreadNotificationsNotifier.instance.value,
               messagesTabIndex: _messagesTabIndex,
               onTap: (index) {
+                if (index == 0 || index == pages.length - 1) {
+                  _refreshVerification();
+                }
                 if (index == _messagesTabIndex) {
                   UnreadMessagesNotifier.instance.refresh();
                   UnreadNotificationsNotifier.instance.refresh();

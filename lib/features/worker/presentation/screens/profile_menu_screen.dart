@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/session/verification_sync_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
@@ -55,8 +56,20 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
   @override
   void initState() {
     super.initState();
+    SessionStore.userChanges.addListener(_onUserChanged);
+    unawaited(VerificationSyncService.instance.refreshQuietly());
     _loadUnreadSupportCount();
     _loadDeletionStatus();
+  }
+
+  void _onUserChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    SessionStore.userChanges.removeListener(_onUserChanged);
+    super.dispose();
   }
 
   /// Si la cuenta tiene una eliminación programada, se avisa arriba del perfil.
@@ -353,7 +366,19 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
-              await Future.wait([_loadUnreadSupportCount(), _loadDeletionStatus()]);
+              try {
+                await Future.wait([
+                  _loadUnreadSupportCount(),
+                  _loadDeletionStatus(),
+                  VerificationSyncService.instance.refresh(),
+                ]);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('No pudimos actualizar tu verificación. Revisa tu conexión e inténtalo de nuevo.'),
+                  ));
+                }
+              }
               // Refresca los datos de sesión mostrados (foto, verificación).
               if (mounted) setState(() {});
             },
@@ -653,7 +678,7 @@ class _ProfileCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child: Material(type: MaterialType.transparency, child: child),
     );
   }
 }
