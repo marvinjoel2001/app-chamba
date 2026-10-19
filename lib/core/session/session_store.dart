@@ -4,6 +4,7 @@ import '../services/worker_background_service.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 import '../push/push_notification_service.dart';
 
@@ -137,6 +138,8 @@ class SessionStore {
   static const _workerBgEnabledKey = 'worker_bg_enabled';
 
   static SessionUser? currentUser;
+  /// Rebuild session-dependent UI after server changes, including cached tabs.
+  static final userChanges = ValueNotifier<int>(0);
   static void clearActiveJob({String? requestId}) {
     if (requestId != null && requestId != activeRequestId) return;
     activeRequestId = null;
@@ -173,6 +176,7 @@ class SessionStore {
   static Future<void> setCurrentUser(SessionUser user, {String? token}) async {
     if (token != null) SessionCredentials.accessToken = token;
     currentUser = user;
+    userChanges.value++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySessionUser, jsonEncode(user.toJson()));
     if (token != null) await prefs.setString('session_access_token', token);
@@ -203,6 +207,7 @@ class SessionStore {
     SessionCredentials.visibleRequestId = null;
     SessionCredentials.visibleDisputeId = null;
     currentUser = null;
+    userChanges.value++;
     activeRequestId = null;
     activeThreadId = null;
 

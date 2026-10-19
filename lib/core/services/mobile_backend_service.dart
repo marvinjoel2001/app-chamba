@@ -14,6 +14,9 @@ class MobileBackendService {
 
   const MobileBackendService._();
 
+  Future<Map<String, dynamic>> myVerification() =>
+      _api.get('/mobile/profile/verification');
+
   static final http.Client _client = http.Client();
   static final ApiService _api = ApiService(
     baseUrl: AppConfig.apiBaseUrl,

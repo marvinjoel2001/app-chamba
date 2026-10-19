@@ -17,6 +17,7 @@ import '../services/sound_effect_service.dart';
 import '../services/toast_service.dart';
 import '../services/volume_service.dart';
 import '../session/session_store.dart';
+import '../session/verification_sync_service.dart';
 import '../session/session_credentials.dart';
 import '../session/unread_messages_notifier.dart';
 import '../session/unread_notifications_notifier.dart';
@@ -130,6 +131,9 @@ class PushNotificationService {
 
   /// Shared presentation owner for Socket.IO and foreground FCM.
   static bool present(Map<String, dynamic> data) {
+    if (data['type'] == 'verification_update') {
+      unawaited(VerificationSyncService.instance.refreshQuietly());
+    }
     final disposition = _policy.evaluate(data, userId: SessionStore.currentUser?.id,
       isVisible: WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
       visibleThreadId: SessionCredentials.visibleThreadId, visibleDisputeId: SessionCredentials.visibleDisputeId, now: DateTime.now());
