@@ -42,6 +42,9 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
   bool _loading = true;
   bool _isOffline = false;
   bool _shouldRedirectToLogin = false;
+  // Si no se pudieron leer sus oficios, guardar pisaría los reales con lo
+  // que esté marcado en pantalla: se bloquea hasta recargar bien.
+  bool _skillsLoadFailed = false;
   List<(String, IconData)> _skills = [
     for (final name in const [
       'Construccion',
@@ -96,19 +99,19 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
         setState(() {
           _isOffline = false;
           _shouldRedirectToLogin = false;
+          _skillsLoadFailed = false;
           _loading = false;
         });
       },
       onFailure: (failure) {
-        selected
-          ..clear()
-          ..addAll(const {'Construccion', 'Plomeria'});
+        selected.clear();
         if (!mounted) {
           return;
         }
         setState(() {
           _isOffline = failure is NetworkFailure;
           _shouldRedirectToLogin = failure is UnauthorizedFailure;
+          _skillsLoadFailed = true;
           _loading = false;
         });
       },
@@ -120,6 +123,16 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
   Future<void> _save() async {
     final user = SessionStore.currentUser;
     if (user == null) {
+      return;
+    }
+
+    if (_skillsLoadFailed) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'No pudimos cargar tus habilidades. Toca recargar e intenta de nuevo.')),
+      );
       return;
     }
 
@@ -213,6 +226,11 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8),
                     child: Text('Sin conexión. Intenta nuevamente.'),
+                  )
+                else if (_skillsLoadFailed && !_shouldRedirectToLogin)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text('No pudimos cargar tus habilidades. Toca recargar.'),
                   ),
                 if (_shouldRedirectToLogin)
                   const Padding(

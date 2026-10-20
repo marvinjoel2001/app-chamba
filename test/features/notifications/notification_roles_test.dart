@@ -6,6 +6,7 @@ import 'package:mobile/features/request/presentation/screens/incoming_request_sc
 import 'package:mobile/features/request/presentation/screens/job_in_progress_screen.dart';
 import 'package:mobile/features/request/presentation/screens/request_status_screen.dart';
 import 'package:mobile/features/request/presentation/screens/request_outcome_screen.dart';
+import 'package:mobile/features/review/presentation/screens/rating_screen.dart';
 import 'package:mobile/features/tracking/presentation/screens/tracking_screen.dart';
 
 void main() {
@@ -101,10 +102,20 @@ void main() {
                 requestId: 'old-job',
                 status: status,
                 type: 'job_finished',
-                isWorker: role == 'worker'),
+                isWorker: role == 'worker',
+                reviewed: true),
             isA<RequestOutcomeScreen>());
       });
     }
+    test('$role: job finished and not yet rated', () {
+      expect(
+          NotificationRouter.destinationForRequest(
+              requestId: 'done-job',
+              status: 'completed',
+              type: 'job_finished',
+              isWorker: role == 'worker'),
+          role == 'worker' ? isA<RequestOutcomeScreen>() : isA<RatingScreen>());
+    });
   }
   test(
       'new work opens incoming requests for worker and request status for client',

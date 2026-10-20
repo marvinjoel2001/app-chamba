@@ -11,6 +11,7 @@ import '../../features/notifications/presentation/screens/notifications_screen.d
 import '../../features/request/presentation/screens/incoming_request_screen.dart';
 import '../../features/request/presentation/screens/job_in_progress_screen.dart';
 import '../../features/request/presentation/screens/request_status_screen.dart';
+import '../../features/review/presentation/screens/rating_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/tracking/presentation/screens/tracking_screen.dart';
 import '../../features/worker/presentation/screens/profile_menu_screen.dart';
@@ -161,7 +162,8 @@ class NotificationRouter {
       final job = response['request'] as Map<String, dynamic>;
       final status = job['requestStatus'];
       final worker = SessionStore.currentUser?.type == 'worker';
-      final screen = destinationForRequest(requestId: requestId, status: status?.toString() ?? '', type: type, isWorker: worker);
+      final screen = destinationForRequest(requestId: requestId, status: status?.toString() ?? '', type: type, isWorker: worker,
+          reviewed: job['reviewed'] == true);
       _pushUnlessOnTop(nav, screen, 'notif:request:$requestId:$status');
     } catch (_) {
       ToastService.show(title: 'No pudimos abrir la solicitud', body: 'Revisa tu conexión o consulta tus notificaciones.', type: ToastType.info);
@@ -169,7 +171,12 @@ class NotificationRouter {
   }
 
   @visibleForTesting
-  static Widget destinationForRequest({required String requestId, required String status, required String type, required bool isWorker}) {
+  static Widget destinationForRequest({required String requestId, required String status, required String type, required bool isWorker,
+      bool reviewed = false}) {
+    // "Trabajo finalizado" lleva al cliente a calificar (el resumen no tiene esa opción).
+    if (!isWorker && status == 'completed' && type == 'job_finished' && !reviewed) {
+      return RatingScreen(requestId: requestId);
+    }
     final terminal = ['cancelled', 'completed', 'expired'].contains(status) ||
         ['offer_rejected', 'request_closed', 'request_timeout'].contains(type);
     if (terminal) return RequestOutcomeScreen(requestId: requestId);
