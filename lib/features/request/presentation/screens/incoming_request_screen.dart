@@ -1536,10 +1536,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
     final isDeclinedOffer = offerStatus == 'declined';
 
+    // El cliente subió su presupuesto después de mi oferta: aunque mi
+    // contraoferta fuera mayor (pedí 150, él subió de 100 a 120), puedo
+    // aceptar su precio nuevo o proponer otro.
     final clientImproved = hasPendingOffer &&
         !isDeclinedOffer &&
         myOfferAmount != null &&
-        currentBudget > myOfferAmount;
+        (currentBudget > myOfferAmount ||
+            workerOffer?['clientRaisedBudget'] == true);
 
     final client = req['client'] as Map<String, dynamic>? ?? {};
     final clientName = client['name']?.toString() ?? 'Cliente';
