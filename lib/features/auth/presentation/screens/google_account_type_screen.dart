@@ -8,6 +8,7 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/services/app_permissions_service.dart';
 import '../../../onboarding/presentation/screens/required_permissions_screen.dart';
 import '../../../shell/presentation/screens/main_shell_screen.dart';
+import 'phone_verification_screen.dart';
 
 class GoogleAccountTypeScreen extends StatefulWidget {
   const GoogleAccountTypeScreen({
@@ -28,7 +29,11 @@ class _GoogleAccountTypeScreenState extends State<GoogleAccountTypeScreen> {
   Future<void> _selectType(String type) async {
     setState(() => _isLoading = true);
     try {
+      final verified = await verifyRegistrationPhone(context);
+      if (verified == null || !mounted) return;
       final result = await MobileBackendService.instance.registerWithGoogle(
+        phone: verified.phone,
+        phoneIdToken: verified.idToken,
         email: widget.googleData['email'] ?? '',
         firstName: widget.googleData['firstName'] ?? 'Usuario',
         lastName: widget.googleData['lastName'],

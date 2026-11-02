@@ -12,6 +12,7 @@ abstract class AuthRemoteDataSource {
     required String role,
     required String email,
     String? phone,
+    String? phoneIdToken,
     String? countryCode,
     String? ciNumber,
     required String firstName,
@@ -36,7 +37,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> checkIdentifier({required String identifier}) {
-    return MobileBackendService.instance.checkIdentifier(identifier: identifier);
+    return MobileBackendService.instance
+        .checkIdentifier(identifier: identifier);
   }
 
   @override
@@ -44,6 +46,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String role,
     required String email,
     String? phone,
+    String? phoneIdToken,
     String? countryCode,
     String? ciNumber,
     required String firstName,
@@ -54,6 +57,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       type: role,
       email: email,
       phone: phone,
+      phoneIdToken: phoneIdToken,
       countryCode: countryCode,
       ciNumber: ciNumber,
       firstName: firstName,

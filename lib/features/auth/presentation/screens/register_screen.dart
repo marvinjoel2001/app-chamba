@@ -11,6 +11,7 @@ import '../../../onboarding/presentation/screens/required_permissions_screen.dar
 import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../controllers/auth_controller.dart';
 import 'terms_and_conditions_screen.dart';
+import 'phone_verification_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -305,12 +306,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     return;
                                   }
 
+                                  final verified = await verifyRegistrationPhone(
+                                      context,
+                                      phone:
+                                          '$_countryCode${_phoneController.text}');
+                                  if (verified == null || !mounted) return;
                                   await ref
                                       .read(authControllerProvider.notifier)
                                       .register(
                                         role: _selectedRole,
                                         email: _emailController.text,
-                                        phone: _phoneController.text,
+                                        phone: verified.phone,
+                                        phoneIdToken: verified.idToken,
                                         countryCode: _countryCode,
                                         ciNumber: _selectedRole == 'worker'
                                             ? _ciController.text

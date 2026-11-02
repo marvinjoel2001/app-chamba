@@ -50,6 +50,7 @@ class MobileBackendService {
     required String type,
     required String email,
     String? phone,
+    String? phoneIdToken,
     String? countryCode,
     String? ciNumber,
     required String firstName,
@@ -62,6 +63,7 @@ class MobileBackendService {
         'type': type,
         'email': email,
         'phone': phone,
+        'phoneIdToken': phoneIdToken,
         'countryCode': countryCode,
         'ciNumber': ciNumber,
         'firstName': firstName,
@@ -76,6 +78,8 @@ class MobileBackendService {
   }
 
   Future<Map<String, dynamic>> registerWithGoogle({
+    String? phone,
+    String? phoneIdToken,
     required String email,
     required String firstName,
     String? lastName,
@@ -91,6 +95,8 @@ class MobileBackendService {
         'lastName': lastName,
         'googleId': googleId,
         'registrationToken': registrationToken,
+        'phone': phone,
+        'phoneIdToken': phoneIdToken,
         'type': type,
       },
     );

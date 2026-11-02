@@ -66,6 +66,7 @@ dependencies:
   flutter_stripe: ^10.1.1
   url_launcher: ^6.3.2
   share_plus: ^12.0.2
+  firebase_auth: 5.7.0
 
 dependency_overrides:
   geolocator_android: ^4.4.0

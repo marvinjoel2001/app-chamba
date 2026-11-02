@@ -39,7 +39,8 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Error(ServerFailure('Respuesta de login inválida.'));
       }
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson),
+          token: response['token'] as String?);
       unawaited(_syncPushTokenBestEffort());
       return Success(AuthPayloadModel.fromJson(response));
     } catch (error) {
@@ -78,6 +79,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String role,
     required String email,
     String? phone,
+    String? phoneIdToken,
     String? countryCode,
     String? ciNumber,
     required String firstName,
@@ -97,6 +99,7 @@ class AuthRepositoryImpl implements AuthRepository {
         role: role.trim(),
         email: email.trim(),
         phone: phone?.trim().isEmpty == true ? null : phone?.trim(),
+        phoneIdToken: phoneIdToken,
         countryCode:
             countryCode?.trim().isEmpty == true ? null : countryCode?.trim(),
         ciNumber: ciNumber?.trim().isEmpty == true ? null : ciNumber?.trim(),
@@ -110,7 +113,8 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Error(ServerFailure('Respuesta de registro inválida.'));
       }
 
-      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson), token: response['token'] as String?);
+      await SessionStore.setCurrentUser(SessionUser.fromJson(userJson),
+          token: response['token'] as String?);
       unawaited(_syncPushTokenBestEffort());
       return Success(AuthPayloadModel.fromJson(response));
     } catch (error) {
