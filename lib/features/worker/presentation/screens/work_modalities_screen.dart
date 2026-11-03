@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/services/work_modalities_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -15,6 +16,7 @@ class WorkModalitiesScreen extends StatefulWidget {
   const WorkModalitiesScreen({
     this.getWorkerModalitiesUseCase,
     this.updateWorkerModalitiesUseCase,
+    this.modalitiesService,
     this.forceToHomeAfterSave = false,
     super.key,
   });
@@ -24,6 +26,9 @@ class WorkModalitiesScreen extends StatefulWidget {
   final bool forceToHomeAfterSave;
   final GetWorkerModalitiesUseCase? getWorkerModalitiesUseCase;
   final UpdateWorkerModalitiesUseCase? updateWorkerModalitiesUseCase;
+
+  /// Modalidades activas (las que el admin apagó no se muestran).
+  final WorkModalitiesService? modalitiesService;
 
   @override
   State<WorkModalitiesScreen> createState() => _WorkModalitiesScreenState();
@@ -43,6 +48,7 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
 
   bool _loading = true;
   bool _saving = false;
+  WorkModalitiesSettings _enabled = WorkModalitiesSettings.all;
 
   @override
   void initState() {
@@ -65,12 +71,16 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
     }
 
     setState(() => _loading = true);
+    final enabled =
+        await (widget.modalitiesService ?? WorkModalitiesService()).load();
     final result = await _getModalities(workerUserId: user.id);
+    _enabled = enabled;
     result.fold(
       onSuccess: (modalities) {
+        // Las que el admin apagó ya no se ofrecen ni se guardan.
         _selected
           ..clear()
-          ..addAll(modalities.modalities);
+          ..addAll(modalities.modalities.where(enabled.isEnabled));
         if (modalities.hourlyRate != null) {
           _hourlyRateController.text =
               modalities.hourlyRate!.toStringAsFixed(2);
@@ -172,7 +182,8 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back, color: AppTheme.colorText),
+                      icon: const Icon(Icons.arrow_back,
+                          color: AppTheme.colorText),
                     ),
                     const Spacer(),
                     Text(
@@ -220,49 +231,54 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
                 Expanded(
                   child: ListView(
                     children: [
-                      _ModalityCheck(
-                        icon: Icons.work_outline,
-                        title: 'Por trabajo',
-                        description:
-                            'Precio cerrado: acuerdas un monto fijo por todo '
-                            'el trabajo.',
-                        selected: _selected.contains('fixed'),
-                        onTap: () => _toggle('fixed'),
-                      ),
-                      const SizedBox(height: 12),
-                      _ModalityCheck(
-                        icon: Icons.access_time,
-                        title: 'Por hora',
-                        description:
-                            'Cobras por las horas trabajadas. Indica una tarifa '
-                            'de referencia.',
-                        selected: _selected.contains('hourly'),
-                        onTap: () => _toggle('hourly'),
-                        rateField: _selected.contains('hourly')
-                            ? _RateField(
-                                controller: _hourlyRateController,
-                                label: 'Tu tarifa por hora',
-                                suffix: 'Bs / hr',
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      _ModalityCheck(
-                        icon: Icons.calendar_today_outlined,
-                        title: 'Por día',
-                        description:
-                            'Cobras por jornada completa. Indica una tarifa de '
-                            'referencia.',
-                        selected: _selected.contains('daily'),
-                        onTap: () => _toggle('daily'),
-                        rateField: _selected.contains('daily')
-                            ? _RateField(
-                                controller: _dailyRateController,
-                                label: 'Tu tarifa por día',
-                                suffix: 'Bs / día',
-                              )
-                            : null,
-                      ),
+                      if (_enabled.fixed) ...[
+                        _ModalityCheck(
+                          icon: Icons.work_outline,
+                          title: 'Por trabajo',
+                          description:
+                              'Precio cerrado: acuerdas un monto fijo por todo '
+                              'el trabajo.',
+                          selected: _selected.contains('fixed'),
+                          onTap: () => _toggle('fixed'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_enabled.hourly) ...[
+                        _ModalityCheck(
+                          icon: Icons.access_time,
+                          title: 'Por hora',
+                          description:
+                              'Cobras por las horas trabajadas. Indica una tarifa '
+                              'de referencia.',
+                          selected: _selected.contains('hourly'),
+                          onTap: () => _toggle('hourly'),
+                          rateField: _selected.contains('hourly')
+                              ? _RateField(
+                                  controller: _hourlyRateController,
+                                  label: 'Tu tarifa por hora',
+                                  suffix: 'Bs / hr',
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_enabled.daily)
+                        _ModalityCheck(
+                          icon: Icons.calendar_today_outlined,
+                          title: 'Por día',
+                          description:
+                              'Cobras por jornada completa. Indica una tarifa de '
+                              'referencia.',
+                          selected: _selected.contains('daily'),
+                          onTap: () => _toggle('daily'),
+                          rateField: _selected.contains('daily')
+                              ? _RateField(
+                                  controller: _dailyRateController,
+                                  label: 'Tu tarifa por día',
+                                  suffix: 'Bs / día',
+                                )
+                              : null,
+                        ),
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(14),

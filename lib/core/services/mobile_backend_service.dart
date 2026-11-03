@@ -207,6 +207,11 @@ class MobileBackendService {
     return _api.get('/mobile/categories');
   }
 
+  /// Modalidades de contratación activas: `{fixed, hourly, daily}` (bool).
+  Future<Map<String, dynamic>> workModalities() {
+    return _api.get('/mobile/work-modalities');
+  }
+
   // ── Eliminación de cuenta (espera de 30 días). El servidor toma el usuario
   //    del token de sesión, por eso no se envía userId.
   Future<Map<String, dynamic>> accountDeletionStatus() =>
