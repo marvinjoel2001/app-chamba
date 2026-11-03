@@ -15,8 +15,8 @@ import '../domain/payment_checkout.dart';
 
 /// Pantalla genérica para pagos que se completan fuera de la app (QR del
 /// banco o página de una pasarela). Muestra lo que manda el backend, consulta
-/// el estado cada `pollSeconds` y devuelve `true` cuando el pago quedó hecho
-/// (o reportado con "Ya pagué").
+/// el estado cada `pollSeconds` y devuelve `true` cuando el proveedor
+/// confirmó el pago. No hay "Ya pagué": el banco lo confirma por su API.
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
     required this.offerId,
@@ -116,31 +116,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _reportPaid() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Ya hiciste el pago?'),
-        content: Text(
-          'Confirma que pagaste ${_payment.amountLabel} desde tu banco. '
-          'Lo revisaremos y avisaremos si hay algún problema.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Todavía no'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sí, ya pagué'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    await _run(() => widget.api.reportPaid(_payment.id!));
   }
 
   Future<void> _openUrl() async {
@@ -277,22 +252,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                 ],
                 const SizedBox(height: 22),
-                if (!dead && _payment.canReportPaid)
-                  SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      key: const Key('payment-report'),
-                      onPressed: _busy ? null : _reportPaid,
-                      child: _busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Ya pagué'),
-                    ),
-                  ),
                 TextButton(
                   onPressed:
                       _busy ? null : () => Navigator.of(context).pop(false),

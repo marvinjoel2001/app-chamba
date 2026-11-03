@@ -77,6 +77,25 @@ class MobileBackendService {
     return _api.post('/auth/google', body: {'idToken': idToken});
   }
 
+  /// "Olvidé mi contraseña", paso 1: con el idToken de la cuenta de Google del
+  /// mismo correo devuelve `resetToken`, `email`, `firstName`, `hadPassword`.
+  Future<Map<String, dynamic>> startGooglePasswordReset({
+    required String idToken,
+  }) {
+    return _api.post('/auth/password/google/start', body: {'idToken': idToken});
+  }
+
+  /// Paso 2: guarda la contraseña nueva y devuelve la sesión (`user`, `token`).
+  Future<Map<String, dynamic>> completeGooglePasswordReset({
+    required String resetToken,
+    required String newPassword,
+  }) {
+    return _api.post(
+      '/auth/password/google/complete',
+      body: {'resetToken': resetToken, 'newPassword': newPassword},
+    );
+  }
+
   Future<Map<String, dynamic>> registerWithGoogle({
     String? phone,
     String? phoneIdToken,
@@ -740,9 +759,5 @@ class MobileBackendService {
 
   Future<Map<String, dynamic>> paymentStatus(String paymentId) {
     return _api.get('/mobile/payments/$paymentId');
-  }
-
-  Future<Map<String, dynamic>> reportPaymentPaid(String paymentId) {
-    return _api.post('/mobile/payments/$paymentId/report', body: const {});
   }
 }

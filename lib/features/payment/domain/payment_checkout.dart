@@ -7,6 +7,8 @@ enum PaymentAction { none, qr, cardSheet, openUrl, unknown }
 enum PaymentStatus {
   notRequired,
   pending,
+
+  /// Solo pagos viejos ("Ya pagué" ya no existe): no habilita aceptar.
   reported,
   paid,
   failed,
@@ -60,7 +62,6 @@ class PaymentCheckout {
     this.cardPublishableKey,
     this.url,
     this.expiresAt,
-    this.canReportPaid = false,
     this.pollSeconds = 0,
   });
 
@@ -86,7 +87,6 @@ class PaymentCheckout {
       url: _text(json['url']),
       expiresAt:
           DateTime.tryParse(json['expiresAt']?.toString() ?? '')?.toLocal(),
-      canReportPaid: json['canReportPaid'] == true,
       pollSeconds: int.tryParse(json['pollSeconds']?.toString() ?? '') ?? 0,
     );
   }
@@ -107,14 +107,12 @@ class PaymentCheckout {
   final String? cardPublishableKey;
   final String? url;
   final DateTime? expiresAt;
-  final bool canReportPaid;
   final int pollSeconds;
 
-  /// Con estos estados ya se puede aceptar la oferta.
+  /// Con estos estados ya se puede aceptar la oferta. Un pago solo queda
+  /// `paid` cuando el proveedor (banco o tarjeta) lo confirma por su API.
   bool get isSettled =>
-      status == PaymentStatus.notRequired ||
-      status == PaymentStatus.paid ||
-      status == PaymentStatus.reported;
+      status == PaymentStatus.notRequired || status == PaymentStatus.paid;
 
   /// El cobro terminó sin pago: hay que generar otro o elegir otra cosa.
   bool get isDead =>
@@ -144,8 +142,4 @@ class PaymentApi {
   Future<PaymentCheckout> status(String paymentId) async =>
       PaymentCheckout.fromJson(
           await MobileBackendService.instance.paymentStatus(paymentId));
-
-  Future<PaymentCheckout> reportPaid(String paymentId) async =>
-      PaymentCheckout.fromJson(
-          await MobileBackendService.instance.reportPaymentPaid(paymentId));
 }

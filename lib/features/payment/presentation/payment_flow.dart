@@ -8,7 +8,7 @@ enum PaymentOutcome {
   /// El método no cobra en la app (efectivo, etc.).
   notRequired,
 
-  /// Pagado o reportado: ya se puede aceptar la oferta.
+  /// Pagado (confirmado por el proveedor): ya se puede aceptar la oferta.
   paid,
 
   /// El cliente salió sin pagar.
