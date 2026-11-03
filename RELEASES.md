@@ -8,12 +8,25 @@ git fetch --tags
 git checkout v1.0.2+3
 ```
 
-| Versión | Tag | Google Play | App Store | Qué trae |
-|---|---|---|---|---|
-| **1.0.3+4** | `v1.0.3+4` | Lista para compilar, **aún no subida** | Lista para compilar (ver [docs/publicar-ios.md](docs/publicar-ios.md)) | "Olvidé mi contraseña" con Google; aviso de intentos y bloqueo de 15 min; sin botón "Ya pagué"; correcciones de la auditoría (20-oct); verificación del teléfono al registrarse (2-nov); proyecto iOS listo. |
-| 1.0.2+3 | `v1.0.2+3` | **Prueba cerrada** | — | Compilada con `env/dart_define.prod.json`. No incluye nada de 1.0.3+4. |
-| 1.0.1+2 | `v1.0.1+2` | Reemplazada | — | Se compiló sin `--dart-define-from-file` y salió sin `API_BASE_URL`. |
-| 1.0.0+1 | — | — | — | Antes de llevar este registro (commit exacto desconocido). |
+| Versión | Tag | Commit | Google Play | App Store | Qué trae |
+|---|---|---|---|---|---|
+| **1.0.3+4** | `v1.0.3+4` | `8479999` | Lista para compilar, **aún no subida** | Lista para compilar (ver [docs/publicar-ios.md](docs/publicar-ios.md)) | "Olvidé mi contraseña" con Google; aviso de intentos y bloqueo de 15 min; sin botón "Ya pagué"; correcciones de la auditoría (20-oct); verificación del teléfono al registrarse (2-nov); proyecto iOS listo. |
+| 1.0.2+3 | `v1.0.2+3` | `93f4dec` | **Prueba cerrada** | — | Compilada con `env/dart_define.prod.json`. No incluye nada de 1.0.3+4. |
+| 1.0.1+2 | `v1.0.1+2` | `2ce9d89` | Reemplazada | — | Se compiló sin `--dart-define-from-file` y salió sin `API_BASE_URL`. |
+| 1.0.0+1 | — | — | — | — | Antes de llevar este registro (commit exacto desconocido). |
+
+### Crear los tags (una sola vez)
+
+Los tags de la tabla todavía no están en GitHub. Después de fusionar esta rama
+a `main`, créalos desde tu computadora:
+
+```bash
+git fetch origin && git tag -a v1.0.1+2 2ce9d89 -m "1.0.1+2 (reemplazada)" && git tag -a v1.0.2+3 93f4dec -m "1.0.2+3 - Play prueba cerrada" && git tag -a v1.0.3+4 8479999 -m "1.0.3+4"
+```
+
+```bash
+git push origin v1.0.1+2 v1.0.2+3 v1.0.3+4
+```
 
 ## Compatibilidad con el backend
 
