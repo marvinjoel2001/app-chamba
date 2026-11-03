@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/work_modalities_service.dart';
 import 'request_form_screen.dart';
 
-class RequestModalityScreen extends StatelessWidget {
+class RequestModalityScreen extends StatefulWidget {
   const RequestModalityScreen({
     required this.initialPrompt,
     this.initialTitle,
@@ -11,6 +12,7 @@ class RequestModalityScreen extends StatelessWidget {
     this.initialAddress,
     this.preselectedCategory,
     this.preselectedWorkerId,
+    this.modalitiesService,
     super.key,
   });
 
@@ -23,19 +25,37 @@ class RequestModalityScreen extends StatelessWidget {
   final String? preselectedCategory;
   final String? preselectedWorkerId;
 
+  /// Modalidades activas (las que el admin apagó no se muestran).
+  final WorkModalitiesService? modalitiesService;
+
+  @override
+  State<RequestModalityScreen> createState() => _RequestModalityScreenState();
+}
+
+class _RequestModalityScreenState extends State<RequestModalityScreen> {
+  WorkModalitiesSettings? _settings;
+
+  @override
+  void initState() {
+    super.initState();
+    (widget.modalitiesService ?? WorkModalitiesService()).load().then((value) {
+      if (mounted) setState(() => _settings = value);
+    });
+  }
+
   void _selectModality(BuildContext context, String modality) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => RequestFormScreen(
           modality: modality,
-          initialPrompt: initialPrompt,
-          initialTitle: initialTitle,
-          suggestedCategories: suggestedCategories,
-          initialLatitude: initialLatitude,
-          initialLongitude: initialLongitude,
-          initialAddress: initialAddress,
-          preselectedCategory: preselectedCategory,
-          preselectedWorkerId: preselectedWorkerId,
+          initialPrompt: widget.initialPrompt,
+          initialTitle: widget.initialTitle,
+          suggestedCategories: widget.suggestedCategories,
+          initialLatitude: widget.initialLatitude,
+          initialLongitude: widget.initialLongitude,
+          initialAddress: widget.initialAddress,
+          preselectedCategory: widget.preselectedCategory,
+          preselectedWorkerId: widget.preselectedWorkerId,
         ),
       ),
     );
@@ -140,61 +160,74 @@ class RequestModalityScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
+              if (_settings == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
               // 1. Tarjeta: Por trabajo
-              _ModalityCard(
-                imagePath: 'assets/images/modalities/modality_job.png',
-                cardBgColor: const Color(0xFFFAFAFE),
-                borderColor: const Color(0xFFE9D5FF),
-                title: 'Por trabajo',
-                badgeText: 'Precio cerrado',
-                badgeBgColor: const Color(0xFF7C3AED),
-                description: 'Acuerda un precio fijo por el trabajo completo.',
-                tagBgColor: const Color(0xFFEDE9FE),
-                tagTextColor: const Color(0xFF7C3AED),
-                tags: const ['Tareas específicas', 'Proyectos puntuales'],
-                arrowBgColor: const Color(0xFFF3E8FF),
-                arrowColor: const Color(0xFF7C3AED),
-                onTap: () => _selectModality(context, 'fixed'),
-              ),
-              const SizedBox(height: 16),
+              if (_settings?.fixed == true) ...[
+                _ModalityCard(
+                  imagePath: 'assets/images/modalities/modality_job.png',
+                  cardBgColor: const Color(0xFFFAFAFE),
+                  borderColor: const Color(0xFFE9D5FF),
+                  title: 'Por trabajo',
+                  badgeText: 'Precio cerrado',
+                  badgeBgColor: const Color(0xFF7C3AED),
+                  description:
+                      'Acuerda un precio fijo por el trabajo completo.',
+                  tagBgColor: const Color(0xFFEDE9FE),
+                  tagTextColor: const Color(0xFF7C3AED),
+                  tags: const ['Tareas específicas', 'Proyectos puntuales'],
+                  arrowBgColor: const Color(0xFFF3E8FF),
+                  arrowColor: const Color(0xFF7C3AED),
+                  onTap: () => _selectModality(context, 'fixed'),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // 2. Tarjeta: Por hora
-              _ModalityCard(
-                imagePath: 'assets/images/modalities/modality_hour.png',
-                cardBgColor: const Color(0xFFF0F9FF),
-                borderColor: const Color(0xFFBAE6FD),
-                title: 'Por hora',
-                badgeText: 'Tarifa por hora',
-                badgeBgColor: const Color(0xFF0284C7),
-                description:
-                    'Pones tu tarifa por hora y cuántas horas necesitas. Pagas tarifa × horas.',
-                tagBgColor: const Color(0xFFE0F2FE),
-                tagTextColor: const Color(0xFF0284C7),
-                tags: const ['Trabajos flexibles', 'Sin alcance definido'],
-                arrowBgColor: const Color(0xFFE0F2FE),
-                arrowColor: const Color(0xFF0284C7),
-                onTap: () => _selectModality(context, 'hourly'),
-              ),
-              const SizedBox(height: 16),
+              if (_settings?.hourly == true) ...[
+                _ModalityCard(
+                  imagePath: 'assets/images/modalities/modality_hour.png',
+                  cardBgColor: const Color(0xFFF0F9FF),
+                  borderColor: const Color(0xFFBAE6FD),
+                  title: 'Por hora',
+                  badgeText: 'Tarifa por hora',
+                  badgeBgColor: const Color(0xFF0284C7),
+                  description:
+                      'Pones tu tarifa por hora y cuántas horas necesitas. Pagas tarifa × horas.',
+                  tagBgColor: const Color(0xFFE0F2FE),
+                  tagTextColor: const Color(0xFF0284C7),
+                  tags: const ['Trabajos flexibles', 'Sin alcance definido'],
+                  arrowBgColor: const Color(0xFFE0F2FE),
+                  arrowColor: const Color(0xFF0284C7),
+                  onTap: () => _selectModality(context, 'hourly'),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // 3. Tarjeta: Por día
-              _ModalityCard(
-                imagePath: 'assets/images/modalities/modality_day.png',
-                cardBgColor: const Color(0xFFF0FDF4),
-                borderColor: const Color(0xFFBBF7D0),
-                title: 'Por día',
-                badgeText: 'Pagas una jornada completa',
-                badgeBgColor: const Color(0xFF16A34A),
-                description:
-                    'Contrata por día completo de trabajo (jornada de 8 horas).',
-                tagBgColor: const Color(0xFFDCFCE7),
-                tagTextColor: const Color(0xFF16A34A),
-                tags: const ['Jornada de 8 horas', 'Trabajo continuo'],
-                arrowBgColor: const Color(0xFFDCFCE7),
-                arrowColor: const Color(0xFF16A34A),
-                onTap: () => _selectModality(context, 'daily'),
-              ),
-              const SizedBox(height: 24),
+              if (_settings?.daily == true) ...[
+                _ModalityCard(
+                  imagePath: 'assets/images/modalities/modality_day.png',
+                  cardBgColor: const Color(0xFFF0FDF4),
+                  borderColor: const Color(0xFFBBF7D0),
+                  title: 'Por día',
+                  badgeText: 'Pagas una jornada completa',
+                  badgeBgColor: const Color(0xFF16A34A),
+                  description:
+                      'Contrata por día completo de trabajo (jornada de 8 horas).',
+                  tagBgColor: const Color(0xFFDCFCE7),
+                  tagTextColor: const Color(0xFF16A34A),
+                  tags: const ['Jornada de 8 horas', 'Trabajo continuo'],
+                  arrowBgColor: const Color(0xFFDCFCE7),
+                  arrowColor: const Color(0xFF16A34A),
+                  onTap: () => _selectModality(context, 'daily'),
+                ),
+                const SizedBox(height: 24),
+              ],
             ],
           ),
         ),

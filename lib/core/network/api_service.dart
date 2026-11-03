@@ -286,7 +286,15 @@ class ApiService {
     if (statusCode == 401) {
       final lower = (message ?? '').toLowerCase();
       if (lower.contains('credencial')) {
-        return 'Correo/teléfono o contraseña incorrectos.';
+        // El backend avisa cuántos intentos quedan antes del bloqueo.
+        final hint = message!.indexOf('. ');
+        return hint < 0
+            ? 'Correo/teléfono o contraseña incorrectos.'
+            : 'Correo/teléfono o contraseña incorrectos. ${message.substring(hint + 2)}';
+      }
+      // "Olvidé mi contraseña": el motivo exacto ayuda a volver a empezar.
+      if (lower.contains('recuperación')) {
+        return message!;
       }
       // Errores de inicio de sesión (Google, cuenta bloqueada): el motivo del
       // backend es más útil que "sesión expirada", que aquí confunde.
@@ -313,11 +321,25 @@ class ApiService {
     }
 
     if (statusCode == 403) {
+      final lower = (message ?? '').toLowerCase();
+      if (lower.contains('google') || lower.contains('bloqueada')) {
+        return message!;
+      }
       return 'No tienes permisos para realizar esta acción.';
     }
 
     if (statusCode == 404) {
+      final lower = (message ?? '').toLowerCase();
+      if (lower.contains('cuenta de chamba')) {
+        return message!;
+      }
       return 'No se encontró la información solicitada.';
+    }
+
+    // 429: demasiados intentos de contraseña; el backend dice cuánto esperar.
+    if (statusCode == 429) {
+      return message ??
+          'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.';
     }
 
     if (statusCode >= 500) {

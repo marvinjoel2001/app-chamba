@@ -169,18 +169,19 @@ class WorkerRepositoryImpl implements WorkerRepository {
   }
 
   @override
-  Future<Result<void>> uploadProfilePhoto({
+  Future<Result<String?>> uploadProfilePhoto({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) async {
     try {
-      await _remote.uploadProfilePhoto(
+      final response = await _remote.uploadProfilePhoto(
         userId: userId,
-        imageUrl: imageUrl,
-        imagePublicId: imagePublicId,
+        imageBase64: imageBase64,
       );
-      return const Success(null);
+      final user = response['user'];
+      return Success(
+        user is Map ? user['profilePhotoUrl']?.toString() : null,
+      );
     } catch (error) {
       return Error(mapToFailure(error));
     }

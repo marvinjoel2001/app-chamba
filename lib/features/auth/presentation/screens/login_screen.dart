@@ -13,9 +13,9 @@ import '../../../shell/presentation/screens/main_shell_screen.dart';
 import '../state/auth_dependencies.dart';
 import '../controllers/auth_controller.dart';
 import 'register_screen.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import '../../../../core/config/app_config.dart';
 import '../../../../core/services/mobile_backend_service.dart';
+import '../google_sign_in_helper.dart';
+import 'forgot_password_screen.dart';
 import 'google_account_type_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -108,30 +108,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _continueWithGoogle() async {
     setState(() => _checkingIdentifier = true);
     try {
-      final googleSignIn = GoogleSignIn(
-        serverClientId: AppConfig.googleWebClientId.isNotEmpty
-            ? AppConfig.googleWebClientId
-            : null,
-        scopes: ['email', 'profile'],
-      );
-      // Limpia sesión previa para evitar conflictos de cache
-      await googleSignIn.signOut();
-      final account = await googleSignIn.signIn();
-      if (account == null) {
+      final idToken = await requestGoogleIdToken();
+      if (idToken == null) {
         // El usuario cerró el selector de cuentas; el finally apaga el loader.
         return;
       }
 
-      final auth = await account.authentication;
-      if (auth.idToken == null) {
-        throw Exception(
-          'No se pudo obtener el idToken de Google. '
-          'Verifica que GOOGLE_WEB_CLIENT_ID esté configurado correctamente.',
-        );
-      }
-
-      final result = await MobileBackendService.instance
-          .loginWithGoogle(idToken: auth.idToken!);
+      final result =
+          await MobileBackendService.instance.loginWithGoogle(idToken: idToken);
 
       if (result['requiresRegistration'] == true) {
         if (!mounted) return;
@@ -149,38 +133,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             token: result['token'] as String?);
 
         if (!mounted) return;
+        // Primera vez con Google en una cuenta que tenía contraseña: el
+        // backend la desactivó por seguridad; se le explica a la persona.
+        if (result['passwordDisabled'] == true) {
+          await _showPasswordDisabledNotice();
+          if (!mounted) return;
+        }
         _handleAuthenticated();
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_googleErrorMessage(e))),
+        SnackBar(content: Text(googleSignInErrorMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _checkingIdentifier = false);
     }
   }
 
-  /// Traduce los errores nativos de Google Sign-In a un mensaje entendible.
-  /// El código 10 (DEVELOPER_ERROR) significa que el paquete + SHA-1 de esta
-  /// build no están registrados como cliente OAuth Android en Firebase.
-  String _googleErrorMessage(Object error) {
-    final raw = error.toString();
-    if (raw.contains('ApiException: 10') || raw.contains('DEVELOPER_ERROR')) {
-      return 'Google Sign-In no está configurado para esta versión de la app '
-          '(falta registrar el SHA-1 en Firebase). Usa correo y contraseña por ahora.';
-    }
-    if (raw.contains('network_error') || raw.contains('ApiException: 7')) {
-      return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
-    }
-    if (raw.contains('ApiException: 12501') ||
-        raw.contains('sign_in_canceled')) {
-      return 'Inicio de sesión con Google cancelado.';
-    }
-    if (raw.contains('sign_in_failed')) {
-      return 'No se pudo iniciar sesión con Google. Intenta de nuevo.';
-    }
-    return raw.replaceAll('Exception: ', '');
+  Future<void> _showPasswordDisabledNotice() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tu cuenta ahora usa Google'),
+        content: const Text(
+          'Vinculamos tu cuenta con Google. Por seguridad, la contraseña que '
+          'tenías ya no funciona y cerramos tu sesión en otros teléfonos. '
+          'Entra con Google o crea una contraseña nueva en '
+          '"¿Olvidaste tu contraseña?".',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// "Olvidé mi contraseña": se recupera con la cuenta de Google del mismo
+  /// correo; al terminar vuelve con la sesión nueva y entra directo.
+  Future<void> _openForgotPassword() async {
+    final session = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+    );
+    final user = session?['user'];
+    if (user is! Map || !mounted) return;
+    await SessionStore.setCurrentUser(
+      SessionUser.fromJson(Map<String, dynamic>.from(user)),
+      token: session?['token'] as String?,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Listo: guardamos tu contraseña nueva.')),
+    );
+    _handleAuthenticated();
   }
 
   @override
@@ -399,6 +407,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           }
                                           return null;
                                         },
+                                      ),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton(
+                                          key: const Key('login-forgot'),
+                                          onPressed: authState.isLoading
+                                              ? null
+                                              : _openForgotPassword,
+                                          child: const Text(
+                                              '¿Olvidaste tu contraseña?'),
+                                        ),
                                       ),
                                     ],
                                     const SizedBox(height: 20),

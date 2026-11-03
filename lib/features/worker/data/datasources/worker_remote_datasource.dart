@@ -34,8 +34,7 @@ abstract class WorkerRemoteDataSource {
 
   Future<Map<String, dynamic>> uploadProfilePhoto({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   });
 
   Future<Map<String, dynamic>> deleteProfilePhoto({required String userId});
@@ -124,13 +123,11 @@ class WorkerRemoteDataSourceImpl implements WorkerRemoteDataSource {
   @override
   Future<Map<String, dynamic>> uploadProfilePhoto({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) {
     return _backendService.uploadProfilePhoto(
       userId: userId,
-      imageUrl: imageUrl,
-      imagePublicId: imagePublicId,
+      imageBase64: imageBase64,
     );
   }
 

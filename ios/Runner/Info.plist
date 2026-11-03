@@ -7,9 +7,21 @@
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>google-sign-in</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.899491855193-cu0bpde89qq24q1dhg71bq2lrfhlcipr</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>firebase-phone-auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-899491855193-ios-8d14ccd3462745c1af6a48</string>
 			</array>
 		</dict>
 	</array>
@@ -65,17 +77,17 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Necesitamos tu ubicación para mostrar tu posición actual en el mapa y encontrar trabajos cercanos.</string>
+	<string>Usamos tu ubicación para mostrarte en el mapa, ubicar tu solicitud y encontrar trabajos o trabajadores cercanos.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<string>Si eres trabajador, usamos tu ubicación también en segundo plano para avisarte de trabajos cercanos y mostrarle al cliente que vas en camino, aunque la app esté cerrada.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Como trabajador, necesitamos tu ubicación siempre activa para mantener seguimiento de servicios aunque la app esté en segundo plano.</string>
+	<string>Si eres trabajador, usamos tu ubicación también en segundo plano para avisarte de trabajos cercanos y mostrarle al cliente que vas en camino, aunque la app esté cerrada.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Necesitamos tu cámara para las videollamadas dentro de la aplicación.</string>
+	<string>Usamos la cámara para que tomes fotos de tu solicitud, de tus trabajos y del chat, y para verificar tu identidad.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Necesitamos tu micrófono para que puedas dictar lo que buscas por voz y realizar llamadas en la app.</string>
+	<string>Usamos el micrófono solo para que dictes por voz lo que necesitas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Necesitamos acceso al reconocimiento de voz para transcribir tu dictado.</string>
+	<string>Usamos el reconocimiento de voz para convertir tu dictado en texto.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
@@ -97,5 +109,15 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Usamos tus fotos para que elijas tu foto de perfil y compartas fotos de tus trabajos o en el chat.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Para guardar en tus fotos el QR de pago o las imágenes que compartes.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>dev.flutter.background.refresh</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

@@ -42,10 +42,10 @@ abstract class WorkerRepository {
 
   Future<Result<WorkerCategory>> createCategory({required String name});
 
-  Future<Result<void>> uploadProfilePhoto({
+  /// Sube la foto (data URI base64) por el backend y devuelve la URL nueva.
+  Future<Result<String?>> uploadProfilePhoto({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   });
 
   Future<Result<void>> deleteProfilePhoto({required String userId});

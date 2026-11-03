@@ -77,6 +77,25 @@ class MobileBackendService {
     return _api.post('/auth/google', body: {'idToken': idToken});
   }
 
+  /// "Olvidé mi contraseña", paso 1: con el idToken de la cuenta de Google del
+  /// mismo correo devuelve `resetToken`, `email`, `firstName`, `hadPassword`.
+  Future<Map<String, dynamic>> startGooglePasswordReset({
+    required String idToken,
+  }) {
+    return _api.post('/auth/password/google/start', body: {'idToken': idToken});
+  }
+
+  /// Paso 2: guarda la contraseña nueva y devuelve la sesión (`user`, `token`).
+  Future<Map<String, dynamic>> completeGooglePasswordReset({
+    required String resetToken,
+    required String newPassword,
+  }) {
+    return _api.post(
+      '/auth/password/google/complete',
+      body: {'resetToken': resetToken, 'newPassword': newPassword},
+    );
+  }
+
   Future<Map<String, dynamic>> registerWithGoogle({
     String? phone,
     String? phoneIdToken,
@@ -188,6 +207,11 @@ class MobileBackendService {
     return _api.get('/mobile/categories');
   }
 
+  /// Modalidades de contratación activas: `{fixed, hourly, daily}` (bool).
+  Future<Map<String, dynamic>> workModalities() {
+    return _api.get('/mobile/work-modalities');
+  }
+
   // ── Eliminación de cuenta (espera de 30 días). El servidor toma el usuario
   //    del token de sesión, por eso no se envía userId.
   Future<Map<String, dynamic>> accountDeletionStatus() =>
@@ -221,20 +245,14 @@ class MobileBackendService {
     );
   }
 
+  /// La foto la sube el backend (así queda como nuestra y se puede borrar).
   Future<Map<String, dynamic>> uploadProfilePhoto({
     required String userId,
-    String? imageBase64,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) {
     return _api.post(
       '/mobile/profile/photo',
-      body: {
-        'userId': userId,
-        'imageBase64': imageBase64,
-        'imageUrl': imageUrl,
-        'imagePublicId': imagePublicId,
-      },
+      body: {'userId': userId, 'imageBase64': imageBase64},
     );
   }
 
@@ -613,6 +631,8 @@ class MobileBackendService {
     );
   }
 
+  /// Devuelve `url`, `publicId` y `uploadToken`: el comprobante que va en
+  /// `photos` al crear la solicitud.
   Future<Map<String, dynamic>> uploadRequestPhoto(String imageBase64) {
     return _api.post('/mobile/requests/photos/upload',
         body: {'imageBase64': imageBase64});
@@ -740,9 +760,5 @@ class MobileBackendService {
 
   Future<Map<String, dynamic>> paymentStatus(String paymentId) {
     return _api.get('/mobile/payments/$paymentId');
-  }
-
-  Future<Map<String, dynamic>> reportPaymentPaid(String paymentId) {
-    return _api.post('/mobile/payments/$paymentId/report', body: const {});
   }
 }

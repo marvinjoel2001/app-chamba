@@ -10,7 +10,6 @@ const _pixel =
 Map<String, dynamic> _json({
   String status = 'pending',
   String action = 'qr',
-  bool canReportPaid = true,
   int pollSeconds = 0,
   String? expiresAt,
 }) =>
@@ -27,7 +26,9 @@ Map<String, dynamic> _json({
       'card': null,
       'url': action == 'open_url' ? 'https://pagos.ejemplo/123' : null,
       'expiresAt': expiresAt,
-      'canReportPaid': canReportPaid,
+      // Versiones viejas del backend podían mandarlo en true: ya no existe
+      // "Ya pagué" y la app lo ignora.
+      'canReportPaid': true,
       'pollSeconds': pollSeconds,
       // Campo que esta versión no conoce: debe ignorarse sin romper.
       'algoNuevo': {'x': 1},
@@ -38,7 +39,6 @@ class _FakeApi extends PaymentApi {
 
   final Map<String, dynamic> first;
   final Map<String, dynamic> Function()? onStatus;
-  int reports = 0;
   int checkouts = 0;
   int statuses = 0;
 
@@ -52,13 +52,6 @@ class _FakeApi extends PaymentApi {
   Future<PaymentCheckout> status(String paymentId) async {
     statuses++;
     return PaymentCheckout.fromJson(onStatus?.call() ?? first);
-  }
-
-  @override
-  Future<PaymentCheckout> reportPaid(String paymentId) async {
-    reports++;
-    return PaymentCheckout.fromJson(
-        _json(status: 'reported', canReportPaid: false));
   }
 }
 
@@ -131,7 +124,7 @@ void main() {
     expect(find.text('Pagar'), findsNothing);
   });
 
-  testWidgets('QR: muestra monto, QR e instrucciones; "Ya pagué" confirma',
+  testWidgets('QR: muestra monto, QR e instrucciones, sin botón "Ya pagué"',
       (tester) async {
     final api = _FakeApi(_json());
     final outcomes = await _launch(tester, api);
@@ -139,21 +132,23 @@ void main() {
     expect(find.text('Bs 150'), findsOneWidget);
     expect(find.text('Escanea con tu banco'), findsOneWidget);
     expect(find.text('Guardar o compartir QR'), findsOneWidget);
+    // Aunque un backend viejo mande canReportPaid, ya no existe "Ya pagué":
+    // el pago solo pasa cuando el banco lo confirma por su API.
+    expect(find.text('Ya pagué'), findsNothing);
     expect(outcomes, isEmpty);
+    await tester.tap(find.text('Pagar después'));
+    await _settle(tester);
+  });
 
-    await tester.tap(find.byKey(const Key('payment-report')));
-    await _settle(tester);
-    // Echarse atrás en la confirmación no reporta nada.
-    await tester.tap(find.text('Todavía no'));
-    await _settle(tester);
-    expect(api.reports, 0);
-
-    await tester.tap(find.byKey(const Key('payment-report')));
-    await _settle(tester);
-    await tester.tap(find.text('Sí, ya pagué'));
-    await _settle(tester);
-    expect(api.reports, 1);
-    expect(outcomes, [PaymentOutcome.paid]);
+  test('un pago "reportado" (viejo) no habilita aceptar la oferta', () {
+    final legacy = PaymentCheckout.fromJson(_json(status: 'reported'));
+    expect(legacy.status, PaymentStatus.reported);
+    expect(legacy.isSettled, isFalse);
+    expect(PaymentCheckout.fromJson(_json(status: 'paid')).isSettled, isTrue);
+    // Estados de reembolso: la app no los conoce y no los toma como pagados.
+    final refund = PaymentCheckout.fromJson(_json(status: 'refund_pending'));
+    expect(refund.status, PaymentStatus.unknown);
+    expect(refund.isSettled, isFalse);
   });
 
   testWidgets('QR: "Pagar después" no acepta la oferta', (tester) async {
@@ -167,12 +162,11 @@ void main() {
       (tester) async {
     var confirmed = false;
     final api = _FakeApi(
-      _json(pollSeconds: 3, canReportPaid: false),
+      _json(pollSeconds: 3),
       onStatus: () =>
           _json(status: confirmed ? 'paid' : 'pending', pollSeconds: 3),
     );
     final outcomes = await _launch(tester, api);
-    expect(find.byKey(const Key('payment-report')), findsNothing);
 
     await tester.pump(const Duration(seconds: 3));
     await _settle(tester);
@@ -192,7 +186,6 @@ void main() {
             .toIso8601String()));
     await _launch(tester, api);
     expect(find.text('Este cobro venció.'), findsOneWidget);
-    expect(find.byKey(const Key('payment-report')), findsNothing);
     await tester.tap(find.byKey(const Key('payment-retry')));
     await _settle(tester);
     expect(api.checkouts, 2);
@@ -203,7 +196,7 @@ void main() {
   testWidgets('pasarela con enlace: muestra el botón para abrirla',
       (tester) async {
     await _launch(
-        tester, _FakeApi(_json(action: 'open_url', canReportPaid: false)));
+        tester, _FakeApi(_json(action: 'open_url')));
     expect(find.byKey(const Key('payment-open-url')), findsOneWidget);
     expect(find.byKey(const Key('payment-qr')), findsNothing);
     await tester.tap(find.text('Pagar después'));
@@ -216,7 +209,7 @@ void main() {
     final outcomes = await _launch(
       tester,
       _FakeApi({
-        ..._json(action: 'card_sheet', canReportPaid: false),
+        ..._json(action: 'card_sheet'),
         'card': {'clientSecret': 'pi_1_secret', 'publishableKey': 'pk'},
       }),
       card: (p) async {
