@@ -39,12 +39,8 @@ flutter run --dart-define-from-file=env/dart_define.local.json
 
 `env/dart_define.local.json` está ignorado por git.
 
-Para subida directa de imágenes a Cloudinary desde la app, agrega:
-
-```json
-"CLOUDINARY_CLOUD_NAME": "tu_cloud_name",
-"CLOUDINARY_UPLOAD_PRESET": "tu_unsigned_upload_preset"
-```
+Las fotos (perfil, solicitudes, chat, portafolio y verificación) las sube
+siempre el backend: la app no tiene claves ni upload preset de Cloudinary.
 
 ## Optional Firebase push config
 

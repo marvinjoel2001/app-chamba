@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
 
-import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -146,20 +147,17 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
     setState(() => _updatingPhoto = true);
     try {
       final bytes = await file.readAsBytes();
-      final uploaded = await CloudinaryUploadService.uploadImageBytes(
-        bytes: bytes,
-        fileName: file.name,
-        folder: 'chamba/profile',
-      );
+      // La sube el backend: así la foto queda a nombre de este usuario y
+      // nadie más puede borrarla.
+      final mime = lookupMimeType(file.name, headerBytes: bytes) ?? 'image/jpeg';
       final result = await _uploadWorkerProfilePhotoUseCase(
         userId: user.id,
-        imageUrl: uploaded.secureUrl,
-        imagePublicId: uploaded.publicId,
+        imageBase64: 'data:$mime;base64,${base64Encode(bytes)}',
       );
       result.fold(
-        onSuccess: (_) {
+        onSuccess: (url) {
           SessionStore.currentUser = user.copyWith(
-            profilePhotoUrl: uploaded.secureUrl,
+            profilePhotoUrl: url ?? user.profilePhotoUrl,
           );
           unawaited(SessionStore.persistCurrentUser());
           if (!mounted) {

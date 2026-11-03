@@ -240,20 +240,14 @@ class MobileBackendService {
     );
   }
 
+  /// La foto la sube el backend (así queda como nuestra y se puede borrar).
   Future<Map<String, dynamic>> uploadProfilePhoto({
     required String userId,
-    String? imageBase64,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) {
     return _api.post(
       '/mobile/profile/photo',
-      body: {
-        'userId': userId,
-        'imageBase64': imageBase64,
-        'imageUrl': imageUrl,
-        'imagePublicId': imagePublicId,
-      },
+      body: {'userId': userId, 'imageBase64': imageBase64},
     );
   }
 
@@ -632,6 +626,8 @@ class MobileBackendService {
     );
   }
 
+  /// Devuelve `url`, `publicId` y `uploadToken`: el comprobante que va en
+  /// `photos` al crear la solicitud.
   Future<Map<String, dynamic>> uploadRequestPhoto(String imageBase64) {
     return _api.post('/mobile/requests/photos/upload',
         body: {'imageBase64': imageBase64});

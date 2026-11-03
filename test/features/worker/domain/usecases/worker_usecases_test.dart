@@ -90,10 +90,9 @@ class _FakeWorkerRepository implements WorkerRepository {
       );
 
   @override
-  Future<Result<void>> uploadProfilePhoto({
+  Future<Result<String?>> uploadProfilePhoto({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) async => const Success(null);
 
   @override

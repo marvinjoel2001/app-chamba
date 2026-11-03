@@ -11,7 +11,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 
 import '../../../../core/config/app_config.dart';
-import '../../../../core/network/cloudinary_upload_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -607,28 +606,20 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     setState(() => _loading = true);
 
     try {
+      // Las fotos las sube el backend: devuelve un comprobante que prueba que
+      // son de este cliente (sin él no se aceptan como suyas).
       final uploadedPhotos = <Map<String, String>>[];
       for (final image in _pendingImages) {
-        try {
-          final uploaded = await CloudinaryUploadService.uploadImageBytes(
-              bytes: image.bytes,
-              fileName: image.fileName,
-              folder: 'chamba/requests');
-          uploadedPhotos
-              .add({'url': uploaded.secureUrl, 'publicId': uploaded.publicId});
-        } catch (_) {
-          // Signed presets are uploaded by the server. Its private key never enters the APK.
-          final mime =
-              lookupMimeType(image.fileName, headerBytes: image.bytes) ??
-                  'image/jpeg';
-          final uploaded = await MobileBackendService.instance
-              .uploadRequestPhoto(
-                  'data:$mime;base64,${base64Encode(image.bytes)}');
-          uploadedPhotos.add({
-            'url': uploaded['url'] as String,
-            'publicId': uploaded['publicId'] as String
-          });
-        }
+        final mime = lookupMimeType(image.fileName, headerBytes: image.bytes) ??
+            'image/jpeg';
+        final uploaded = await MobileBackendService.instance
+            .uploadRequestPhoto('data:$mime;base64,${base64Encode(image.bytes)}');
+        final token = uploaded['uploadToken']?.toString();
+        uploadedPhotos.add({
+          'url': uploaded['url'] as String,
+          'publicId': uploaded['publicId'] as String,
+          if (token != null && token.isNotEmpty) 'uploadToken': token,
+        });
       }
 
       final response = (await RequestDependencies.createRequest(

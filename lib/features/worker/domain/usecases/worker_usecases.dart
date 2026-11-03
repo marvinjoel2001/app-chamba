@@ -124,15 +124,14 @@ class UploadWorkerProfilePhotoUseCase {
 
   final WorkerRepository _repository;
 
-  Future<Result<void>> call({
+  /// Devuelve la URL de la foto nueva.
+  Future<Result<String?>> call({
     required String userId,
-    String? imageUrl,
-    String? imagePublicId,
+    required String imageBase64,
   }) {
     return _repository.uploadProfilePhoto(
       userId: userId,
-      imageUrl: imageUrl,
-      imagePublicId: imagePublicId,
+      imageBase64: imageBase64,
     );
   }
 }
