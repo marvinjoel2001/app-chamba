@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/network/realtime_service.dart';
 import 'core/services/new_request_alert.dart';
@@ -11,6 +12,9 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/offline_banner.dart';
 import 'features/onboarding/presentation/screens/splash_screen.dart';
+
+/// Español de Bolivia; Material usa los textos de 'es'.
+const chambaLocale = Locale('es', 'BO');
 
 class ChambaApp extends StatefulWidget {
   const ChambaApp({super.key});
@@ -72,6 +76,11 @@ class _ChambaAppState extends State<ChambaApp> {
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.light,
       theme: AppTheme.light(),
+      // La app es en español: sin esto, el calendario, el reloj y el menú de
+      // copiar/pegar de Material salen en inglés.
+      locale: chambaLocale,
+      supportedLocales: const [chambaLocale],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       // Cualquier toque en la pantalla calla el aviso de solicitud nueva: el
       // trabajador ya se enteró. El toque sigue llegando normal a la app.
       builder: (context, child) => Listener(
