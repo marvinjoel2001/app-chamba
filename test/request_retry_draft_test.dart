@@ -72,4 +72,45 @@ void main() {
     expect(formatInitialAmount(24.5), '24.5');
     expect(formatInitialAmount(0.41), '0.41');
   });
+
+  group('buscar otro trabajador conserva fecha y materiales', () {
+    final now = DateTime(2026, 11, 9, 14, 0);
+    Map<String, dynamic> daily(String? start) => {
+          ...base,
+          'modality': 'daily',
+          'days': 1,
+          'dailyRate': 150,
+          'startDate': start,
+          'materialsMode': 'worker',
+        };
+
+    test('fecha y hora futuras se mantienen tal cual', () {
+      final draft = RequestRetryDraft.fromRequest(
+          daily('2026-11-10T08:00:00'),
+          now: now);
+      expect(draft.startDate, '2026-11-10T08:00:00');
+      expect(draft.materialsMode, 'worker');
+    });
+
+    test('sin hora elegida también se mantiene la fecha', () {
+      expect(
+          RequestRetryDraft.fromRequest(daily('2026-11-12'), now: now)
+              .startDate,
+          '2026-11-12');
+    });
+
+    test('una fecha pasada o a menos de una hora no se copia', () {
+      for (final start in [
+        '2026-11-08T08:00:00',
+        '2026-11-09T14:30:00',
+        '2026-11-09',
+      ]) {
+        expect(RequestRetryDraft.fromRequest(daily(start), now: now).startDate,
+            isNull,
+            reason: start);
+      }
+      expect(RequestRetryDraft.fromRequest(daily(null), now: now).startDate,
+          isNull);
+    });
+  });
 }

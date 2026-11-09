@@ -66,6 +66,10 @@ class _RetryCancelledRequestButtonState
                 initialHourlyRate: draft.hourlyRate,
                 initialDays: draft.days,
                 initialDailyRate: draft.dailyRate,
+                // La fecha solo se ve y se envía en trabajos por día.
+                initialStartDate:
+                    draft.modality == 'daily' ? draft.startDate : null,
+                initialMaterialsMode: draft.materialsMode,
                 suggestedCategories: [
                   {'id': '', 'name': draft.category, 'confidence': 1.0}
                 ],

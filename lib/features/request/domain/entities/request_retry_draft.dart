@@ -1,8 +1,10 @@
+import '../../../../core/utils/job_schedule_format.dart';
+
 /// A new request draft preserves the advertised terms, never the former
 /// worker's counteroffer or acceptance. The original request stays cancelled.
 class RequestRetryDraft {
   RequestRetryDraft.fromRequest(Map<String, dynamic> request,
-      {Map<String, dynamic>? destination})
+      {Map<String, dynamic>? destination, DateTime? now})
       : title = request['title']?.toString() ?? '',
         description = request['description']?.toString() ?? '',
         category = request['category']?.toString() ?? 'General',
@@ -15,7 +17,10 @@ class RequestRetryDraft {
         dailyRate = _number(request['dailyRate']),
         latitude = _number(request['latitude'] ?? destination?['latitude']),
         longitude = _number(request['longitude'] ?? destination?['longitude']),
-        address = request['address']?.toString() {
+        address = request['address']?.toString(),
+        // "Solo mano de obra" o "+ materiales": lo que eligió el cliente.
+        materialsMode = request['materialsMode']?.toString(),
+        startDate = _upcomingStart(request['startDate'], now ?? DateTime.now()) {
     if (description.trim().isEmpty ||
         !['fixed', 'hourly', 'daily'].contains(modality) ||
         (budget ?? 0) <= 0 ||
@@ -27,7 +32,22 @@ class RequestRetryDraft {
   }
 
   final String title, description, category, modality;
-  final String? address;
+  final String? address, materialsMode;
+
+  /// Fecha (y hora) de inicio del trabajo cancelado, solo si todavía está a
+  /// más de una hora: más cerca, el backend la cancelaría al publicarla.
+  final String? startDate;
+
+  /// El backend toma las 09:00 si el cliente no eligió hora.
+  static String? _upcomingStart(dynamic raw, DateTime now) {
+    final text = raw?.toString().trim() ?? '';
+    final day = jobStartDay(text);
+    if (day == null) return null;
+    final time = (jobStartTime(text) ?? '09:00').split(':');
+    final start = day.add(
+        Duration(hours: int.parse(time[0]), minutes: int.parse(time[1])));
+    return start.isAfter(now.add(const Duration(hours: 1))) ? text : null;
+  }
   final double? budget, hourlyRate, dailyRate, latitude, longitude;
   final int? estimatedHours, days;
   static int? _integer(dynamic value) {

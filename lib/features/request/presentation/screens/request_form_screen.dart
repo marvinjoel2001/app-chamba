@@ -14,6 +14,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/job_schedule_format.dart';
 import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
@@ -43,6 +44,8 @@ class RequestFormScreen extends StatefulWidget {
     this.initialDays,
     this.initialDailyRate,
     this.isRetry = false,
+    this.initialStartDate,
+    this.initialMaterialsMode,
     this.initialVideo,
     super.key,
   });
@@ -63,6 +66,11 @@ class RequestFormScreen extends StatefulWidget {
   final double? initialBudget, initialHourlyRate, initialDailyRate;
   final int? initialEstimatedHours, initialDays;
   final bool isRetry;
+
+  /// "Buscar otro trabajador": fecha de inicio ('YYYY-MM-DD' o con
+  /// 'THH:mm:00') y materiales del trabajo cancelado.
+  final String? initialStartDate;
+  final String? initialMaterialsMode;
 
   @override
   State<RequestFormScreen> createState() => _RequestFormScreenState();
@@ -141,6 +149,18 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       priceType = 'Por día';
     } else {
       priceType = 'Precio fijo';
+    }
+    final initialDay = jobStartDay(widget.initialStartDate);
+    if (initialDay != null) {
+      _startDate = widget.initialStartDate!.substring(0, 10);
+      final time = jobStartTime(widget.initialStartDate)?.split(':');
+      if (time != null) {
+        _startTime =
+            TimeOfDay(hour: int.parse(time[0]), minute: int.parse(time[1]));
+      }
+    }
+    for (final mode in MaterialsMode.values) {
+      if (mode.code == widget.initialMaterialsMode) _materialsMode = mode;
     }
     _descriptionController = TextEditingController(text: widget.initialPrompt);
     _suggestedCategories = widget.suggestedCategories
