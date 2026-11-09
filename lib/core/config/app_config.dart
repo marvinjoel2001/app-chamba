@@ -9,9 +9,9 @@ class AppConfig {
   /// `--dart-define-from-file`, usa este en vez de quedar sin servidor
   /// ("No host specified in URI").
   static const String _productionApi =
-      'https://web-production-f0db6d.up.railway.app/api';
+      'https://api.chambatrabajo.com/api';
   static const String _productionSocket =
-      'https://web-production-f0db6d.up.railway.app';
+      'https://api.chambatrabajo.com';
 
   static String get apiBaseUrl => _resolveLocalhost(
         _orProduction(
