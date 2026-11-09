@@ -40,6 +40,9 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
   /// El cliente pidió que el trabajador lleve los materiales.
   bool get _bringsMaterials => widget.requestData?['materialsMode'] == 'worker';
 
+  /// El cliente pidió solo mano de obra (ya tiene los materiales).
+  bool get _laborOnly => widget.requestData?['materialsMode'] == 'client';
+
   double get _materialsAmount =>
       _bringsMaterials ? (double.tryParse(_materialsCtrl.text.trim()) ?? 0) : 0;
 
@@ -201,7 +204,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'El cliente pidió que lleves los materiales: escribe cuánto cuestan.'),
+              'El cliente pidió mano de obra + materiales: escribe cuánto cuestan los materiales.'),
         ),
       );
       return;
@@ -328,7 +331,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                 Text(
                   _perHour
                       ? 'Tu tarifa por hora'
-                      : _bringsMaterials
+                      : _bringsMaterials || _laborOnly
                           ? 'Tu mano de obra'
                           : 'Tu precio total propuesto',
                   textAlign: TextAlign.center,
@@ -859,7 +862,7 @@ class _MaterialsAmountField extends StatelessWidget {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'El cliente pide que lleves los materiales',
+                  'Mano de obra + materiales: tú los llevas',
                   style: TextStyle(
                     color: Color(0xFF633806),
                     fontSize: 14,

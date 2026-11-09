@@ -60,7 +60,7 @@ void main() {
           role: role,
           currentIndex: selected,
           unreadCount: 7,
-          messagesTabIndex: role == 'worker' ? 2 : 1,
+          messagesTabIndex: role == 'worker' ? 3 : 1,
           onTap: (index) {
             taps.add(index);
             setState(() => selected = index);
@@ -69,7 +69,7 @@ void main() {
       })));
       await tester.pumpAndSettle();
       final labels = role == 'worker'
-          ? ['Inicio', 'Billetera', 'Notificaciones', 'Perfil']
+          ? ['Inicio', 'Agenda', 'Billetera', 'Notificaciones', 'Perfil']
           : ['Inicio', 'Notificaciones', 'Perfil'];
       for (var index = 0; index < labels.length; index++) {
         await tester.tap(find.byKey(ValueKey('chamba-nav-tab-$index')));
@@ -147,7 +147,7 @@ void main() {
           role: role,
           currentIndex: selected,
           unreadCount: 12,
-          messagesTabIndex: role == 'worker' ? 2 : 1,
+          messagesTabIndex: role == 'worker' ? 3 : 1,
           onTap: (index) {
             taps.add(index);
             setState(() => selected = index);
@@ -267,13 +267,13 @@ void main() {
         scale: 2,
         bottom: 24));
     await tester.pumpAndSettle();
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < 5; index++) {
       final tab = find.byKey(ValueKey('chamba-nav-tab-$index'));
       expect(tester.getSize(tab).width, greaterThanOrEqualTo(48));
       expect(tester.getRect(tab).bottom, lessThanOrEqualTo(616));
       await tester.tap(tab);
     }
-    expect(taps, [0, 1, 2, 3]);
+    expect(taps, [0, 1, 2, 3, 4]);
     expect(tester.takeException(), isNull);
   });
 
@@ -287,7 +287,7 @@ void main() {
     for (final state in [
       (name: 'client', role: 'client', index: 0, count: 0),
       (name: 'worker', role: 'worker', index: 0, count: 0),
-      (name: 'worker-wallet', role: 'worker', index: 1, count: 12),
+      (name: 'worker-wallet', role: 'worker', index: 2, count: 12),
       (name: 'client-notifications', role: 'client', index: 1, count: 123),
     ]) {
       final capture = GlobalKey();
@@ -299,7 +299,7 @@ void main() {
               role: state.role,
               currentIndex: state.index,
               unreadCount: state.count,
-              messagesTabIndex: state.role == 'worker' ? 2 : 1,
+              messagesTabIndex: state.role == 'worker' ? 3 : 1,
               onTap: (_) {},
             ),
           ))));
@@ -350,7 +350,7 @@ void main() {
               role: role,
               currentIndex: selected,
               unreadCount: 3,
-              messagesTabIndex: role == 'worker' ? 2 : 1,
+              messagesTabIndex: role == 'worker' ? 3 : 1,
               onTap: (index) => setState(() => selected = index),
             ),
           ),

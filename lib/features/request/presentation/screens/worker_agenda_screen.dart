@@ -11,6 +11,7 @@ class WorkerAgendaScreen extends StatelessWidget {
     required this.jobs,
     required this.onOpenJob,
     required this.onOpenChat,
+    this.onRefresh,
     super.key,
   });
 
@@ -18,6 +19,9 @@ class WorkerAgendaScreen extends StatelessWidget {
   final List<Map<String, dynamic>> jobs;
   final void Function(String requestId) onOpenJob;
   final Future<void> Function(String requestId) onOpenChat;
+
+  /// Si se da, la agenda se actualiza deslizando hacia abajo (pestaña Agenda).
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +45,52 @@ class WorkerAgendaScreen extends StatelessWidget {
       groups.putIfAbsent(dayOf(job), () => []).add(job);
     }
 
+    final Widget body = jobs.isEmpty
+        ? (onRefresh == null
+            ? const _EmptyAgenda()
+            : LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: const _EmptyAgenda(),
+                  ),
+                ),
+              ))
+        : ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+            children: [
+              const _AgendaRule(),
+              const SizedBox(height: 14),
+              for (final entry in groups.entries) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8, top: 4),
+                  child: Text(
+                    _dayTitle(entry.key, todayKey),
+                    style: const TextStyle(
+                      color: AppTheme.colorMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                for (final job in entry.value)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AgendaJobCard(
+                      job: job,
+                      isToday: entry.key == todayKey,
+                      onOpen: () => onOpenJob(job['id'].toString()),
+                      onChat: () => onOpenChat(job['id'].toString()),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+              ],
+            ],
+          );
+
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
       appBar: AppBar(
@@ -48,39 +98,9 @@ class WorkerAgendaScreen extends StatelessWidget {
         backgroundColor: AppTheme.colorBackground,
         surfaceTintColor: Colors.transparent,
       ),
-      body: jobs.isEmpty
-          ? const _EmptyAgenda()
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                const _AgendaRule(),
-                const SizedBox(height: 14),
-                for (final entry in groups.entries) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8, top: 4),
-                    child: Text(
-                      _dayTitle(entry.key, todayKey),
-                      style: const TextStyle(
-                        color: AppTheme.colorMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  for (final job in entry.value)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _AgendaJobCard(
-                        job: job,
-                        isToday: entry.key == todayKey,
-                        onOpen: () => onOpenJob(job['id'].toString()),
-                        onChat: () => onOpenChat(job['id'].toString()),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                ],
-              ],
-            ),
+      body: onRefresh == null
+          ? body
+          : RefreshIndicator(onRefresh: onRefresh!, child: body),
     );
   }
 

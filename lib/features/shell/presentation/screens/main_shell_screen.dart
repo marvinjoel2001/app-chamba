@@ -14,6 +14,7 @@ import '../../../../core/widgets/chamba_widgets.dart';
 import '../../../explore/presentation/screens/explore_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../request/presentation/screens/incoming_request_screen.dart';
+import '../../../request/presentation/screens/worker_agenda_tab.dart';
 import '../../../worker/presentation/screens/wallet_screen.dart';
 import '../../../worker/presentation/screens/profile_menu_screen.dart';
 import '../../../worker/presentation/screens/worker_onboarding_banner.dart';
@@ -33,9 +34,9 @@ class _MainShellScreenState extends State<MainShellScreen>
   final Set<int> _visitedIndices = {0};
   final RealtimeService _realtime = RealtimeService.instance;
 
-  // Worker: [Inicio(0), Billetera(1), Mensajes(2), Perfil(3)]
+  // Worker: [Inicio(0), Agenda(1), Billetera(2), Mensajes(3), Perfil(4)]
   // Client: [Inicio(0), Mensajes(1), Perfil(2)]
-  int get _messagesTabIndex => widget.role == 'worker' ? 2 : 1;
+  int get _messagesTabIndex => widget.role == 'worker' ? 3 : 1;
 
   @override
   void initState() {
@@ -132,8 +133,9 @@ class _MainShellScreenState extends State<MainShellScreen>
     final pages = isWorker
         ? [
             IncomingRequestScreen(isActive: currentIndex == 0),
+            WorkerAgendaTab(isActive: currentIndex == 1),
             WalletScreen(
-                isActive: currentIndex == 1,
+                isActive: currentIndex == 2,
                 onFindJobs: () => setState(() => currentIndex = 0)),
             MessagesScreen(isActive: currentIndex == _messagesTabIndex),
             const ProfileMenuScreen(),

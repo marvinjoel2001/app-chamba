@@ -79,7 +79,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final _daysController = TextEditingController(text: '1');
   final _dailyRateController = TextEditingController();
   RecordedJobVideo? _video;
-  MaterialsMode? _materialsMode;
+  MaterialsMode _materialsMode = MaterialsMode.client;
   final _materialsNoteController = TextEditingController();
   String? _startDate;
   TimeOfDay? _startTime;
@@ -722,10 +722,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         days: days,
         dailyRate: dailyRate,
         startDate: _startDateForBackend,
-        materialsMode: _materialsMode?.code,
-        materialsNote: _materialsMode == MaterialsMode.discuss
-            ? null
-            : _materialsNoteController.text.trim(),
+        materialsMode: _materialsMode.code,
+        materialsNote: _materialsMode == MaterialsMode.worker
+            ? _materialsNoteController.text.trim()
+            : null,
         video: uploadedVideo,
       ))
           .fold(
@@ -931,8 +931,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         const SizedBox(height: 10),
         RequestStepCard(
           number: 2,
-          title: '¿Quién pone los materiales?',
-          subtitle: 'Pintura, cemento, repuestos, productos…',
+          title: '¿Qué quieres que te coticen?',
+          subtitle: 'Solo el trabajo, o el trabajo con los materiales',
           color: requestOrange,
           child: RequestMaterialsPicker(
             mode: _materialsMode,

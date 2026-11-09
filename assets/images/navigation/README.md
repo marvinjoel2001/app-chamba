@@ -42,3 +42,6 @@ worker-wave.png: Matching warm ivory-white navigation background, single pale am
 
 Flutter uses BoxFit.fill for the waves to retain both ends of the curve at narrow widths. No scrolling or repeating wave animation is added: the supplied design shows a static flowing ribbon.
 
+## calendar.png (Agenda del trabajador)
+
+Dibujado con Pillow el 2026-11-09 para que coincida con los íconos de arriba: mismo lienzo 1254 × 1254 con alfa real, un solo color sólido #746B99 (se tiñe en tiempo de ejecución), cuerpo redondeado de ~80% del ancho, dos anillos arriba, franja transparente bajo el encabezado y 3 × 2 días como recortes transparentes. Se lee a 28 px.

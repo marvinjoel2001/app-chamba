@@ -25,6 +25,7 @@ class ChambaWaveBottomNav extends StatelessWidget {
   ];
   static const _workerItems = [
     _WaveNavItem('Inicio', 'briefcase'),
+    _WaveNavItem('Agenda', 'calendar'),
     _WaveNavItem('Billetera', 'wallet'),
     _WaveNavItem('Notificaciones', 'bell'),
     _WaveNavItem('Perfil', 'profile'),
@@ -160,9 +161,22 @@ class ChambaWaveBottomNav extends StatelessWidget {
                                                 ? labelColor
                                                 : const Color(0xFF6E638D),
                                           ),
-                                          child: Text(item.label,
-                                              textAlign: TextAlign.center,
-                                              maxLines: textScale > 1 ? 3 : 1),
+                                          // Con 5 pestañas "Notificaciones" no
+                                          // entra a 11 px en teléfonos angostos:
+                                          // se achica en vez de cortarse.
+                                          child: textScale > 1
+                                              ? Text(item.label,
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 3)
+                                              : FittedBox(
+                                                  fit: BoxFit.scaleDown,
+                                                  alignment:
+                                                      Alignment.topCenter,
+                                                  child: Text(item.label,
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      maxLines: 1),
+                                                ),
                                         ),
                                       ),
                                     ],

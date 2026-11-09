@@ -6,14 +6,13 @@ import 'package:video_player/video_player.dart';
 import '../screens/guided_video_screen.dart';
 import 'request_form_widgets.dart';
 
-/// Quién pone los materiales del trabajo.
+/// Qué cotiza el trabajador: solo su mano de obra, o también los materiales.
+/// Los códigos son los que guarda el backend (`materialsMode`).
 enum MaterialsMode {
-  client('client', 'Yo ya los tengo', Icons.home_outlined,
-      'El trabajador solo cobra su mano de obra.'),
-  worker('worker', 'Que el trabajador los traiga', Icons.local_shipping_outlined,
-      'Te cotiza los materiales aparte de la mano de obra.'),
-  discuss('discuss', 'Lo hablamos en el chat', Icons.chat_bubble_outline_rounded,
-      'Lo acuerdan cuando elijas a alguien.');
+  client('client', 'Solo mano de obra', Icons.handyman_outlined,
+      'Ya tienes los materiales. Te ofertan solo por el trabajo.'),
+  worker('worker', 'Mano de obra + materiales', Icons.local_shipping_outlined,
+      'El trabajador los trae y te cotiza los materiales aparte.');
 
   const MaterialsMode(this.code, this.label, this.icon, this.help);
   final String code;
@@ -29,7 +28,8 @@ enum MaterialsMode {
   }
 }
 
-/// Pregunta "¿Quién pone los materiales?" con 3 respuestas y un detalle.
+/// Pregunta "¿Qué quieres que te coticen?" con 2 respuestas. Si pide
+/// materiales, puede anotar cuáles.
 class RequestMaterialsPicker extends StatelessWidget {
   const RequestMaterialsPicker({
     super.key,
@@ -57,7 +57,7 @@ class RequestMaterialsPicker extends StatelessWidget {
           ),
           const SizedBox(height: 6),
         ],
-        if (mode == MaterialsMode.worker || mode == MaterialsMode.client) ...[
+        if (mode == MaterialsMode.worker) ...[
           const SizedBox(height: 2),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -83,9 +83,8 @@ class RequestMaterialsPicker extends StatelessWidget {
                 focusedBorder: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
                 counterText: '',
-                hintText: mode == MaterialsMode.worker
-                    ? '¿Qué debe traer? Ej.: pintura látex blanca, 2 manos'
-                    : '¿Qué tienes? Ej.: 2 baldes de pintura y rodillos',
+                hintText:
+                    '¿Qué materiales necesitas? Ej.: pintura látex blanca, 2 manos',
                 hintStyle:
                     const TextStyle(color: requestMuted, height: 1.25),
               ),
@@ -405,11 +404,12 @@ List<Widget> requestTagChips(Map<String, dynamic> request) {
   final mode = MaterialsMode.fromCode(request['materialsMode']?.toString());
   if (mode == MaterialsMode.worker) {
     chips.add(const RequestTagChip(
-        icon: Icons.local_shipping_outlined, label: 'Llevar materiales'));
+        icon: Icons.local_shipping_outlined,
+        label: 'Mano de obra + materiales'));
   } else if (mode == MaterialsMode.client) {
     chips.add(const RequestTagChip(
-      icon: Icons.home_outlined,
-      label: 'Materiales del cliente',
+      icon: Icons.handyman_outlined,
+      label: 'Solo mano de obra',
       background: Color(0xFFE1F5EE),
       foreground: Color(0xFF085041),
     ));
@@ -525,11 +525,9 @@ class JobExtrasSection extends StatelessWidget {
                       Text(
                         switch (mode) {
                           MaterialsMode.worker =>
-                            'El cliente pide que lleves los materiales',
+                            'Mano de obra + materiales: tú los llevas',
                           MaterialsMode.client =>
-                            'El cliente ya tiene los materiales',
-                          MaterialsMode.discuss =>
-                            'Los materiales se hablan en el chat',
+                            'Solo mano de obra: el cliente tiene los materiales',
                         },
                         style: const TextStyle(
                             color: requestInk,
