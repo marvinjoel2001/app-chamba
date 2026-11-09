@@ -575,29 +575,126 @@ class OfferPrice extends StatelessWidget {
           Text('Total Bs ${_bs(amount)}', style: small),
         if (withMaterials) ...[
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFAEEDA),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.local_shipping_outlined,
-                    size: 13, color: Color(0xFF854F0B)),
-                const SizedBox(width: 4),
-                Text(
-                  '+ Bs ${_bs(materials)} materiales',
-                  style: const TextStyle(
-                    color: Color(0xFF854F0B),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          MaterialsPill(amount: materials),
+        ],
+      ],
+    );
+  }
+}
+
+/// Monto en bolivianos sin decimales de más: 300, 12.50.
+String formatBs(num value) {
+  final v = value.toDouble();
+  return v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+}
+
+/// "+ Bs 700 materiales" en el ámbar de materiales. Va siempre debajo de la
+/// mano de obra, nunca solo.
+class MaterialsPill extends StatelessWidget {
+  const MaterialsPill({super.key, required this.amount});
+
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAEEDA),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_shipping_outlined,
+              size: 13, color: Color(0xFF854F0B)),
+          const SizedBox(width: 4),
+          Text(
+            '+ Bs ${formatBs(amount)} materiales',
+            style: const TextStyle(
+              color: Color(0xFF854F0B),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Monto acordado en el seguimiento (cliente y trabajador), a la derecha
+/// de la etiqueta de estado.
+///
+/// Solo mano de obra: el total grande y debajo la modalidad, como siempre.
+/// Con materiales: igual que la tarjeta de la oferta — la mano de obra
+/// grande, "mano de obra", la píldora de materiales y el total en gris.
+class JobAmountSummary extends StatelessWidget {
+  const JobAmountSummary({
+    super.key,
+    required this.amount,
+    this.materials = 0,
+    this.modality = 'fixed',
+    this.hours = 0,
+    this.days = 0,
+  });
+
+  /// Lo que paga el cliente; ya incluye los materiales.
+  final double amount;
+  final double materials;
+  final String modality;
+  final double hours;
+  final double days;
+
+  /// Detalle de la modalidad, con la tarifa calculada sobre [labor].
+  /// "Por día · 2 días × Bs 150", "Por hora · 3h × Bs 50", "Precio fijo".
+  static String modalityDetail(String modality, double labor,
+      {double hours = 0, double days = 0}) {
+    if (modality == 'hourly' && hours > 0) {
+      return 'Por hora · ${hours.toStringAsFixed(0)}h × Bs ${formatBs(labor / hours)}';
+    }
+    if (modality == 'daily' && days > 0) {
+      final unit = days == 1 ? 'día' : 'días';
+      return 'Por día · ${days.toStringAsFixed(0)} $unit × Bs ${formatBs(labor / days)}';
+    }
+    return 'Precio fijo';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final withMaterials = materials > 0;
+    final labor = withMaterials ? amount - materials : amount;
+    const small = TextStyle(
+      color: AppTheme.colorMuted,
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    );
+    final detail = modalityDetail(modality, labor, hours: hours, days: days);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Bs ${formatBs(labor)}',
+          style: const TextStyle(
+            color: AppTheme.colorText,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (!withMaterials)
+          Text(detail, style: small)
+        else ...[
+          // Precio fijo no agrega nada bajo "mano de obra"; por hora o por
+          // día, la tarifa sí.
+          Text(
+            detail == 'Precio fijo' ? 'mano de obra' : 'mano de obra · $detail',
+            style: small,
+          ),
+          const SizedBox(height: 4),
+          MaterialsPill(amount: materials),
+          const SizedBox(height: 3),
+          Text('Total Bs ${formatBs(amount)}', style: small),
         ],
       ],
     );

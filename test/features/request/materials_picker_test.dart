@@ -64,4 +64,41 @@ void main() {
       expect(find.text('+ Bs 700 materiales'), findsOneWidget);
     });
   });
+
+  group('monto en el seguimiento', () {
+    testWidgets('solo mano de obra: igual que antes, sin ".0" ni "1 días"',
+        (tester) async {
+      await tester.pumpWidget(host(const JobAmountSummary(
+          amount: 180, modality: 'daily', days: 1)));
+      expect(find.text('Bs 180'), findsOneWidget);
+      expect(find.text('Por día · 1 día × Bs 180'), findsOneWidget);
+      expect(find.byType(MaterialsPill), findsNothing);
+      expect(find.textContaining('Total'), findsNothing);
+    });
+
+    testWidgets('precio fijo sin materiales', (tester) async {
+      await tester.pumpWidget(host(const JobAmountSummary(amount: 250)));
+      expect(find.text('Bs 250'), findsOneWidget);
+      expect(find.text('Precio fijo'), findsOneWidget);
+    });
+
+    testWidgets('con materiales: mano de obra, materiales y total',
+        (tester) async {
+      await tester.pumpWidget(
+          host(const JobAmountSummary(amount: 1000, materials: 700)));
+      expect(find.text('Bs 300'), findsOneWidget);
+      expect(find.text('mano de obra'), findsOneWidget);
+      expect(find.text('+ Bs 700 materiales'), findsOneWidget);
+      expect(find.text('Total Bs 1000'), findsOneWidget);
+    });
+
+    testWidgets('por día con materiales: la tarifa es de la mano de obra',
+        (tester) async {
+      await tester.pumpWidget(host(const JobAmountSummary(
+          amount: 1000, materials: 700, modality: 'daily', days: 2)));
+      expect(find.text('Bs 300'), findsOneWidget);
+      expect(find.text('mano de obra · Por día · 2 días × Bs 150'),
+          findsOneWidget);
+    });
+  });
 }

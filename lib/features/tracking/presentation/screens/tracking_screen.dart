@@ -20,6 +20,7 @@ import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../state/tracking_dependencies.dart';
+import '../../../request/presentation/widgets/request_extras_widgets.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 
 class TrackingScreen extends StatefulWidget {
@@ -386,32 +387,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final startDate = _tracking?['startDate']?.toString();
     final scheduledLater = !workerArrived && isJobForLaterDay(startDate);
 
-    // Desglose de la modalidad bajo el monto: el total siempre manda y el
-    // detalle (horas/días × tarifa) evita dudas sobre qué se está pagando.
+    // Monto a la derecha del estado: ver JobAmountSummary.
     final modality = _tracking?['modality']?.toString() ?? 'fixed';
     final estimatedHours =
         (_tracking?['estimatedHours'] as num?)?.toDouble() ?? 0;
     final days = (_tracking?['days'] as num?)?.toDouble() ?? 0;
     final totalAmount = (amount as num?)?.toDouble();
-    String? modalityLabel;
-    if (totalAmount != null) {
-      String rateOf(double units) {
-        final rate = totalAmount / units;
-        return rate % 1 == 0
-            ? rate.toStringAsFixed(0)
-            : rate.toStringAsFixed(2);
-      }
-
-      if (modality == 'hourly' && estimatedHours > 0) {
-        modalityLabel =
-            'Por hora · ${estimatedHours.toStringAsFixed(0)}h × Bs ${rateOf(estimatedHours)}';
-      } else if (modality == 'daily' && days > 0) {
-        modalityLabel =
-            'Por día · ${days.toStringAsFixed(0)} días × Bs ${rateOf(days)}';
-      } else {
-        modalityLabel = 'Precio fijo';
-      }
-    }
+    final materialsAmount =
+        (_tracking?['materialsAmount'] as num?)?.toDouble() ?? 0;
 
     final workerLat = (worker?['latitude'] as num?)?.toDouble();
     final workerLng = (worker?['longitude'] as num?)?.toDouble();
@@ -832,28 +815,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        amount != null ? 'Bs $amount' : '',
-                                        style: const TextStyle(
-                                          color: AppTheme.colorText,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                      if (modalityLabel != null)
-                                        Text(
-                                          modalityLabel,
-                                          style: const TextStyle(
-                                            color: AppTheme.colorMuted,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                  if (totalAmount != null)
+                                    JobAmountSummary(
+                                      amount: totalAmount,
+                                      materials: materialsAmount,
+                                      modality: modality,
+                                      hours: estimatedHours,
+                                      days: days,
+                                    ),
                                 ],
                               ),
                               const SizedBox(height: 8),

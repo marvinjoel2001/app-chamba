@@ -1652,6 +1652,8 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
 
     final currentBudget = (req['budget'] as num?)?.toDouble() ?? 0;
     final myOfferAmount = (workerOffer?['amount'] as num?)?.toDouble();
+    final myOfferMaterials =
+        (workerOffer?['materialsAmount'] as num?)?.toDouble() ?? 0;
 
     final isDeclinedOffer = offerStatus == 'declined';
 
@@ -1899,7 +1901,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                   ),
                   if (req['modality'] != 'fixed' && req['modality'] != null)
                     Text(
-                      'Total: Bs. $currentBudget',
+                      'Total: Bs. ${formatBs(currentBudget)}',
                       style: const TextStyle(
                           color: AppTheme.colorMuted, fontSize: 11),
                     )
@@ -2013,10 +2015,24 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       children: [
                         const Text('Tu oferta',
                             style: TextStyle(color: AppTheme.colorMuted)),
-                        Text('Bs. $myOfferAmount',
-                            style: const TextStyle(
-                                color: AppTheme.colorText,
-                                fontWeight: FontWeight.bold)),
+                        // Con materiales: la mano de obra y debajo los
+                        // materiales, igual que lo ve el cliente.
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                                myOfferAmount == null
+                                    ? 'Bs. -'
+                                    : 'Bs. ${formatBs(myOfferAmount - myOfferMaterials)}',
+                                style: const TextStyle(
+                                    color: AppTheme.colorText,
+                                    fontWeight: FontWeight.bold)),
+                            if (myOfferMaterials > 0) ...[
+                              const SizedBox(height: 4),
+                              MaterialsPill(amount: myOfferMaterials),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -2054,7 +2070,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                   color: AppTheme.colorError,
                                   fontWeight: FontWeight.bold)),
                           Text(
-                              'El cliente declinó tu oferta de Bs. $myOfferAmount',
+                              'El cliente declinó tu oferta de Bs. ${formatBs(myOfferAmount ?? 0)}',
                               style: const TextStyle(
                                   color: AppTheme.colorMuted, fontSize: 12)),
                         ],
