@@ -13,7 +13,9 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/job_schedule_format.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/scheduled_start_badge.dart';
 import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
@@ -380,6 +382,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final address = _tracking?['address']?.toString() ?? '';
     final title = _tracking?['title']?.toString() ?? 'Servicio en curso';
     final amount = _tracking?['agreedAmount'];
+    // Programado para otro día: el trabajador todavía no va en camino.
+    final startDate = _tracking?['startDate']?.toString();
+    final scheduledLater = !workerArrived && isJobForLaterDay(startDate);
 
     // Desglose de la modalidad bajo el monto: el total siempre manda y el
     // detalle (horas/días × tarifa) evita dudas sobre qué se está pagando.
@@ -564,7 +569,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
           ),
 
           // ── ETA BADGE ─────────────────────────────────────────────────
-          if (!workerArrived)
+          if (scheduledLater)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
+                // Arriba, entre atrás y el zoom: al medio la tapa la hoja.
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ScheduledStartBadge(startDate: startDate),
+                ),
+              ),
+            )
+          else if (!workerArrived)
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.only(top: 16),
@@ -793,17 +809,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.colorSuccessSoft,
+                                      color: scheduledLater
+                                          ? AppTheme.colorPrimarySoft
+                                          : AppTheme.colorSuccessSoft,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      workerArrived
-                                          ? clientConfirmed
-                                              ? 'EN TRABAJO'
-                                              : '¡LLEGÓ!'
-                                          : 'EN CAMINO',
-                                      style: const TextStyle(
-                                        color: AppTheme.colorSuccess,
+                                      scheduledLater
+                                          ? 'PROGRAMADO'
+                                          : workerArrived
+                                              ? clientConfirmed
+                                                  ? 'EN TRABAJO'
+                                                  : '¡LLEGÓ!'
+                                              : 'EN CAMINO',
+                                      style: TextStyle(
+                                        color: scheduledLater
+                                            ? AppTheme.colorPrimary
+                                            : AppTheme.colorSuccess,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                       ),
@@ -970,6 +992,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                           )
                                         : _ArrivalStatusBanner(
                                             confirmed: clientConfirmed,
+                                            scheduledText: scheduledLater
+                                                ? '${scheduledStartSentence(startDate)}. Te avisaremos antes.'
+                                                : null,
                                           ),
                                   ),
                                   const SizedBox(width: 10),
@@ -1092,9 +1117,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
 /// Estado de la llegada del trabajador: "en camino" o "confirmada".
 /// Informativo, no interactivo — por eso no es un botón.
 class _ArrivalStatusBanner extends StatelessWidget {
-  const _ArrivalStatusBanner({required this.confirmed});
+  const _ArrivalStatusBanner({required this.confirmed, this.scheduledText});
 
   final bool confirmed;
+
+  /// Trabajo de otro día: en vez de "en camino", cuándo empieza.
+  final String? scheduledText;
 
   @override
   Widget build(BuildContext context) {
@@ -1112,7 +1140,11 @@ class _ArrivalStatusBanner extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            confirmed ? Icons.check_circle : Icons.hourglass_top,
+            confirmed
+                ? Icons.check_circle
+                : scheduledText != null
+                    ? Icons.event_outlined
+                    : Icons.hourglass_top,
             color: color,
             size: 20,
           ),
@@ -1121,7 +1153,7 @@ class _ArrivalStatusBanner extends StatelessWidget {
             child: Text(
               confirmed
                   ? 'Llegada confirmada'
-                  : 'El trabajador está en camino…',
+                  : scheduledText ?? 'El trabajador está en camino…',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: color,

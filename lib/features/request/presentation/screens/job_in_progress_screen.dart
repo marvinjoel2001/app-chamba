@@ -14,7 +14,9 @@ import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/job_schedule_format.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../../core/widgets/scheduled_start_badge.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
@@ -649,6 +651,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final address = _tracking?['address']?.toString() ?? '';
     final title = _tracking?['title']?.toString() ?? 'Trabajo en curso';
     final amount = _tracking?['agreedAmount'];
+    // Programado para otro día: todavía no va en camino ni puede marcar
+    // la llegada.
+    final startDate = _tracking?['startDate']?.toString();
+    final scheduledLater = !workerArrived && isJobForLaterDay(startDate);
 
     // Desglose de la modalidad bajo el monto (mismo criterio que la
     // pantalla del cliente): el total manda, el detalle aclara.
@@ -843,7 +849,18 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
               ),
 
               // ── ETA BADGE ─────────────────────────────────────────────────
-              if (!workerArrived)
+              if (scheduledLater)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    // Arriba, entre atrás y el zoom: al medio la tapa la hoja.
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ScheduledStartBadge(startDate: startDate),
+                    ),
+                  ),
+                )
+              else if (!workerArrived)
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 16),
@@ -1113,17 +1130,23 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.colorSuccessSoft,
+                                      color: scheduledLater
+                                          ? AppTheme.colorPrimarySoft
+                                          : AppTheme.colorSuccessSoft,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      workerArrived
-                                          ? clientConfirmed
-                                              ? 'EN TRABAJO'
-                                              : 'LLEGASTE'
-                                          : 'EN CAMINO',
-                                      style: const TextStyle(
-                                        color: AppTheme.colorSuccess,
+                                      scheduledLater
+                                          ? 'PROGRAMADO'
+                                          : workerArrived
+                                              ? clientConfirmed
+                                                  ? 'EN TRABAJO'
+                                                  : 'LLEGASTE'
+                                              : 'EN CAMINO',
+                                      style: TextStyle(
+                                        color: scheduledLater
+                                            ? AppTheme.colorPrimary
+                                            : AppTheme.colorSuccess,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                       ),
@@ -1294,6 +1317,12 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                                 icon: Icons.hourglass_top,
                                                 text:
                                                     'Esperando confirmación del cliente…',
+                                              )
+                                            : scheduledLater
+                                            ? _JobStatusBanner(
+                                                icon: Icons.event_outlined,
+                                                text:
+                                                    '${scheduledStartSentence(startDate)}. Ese día marcas tu llegada.',
                                               )
                                             : ChambaPrimaryButton(
                                                 label: 'LLEGUÉ AL SITIO',

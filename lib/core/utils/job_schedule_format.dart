@@ -53,4 +53,12 @@ String formatJobStart(String? startDate, {int? days, DateTime? now}) {
   return text;
 }
 
+/// True si el trabajo empieza otro día, después de hoy. Hasta ese día
+/// nadie está "en camino" ni puede marcar la llegada.
+bool isJobForLaterDay(String? startDate, {DateTime? now}) {
+  final day = jobStartDay(startDate);
+  if (day == null) return false;
+  return day.isAfter(_dateOnly(now ?? DateTime.now()));
+}
+
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
