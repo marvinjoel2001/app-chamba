@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../services/connectivity_service.dart';
 import 'api_exceptions.dart';
@@ -130,6 +131,34 @@ class ApiService {
       timeout: timeout,
       sessionToken:
           path.startsWith('/auth/') ? null : _bearerToken(requestHeaders),
+    );
+  }
+
+  /// Sube un archivo como multipart (p. ej. el video de una solicitud). Con
+  /// más tiempo que un POST normal: un video tarda en subir con datos.
+  Future<Map<String, dynamic>> postFile(
+    String path, {
+    required String field,
+    required String filePath,
+    required String contentType,
+    Duration timeout = const Duration(minutes: 4),
+  }) {
+    final requestHeaders = _jsonHeaders(null)
+      ..removeWhere((key, _) => key.toLowerCase() == 'content-type');
+    return _send(
+      (candidate) async {
+        final request = http.MultipartRequest('POST', _buildUri(candidate, path))
+          ..headers.addAll(requestHeaders)
+          ..files.add(await http.MultipartFile.fromPath(
+            field,
+            filePath,
+            contentType: MediaType.parse(contentType),
+          ));
+        return http.Response.fromStream(await client.send(request));
+      },
+      timeoutMessage: _timeoutPostMessage,
+      timeout: timeout,
+      sessionToken: _bearerToken(requestHeaders),
     );
   }
 

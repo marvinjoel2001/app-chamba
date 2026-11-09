@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/work_modalities_service.dart';
+import 'guided_video_screen.dart';
 import 'request_form_screen.dart';
 
 class RequestModalityScreen extends StatefulWidget {
@@ -13,8 +14,12 @@ class RequestModalityScreen extends StatefulWidget {
     this.preselectedCategory,
     this.preselectedWorkerId,
     this.modalitiesService,
+    this.initialVideo,
     super.key,
   });
+
+  /// Video grabado con la guía desde el inicio (se adjunta al formulario).
+  final RecordedJobVideo? initialVideo;
 
   final String initialPrompt;
   final String? initialTitle;
@@ -56,6 +61,7 @@ class _RequestModalityScreenState extends State<RequestModalityScreen> {
           initialAddress: widget.initialAddress,
           preselectedCategory: widget.preselectedCategory,
           preselectedWorkerId: widget.preselectedWorkerId,
+          initialVideo: widget.initialVideo,
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -16,6 +17,10 @@ import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
 import '../state/explore_dependencies.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../widgets/explore_video_widgets.dart';
+import '../../../request/presentation/screens/guided_video_screen.dart';
 import '../../../request/presentation/screens/request_modality_screen.dart';
 import '../../../request/presentation/screens/request_status_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
@@ -60,6 +65,13 @@ class _ExploreScreenState extends State<ExploreScreen>
   double _micSoundLevel = 0;
   List<dynamic> _categories = const [];
   Map<String, dynamic>? _activeRequest;
+  /// Trabajos ya asignados para otro día: no ocupan el inicio.
+  List<Map<String, dynamic>> _scheduledRequests = const [];
+  /// Video guiado listo para adjuntar a la próxima solicitud.
+  RecordedJobVideo? _pendingVideo;
+  /// Globo que explica el botón de video (se muestra las primeras veces).
+  bool _showVideoHint = false;
+  static const String _videoHintKey = 'video_hint_seen_count';
   LatLng? _currentUserLocation;
   double _currentZoom = 13;
 
@@ -77,6 +89,56 @@ class _ExploreScreenState extends State<ExploreScreen>
     _realtime.on('job.cancelled', _onJobFinished);
     _realtime.on('offer.new', _onNewOffer);
     _load();
+    _loadVideoHint();
+  }
+
+  /// El globo del botón de video sale las primeras 3 veces que se abre el
+  /// inicio, o hasta que el cliente lo usa o lo cierra.
+  Future<void> _loadVideoHint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getInt(_videoHintKey) ?? 0;
+      if (seen >= 3) return;
+      await prefs.setInt(_videoHintKey, seen + 1);
+      if (mounted) setState(() => _showVideoHint = true);
+    } catch (_) {}
+  }
+
+  Future<void> _dismissVideoHint() async {
+    if (_showVideoHint) setState(() => _showVideoHint = false);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_videoHintKey, 3);
+    } catch (_) {}
+  }
+
+  /// Graba el trabajo con la guía. Lo que dijo el cliente pasa a ser la
+  /// descripción y el video queda listo para la solicitud.
+  Future<void> _recordGuidedVideo() async {
+    if (_analyzingPrompt) return;
+    unawaited(_dismissVideoHint());
+    if (_isListening) _listenToSpeech();
+    final video = await GuidedVideoScreen.open(
+      context,
+      initialTranscript: _promptController.text,
+    );
+    if (!mounted || video == null) return;
+    setState(() {
+      _pendingVideo = video;
+      if (video.transcript.isNotEmpty) {
+        _promptController.text = video.transcript;
+      }
+    });
+    if (_promptController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video listo. Escribe en una frase qué necesitas.'),
+        ),
+      );
+      await _openFocusedComposer();
+      return;
+    }
+    await _startRequestFlow();
   }
 
   @override
@@ -185,11 +247,21 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (cleanedRequest == null) {
         SessionStore.activeRequestId = null;
       }
+      final scheduled = (response['scheduledRequests'] as List<dynamic>? ??
+              const [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
 
       setState(() {
         _currentUserLocation = currentLocation;
         _categories = (response['categories'] as List<dynamic>? ?? const []);
         _activeRequest = cleanedRequest;
+        _scheduledRequests = scheduled;
+        // El video ya viajó con la solicitud que se acaba de publicar.
+        if (cleanedRequest != null &&
+            cleanedRequest['status']?.toString() == 'searching') {
+          _pendingVideo = null;
+        }
         _loading = false;
       });
 
@@ -407,6 +479,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     .toList(),
             initialLatitude: currentLocation.latitude,
             initialLongitude: currentLocation.longitude,
+            initialVideo: _pendingVideo,
           ),
         ),
       );
@@ -764,7 +837,16 @@ class _ExploreScreenState extends State<ExploreScreen>
     // Estado normal: formulario para crear solicitud
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GlassCard(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (_showVideoHint)
+            VideoHintCallout(
+              onTry: _recordGuidedVideo,
+              onClose: _dismissVideoHint,
+            ),
+          GlassCard(
         padding: const EdgeInsets.all(16),
         borderRadius: 32,
         child: Column(
@@ -842,10 +924,21 @@ class _ExploreScreenState extends State<ExploreScreen>
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),
+                        if (_pendingVideo != null) ...[
+                          const SizedBox(height: 10),
+                          PendingVideoChip(
+                            duration: _pendingVideo!.duration,
+                            onRemove: () =>
+                                setState(() => _pendingVideo = null),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                   GestureDetector(
                     // Abre la vista enfocada y empieza a escuchar ahí.
                     onTap: () => _openFocusedComposer(listen: true),
@@ -933,6 +1026,13 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
                     ),
                   ),
+                      const SizedBox(height: 6),
+                      VideoRecordButton(
+                        hasVideo: _pendingVideo != null,
+                        onTap: _recordGuidedVideo,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -985,6 +1085,40 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ],
         ),
+      ),
+        ],
+      ),
+    );
+  }
+
+  /// Trabajos ya asignados para otro día: una tarjeta chica por trabajo
+  /// encima de la caja de pedir, así el cliente puede pedir otro.
+  Widget _buildScheduledStrip() {
+    if (_scheduledRequests.isEmpty) return const SizedBox.shrink();
+    final shown = _scheduledRequests.take(2).toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final job in shown)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: ScheduledJobCard(
+                job: job,
+                extraCount: job == shown.last
+                    ? _scheduledRequests.length - shown.length
+                    : 0,
+                onTap: () {
+                  SessionStore.activeRequestId = job['id']?.toString();
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const TrackingScreen()),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1211,7 +1345,13 @@ class _ExploreScreenState extends State<ExploreScreen>
               left: 0,
               right: 0,
               bottom: MediaQuery.of(context).viewInsets.bottom + 8,
-              child: _buildClientComposer(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildScheduledStrip(),
+                  _buildClientComposer(),
+                ],
+              ),
             ),
           ],
         ],

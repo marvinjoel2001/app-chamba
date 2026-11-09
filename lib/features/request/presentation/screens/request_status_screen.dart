@@ -1990,6 +1990,17 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               ..._offerPriceLines(amount),
+              // Si el trabajador trae los materiales, se ve cuánto es de
+              // materiales dentro del total.
+              if (((offer['materialsAmount'] as num?)?.toDouble() ?? 0) > 0)
+                Text(
+                  'incluye Bs ${(offer['materialsAmount'] as num).toStringAsFixed(0)} de materiales',
+                  style: const TextStyle(
+                    color: Color(0xFF854F0B),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [

@@ -33,6 +33,9 @@ class RequestRepositoryImpl implements RequestRepository {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   }) {
     return _wrap(
       () => _remote.createRequest(
@@ -57,6 +60,9 @@ class RequestRepositoryImpl implements RequestRepository {
         days: days,
         dailyRate: dailyRate,
         startDate: startDate,
+        materialsMode: materialsMode,
+        materialsNote: materialsNote,
+        video: video,
       ),
     );
   }
@@ -115,6 +121,7 @@ class RequestRepositoryImpl implements RequestRepository {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return _wrap(
       () => _remote.counterOffer(
@@ -122,6 +129,7 @@ class RequestRepositoryImpl implements RequestRepository {
         workerUserId: workerUserId,
         amount: amount,
         message: message,
+        materialsAmount: materialsAmount,
       ),
     );
   }

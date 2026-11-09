@@ -15,6 +15,7 @@ abstract class OffersRemoteDataSource {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   });
 }
 
@@ -54,12 +55,14 @@ class OffersRemoteDataSourceImpl implements OffersRemoteDataSource {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return MobileBackendService.instance.counterOffer(
       requestId: requestId,
       workerUserId: workerUserId,
       amount: amount,
       message: message,
+      materialsAmount: materialsAmount,
     );
   }
 }

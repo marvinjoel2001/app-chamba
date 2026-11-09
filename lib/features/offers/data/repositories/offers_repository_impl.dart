@@ -41,6 +41,7 @@ class OffersRepositoryImpl implements OffersRepository {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return _wrap(
       () => _remote.counterOffer(
@@ -48,6 +49,7 @@ class OffersRepositoryImpl implements OffersRepository {
         workerUserId: workerUserId,
         amount: amount,
         message: message,
+        materialsAmount: materialsAmount,
       ),
     );
   }

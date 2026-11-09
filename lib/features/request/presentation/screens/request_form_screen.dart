@@ -18,6 +18,8 @@ import '../../../payment/domain/entities/payment_method.dart';
 import '../state/request_dependencies.dart';
 import 'request_status_screen.dart';
 import '../widgets/request_form_widgets.dart';
+import '../widgets/request_extras_widgets.dart';
+import 'guided_video_screen.dart';
 
 /// Monto precargado sin ".0" sobrante: 100.0 → "100", 24.5 → "24.5".
 @visibleForTesting
@@ -41,10 +43,14 @@ class RequestFormScreen extends StatefulWidget {
     this.initialDays,
     this.initialDailyRate,
     this.isRetry = false,
+    this.initialVideo,
     super.key,
   });
 
   final String modality;
+
+  /// Video grabado con la guía antes de llegar al formulario.
+  final RecordedJobVideo? initialVideo;
 
   final String initialPrompt;
   final String? initialTitle;
@@ -65,11 +71,16 @@ class RequestFormScreen extends StatefulWidget {
 class _RequestFormScreenState extends State<RequestFormScreen> {
   late String priceType;
   late final TextEditingController _descriptionController;
-  final _budgetController = TextEditingController(text: '100');
+  // Los montos empiezan vacíos (en 0): el cliente decide cuánto paga, sin un
+  // precio sugerido que parezca impuesto.
+  final _budgetController = TextEditingController();
   final _estimatedHoursController = TextEditingController(text: '2');
-  final _hourlyRateController = TextEditingController(text: '20');
+  final _hourlyRateController = TextEditingController();
   final _daysController = TextEditingController(text: '1');
-  final _dailyRateController = TextEditingController(text: '100');
+  final _dailyRateController = TextEditingController();
+  RecordedJobVideo? _video;
+  MaterialsMode? _materialsMode;
+  final _materialsNoteController = TextEditingController();
   String? _startDate;
   TimeOfDay? _startTime;
 
@@ -109,6 +120,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   void initState() {
     super.initState();
+    _video = widget.initialVideo;
     if (widget.initialBudget != null) {
       _budgetController.text = formatInitialAmount(widget.initialBudget!);
     }
@@ -147,8 +159,54 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     _hourlyRateController.dispose();
     _daysController.dispose();
     _dailyRateController.dispose();
+    _materialsNoteController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Graba el lugar con la guía. Si la descripción está vacía, se llena con
+  /// lo que dijo el cliente.
+  Future<void> _recordVideo() async {
+    final video = await GuidedVideoScreen.open(context);
+    if (!mounted || video == null) return;
+    setState(() {
+      _video = video;
+      if (_descriptionController.text.trim().isEmpty &&
+          video.transcript.isNotEmpty) {
+        _descriptionController.text = video.transcript.length > 120
+            ? video.transcript.substring(0, 120)
+            : video.transcript;
+      }
+    });
+  }
+
+  /// Video ya grabado: el selector del sistema no pide permiso de galería.
+  Future<void> _pickVideoFromGallery() async {
+    try {
+      final picked = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 60),
+      );
+      if (picked == null || !mounted) return;
+      final size = await picked.length();
+      if (size > 80 * 1024 * 1024) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Ese video es muy pesado. Elige uno de menos de 1 minuto.'),
+        ));
+        return;
+      }
+      setState(() => _video = RecordedJobVideo(
+            path: picked.path,
+            transcript: '',
+            duration: Duration.zero,
+          ));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo abrir el video.')),
+      );
+    }
   }
 
   Map<String, dynamic>? get _firstSuggestedCategory {
@@ -593,11 +651,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       budget = double.tryParse(_budgetController.text.trim()) ?? 0;
     }
 
-    if (description.isEmpty || budget <= 0) {
+    if (description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Describe el trabajo que necesitas.')),
+      );
+      return;
+    }
+    if (budget <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Completa la descripcion y verifica que los montos sean mayores a 0.'),
+          content: Text('Escribe cuánto vas a pagar: el monto debe ser mayor a 0.'),
         ),
       );
       return;
@@ -622,6 +685,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         });
       }
 
+      Map<String, String>? uploadedVideo;
+      final video = _video;
+      if (video != null) {
+        final result =
+            await MobileBackendService.instance.uploadRequestVideo(video.path);
+        final token = result['uploadToken']?.toString();
+        if (token != null && token.isNotEmpty) {
+          uploadedVideo = {
+            'uploadToken': token,
+            if ((result['thumbnailUrl']?.toString() ?? '').isNotEmpty)
+              'thumbnailUrl': result['thumbnailUrl'].toString(),
+          };
+        }
+      }
+
       final response = (await RequestDependencies.createRequest(
         clientUserId: user.id,
         title: description.split('\n').first.length > 100
@@ -644,6 +722,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         days: days,
         dailyRate: dailyRate,
         startDate: _startDateForBackend,
+        materialsMode: _materialsMode?.code,
+        materialsNote: _materialsMode == MaterialsMode.discuss
+            ? null
+            : _materialsNoteController.text.trim(),
+        video: uploadedVideo,
       ))
           .fold(
             onSuccess: (value) => value,
@@ -835,11 +918,32 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               onRemove: (index) =>
                   setState(() => _pendingImages.removeAt(index)),
             ),
+            const SizedBox(height: 14),
+            RequestVideoPicker(
+              video: _video,
+              enabled: !_loading,
+              onRecord: _recordVideo,
+              onPickFromGallery: _pickVideoFromGallery,
+              onRemove: () => setState(() => _video = null),
+            ),
           ]),
         ),
         const SizedBox(height: 10),
         RequestStepCard(
           number: 2,
+          title: '¿Quién pone los materiales?',
+          subtitle: 'Pintura, cemento, repuestos, productos…',
+          color: requestOrange,
+          child: RequestMaterialsPicker(
+            mode: _materialsMode,
+            noteController: _materialsNoteController,
+            enabled: !_loading,
+            onChanged: (mode) => setState(() => _materialsMode = mode),
+          ),
+        ),
+        const SizedBox(height: 10),
+        RequestStepCard(
+          number: 3,
           title: 'Detalles del trabajo',
           subtitle: 'Dónde es, cuánto dura y cuánto pagas',
           color: requestBlue,
@@ -942,7 +1046,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         ),
         const SizedBox(height: 10),
         RequestStepCard(
-            number: 3,
+            number: 4,
             title: 'Método de pago',
             subtitle: 'Selecciona cómo quieres pagar',
             color: requestOrange,

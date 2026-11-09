@@ -160,6 +160,9 @@ class MobileBackendService {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   }) {
     final body = <String, dynamic>{
       'clientUserId': clientUserId,
@@ -181,6 +184,9 @@ class MobileBackendService {
       'days': days,
       'dailyRate': dailyRate,
       'startDate': startDate,
+      'materialsMode': materialsMode,
+      'materialsNote': materialsNote,
+      'video': video,
     };
     if (category != null && category.trim().isNotEmpty) {
       body['category'] = category;
@@ -461,6 +467,9 @@ class MobileBackendService {
     required String workerUserId,
     required double amount,
     String? message,
+    // Parte de [amount] que es materiales (cuando el cliente pidió que el
+    // trabajador los lleve).
+    double? materialsAmount,
   }) {
     return _api.post(
       '/mobile/offers/counter',
@@ -469,6 +478,8 @@ class MobileBackendService {
         'workerUserId': workerUserId,
         'amount': amount,
         'message': message,
+        if (materialsAmount != null && materialsAmount > 0)
+          'materialsAmount': materialsAmount,
       },
     );
   }
@@ -636,6 +647,23 @@ class MobileBackendService {
   Future<Map<String, dynamic>> uploadRequestPhoto(String imageBase64) {
     return _api.post('/mobile/requests/photos/upload',
         body: {'imageBase64': imageBase64});
+  }
+
+  /// Sube el video del lugar. Devuelve `url`, `thumbnailUrl` y `uploadToken`
+  /// (el comprobante que va en `video` al crear la solicitud).
+  Future<Map<String, dynamic>> uploadRequestVideo(String filePath) {
+    final lower = filePath.toLowerCase();
+    return _api.postFile(
+      '/mobile/requests/videos/upload',
+      field: 'video',
+      filePath: filePath,
+      contentType: lower.endsWith('.mov') ? 'video/quicktime' : 'video/mp4',
+    );
+  }
+
+  /// Gastos de servicio (%) que Chamba descuenta de la mano de obra.
+  Future<Map<String, dynamic>> serviceFeeConfig() {
+    return _api.get('/mobile/config/service-fee');
   }
 
   // Worker descarta su oferta pendiente → vuelve al estado sin oferta

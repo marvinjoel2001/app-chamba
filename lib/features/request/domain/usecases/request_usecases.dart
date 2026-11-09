@@ -29,6 +29,9 @@ class CreateRequestUseCase {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   }) {
     return _repository.createRequest(
       clientUserId: clientUserId,
@@ -52,6 +55,9 @@ class CreateRequestUseCase {
       days: days,
       dailyRate: dailyRate,
       startDate: startDate,
+      materialsMode: materialsMode,
+      materialsNote: materialsNote,
+      video: video,
     );
   }
 }
@@ -126,12 +132,14 @@ class CreateCounterOfferUseCase {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return _repository.counterOffer(
       requestId: requestId,
       workerUserId: workerUserId,
       amount: amount,
       message: message,
+      materialsAmount: materialsAmount,
     );
   }
 }

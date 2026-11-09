@@ -19,5 +19,6 @@ abstract class OffersRepository {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   });
 }

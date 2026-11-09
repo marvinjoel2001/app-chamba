@@ -24,6 +24,9 @@ abstract class RequestRepository {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   });
 
   Future<Result<RequestPayloadEntity>> requestStatus({
@@ -67,6 +70,7 @@ abstract class RequestRepository {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   });
 
   Future<Result<void>> clientCounterOffer({

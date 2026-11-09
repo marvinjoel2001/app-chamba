@@ -51,12 +51,14 @@ class CounterOfferUseCase {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return _repository.counterOffer(
       requestId: requestId,
       workerUserId: workerUserId,
       amount: amount,
       message: message,
+      materialsAmount: materialsAmount,
     );
   }
 }

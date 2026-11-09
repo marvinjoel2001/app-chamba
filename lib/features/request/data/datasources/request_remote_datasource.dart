@@ -23,6 +23,9 @@ abstract class RequestRemoteDataSource {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   });
 
   Future<Map<String, dynamic>> requestStatus({
@@ -64,6 +67,7 @@ abstract class RequestRemoteDataSource {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   });
 
   Future<Map<String, dynamic>> clientCounterOffer({
@@ -128,6 +132,9 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   }) {
     return MobileBackendService.instance.createRequest(
       clientUserId: clientUserId,
@@ -151,6 +158,9 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
       days: days,
       dailyRate: dailyRate,
       startDate: startDate,
+      materialsMode: materialsMode,
+      materialsNote: materialsNote,
+      video: video,
     );
   }
 
@@ -237,12 +247,14 @@ class RequestRemoteDataSourceImpl implements RequestRemoteDataSource {
     required String workerUserId,
     required double amount,
     String? message,
+    double? materialsAmount,
   }) {
     return MobileBackendService.instance.counterOffer(
       requestId: requestId,
       workerUserId: workerUserId,
       amount: amount,
       message: message,
+      materialsAmount: materialsAmount,
     );
   }
 

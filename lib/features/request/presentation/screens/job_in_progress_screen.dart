@@ -19,6 +19,7 @@ import '../../../messages/presentation/screens/chat_screen.dart';
 import '../../../messages/presentation/screens/messages_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../state/request_dependencies.dart';
+import '../widgets/request_extras_widgets.dart';
 
 class JobInProgressScreen extends StatefulWidget {
   const JobInProgressScreen({required this.requestId, super.key});
@@ -1149,6 +1150,19 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
+                                      if (((_tracking?['materialsAmount']
+                                                      as num?)
+                                                  ?.toDouble() ??
+                                              0) >
+                                          0)
+                                        Text(
+                                          'incluye Bs ${(_tracking!['materialsAmount'] as num).toStringAsFixed(0)} de materiales',
+                                          style: const TextStyle(
+                                            color: Color(0xFF854F0B),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ],
@@ -1163,6 +1177,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
+                              if (_tracking != null)
+                                JobExtrasSection(request: _tracking!),
                               Row(
                                 children: [
                                   CircleAvatar(

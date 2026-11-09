@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
+import '../../../request/presentation/widgets/request_extras_widgets.dart';
 import '../state/offers_dependencies.dart';
 
 class CounterOfferScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class CounterOfferScreen extends StatefulWidget {
     this.workerId,
     this.originalBudget,
     this.requestData,
+    this.serviceFeePercent = 0,
     super.key,
   });
 
@@ -19,6 +21,9 @@ class CounterOfferScreen extends StatefulWidget {
   final String? workerId;
   final double? originalBudget;
   final Map<String, dynamic>? requestData;
+
+  /// Gastos de servicio de Chamba (% de la mano de obra). 0 = no cobra.
+  final double serviceFeePercent;
 
   @override
   State<CounterOfferScreen> createState() => _CounterOfferScreenState();
@@ -30,6 +35,16 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
   bool _editingManually = false;
   final TextEditingController _manualCtrl = TextEditingController();
   final FocusNode _manualFocus = FocusNode();
+  final TextEditingController _materialsCtrl = TextEditingController();
+
+  /// El cliente pidió que el trabajador lleve los materiales.
+  bool get _bringsMaterials => widget.requestData?['materialsMode'] == 'worker';
+
+  double get _materialsAmount =>
+      _bringsMaterials ? (double.tryParse(_materialsCtrl.text.trim()) ?? 0) : 0;
+
+  double get _serviceFee =>
+      (_selectedTotal * widget.serviceFeePercent / 100);
 
   double get _base => widget.originalBudget ?? 100;
 
@@ -105,6 +120,7 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
   void dispose() {
     _manualCtrl.dispose();
     _manualFocus.dispose();
+    _materialsCtrl.dispose();
     super.dispose();
   }
 
@@ -181,12 +197,24 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
       );
       return;
     }
+    if (_bringsMaterials && _materialsAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'El cliente pidió que lleves los materiales: escribe cuánto cuestan.'),
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       (await OffersDependencies.counterOffer(
         requestId: requestId,
         workerUserId: widget.workerId ?? user.id,
-        amount: _selectedTotal,
+        // El cliente paga mano de obra + materiales; los materiales van
+        // aparte para que la comisión no se cobre sobre ellos.
+        amount: _selectedTotal + _materialsAmount,
+        materialsAmount: _materialsAmount > 0 ? _materialsAmount : null,
       ))
           .fold(
         onSuccess: (value) => value,
@@ -243,8 +271,8 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                       icon: const Icon(Icons.close),
                     ),
                     const Spacer(),
-                    const Text(
-                      'HACER CONTRAOFERTA',
+                    Text(
+                      _bringsMaterials ? 'ENVIAR OFERTA' : 'HACER CONTRAOFERTA',
                       style: TextStyle(
                         color: AppTheme.colorPrimary,
                         fontWeight: FontWeight.w800,
@@ -256,6 +284,10 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
 
                 // ── Oferta original ──────────────────────────────────────
                 Center(
@@ -294,7 +326,11 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
 
                 // ── Precio propuesto ─────────────────────────────────────
                 Text(
-                  _perHour ? 'Tu tarifa por hora' : 'Tu precio total propuesto',
+                  _perHour
+                      ? 'Tu tarifa por hora'
+                      : _bringsMaterials
+                          ? 'Tu mano de obra'
+                          : 'Tu precio total propuesto',
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
@@ -456,7 +492,25 @@ class _CounterOfferScreenState extends State<CounterOfferScreen> {
                     ),
                   ),
 
-                const Spacer(),
+                if (_bringsMaterials) ...[
+                  const SizedBox(height: 8),
+                  _MaterialsAmountField(
+                    controller: _materialsCtrl,
+                    note: widget.requestData?['materialsNote']?.toString(),
+                    onChanged: () => setState(() {}),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _OfferBreakdown(
+                  labor: _selectedTotal,
+                  materials: _materialsAmount,
+                  serviceFee: _serviceFee,
+                  serviceFeePercent: widget.serviceFeePercent,
+                ),
+                const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
 
                 // ── Enviar ───────────────────────────────────────────────
                 ChambaPrimaryButton(
@@ -602,6 +656,8 @@ class _JobDetailsSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
+
+              JobExtrasSection(request: requestData),
 
               // Ubicación
               if (address.isNotEmpty) ...[
@@ -769,6 +825,165 @@ class _JobDetailsSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Costo de materiales (cuando el cliente pidió que los lleve) ──────────────
+class _MaterialsAmountField extends StatelessWidget {
+  const _MaterialsAmountField({
+    required this.controller,
+    required this.onChanged,
+    this.note,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAEEDA),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.local_shipping_outlined,
+                  color: Color(0xFF854F0B), size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'El cliente pide que lleves los materiales',
+                  style: TextStyle(
+                    color: Color(0xFF633806),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (note != null && note!.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              note!.trim(),
+              style: const TextStyle(
+                  color: Color(0xFF854F0B), fontSize: 13, height: 1.3),
+            ),
+          ],
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            onChanged: (_) => onChanged(),
+            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(
+              color: AppTheme.colorText,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Costo de los materiales',
+              prefixText: 'Bs ',
+              hintText: '0',
+              filled: true,
+              fillColor: Colors.white,
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Desglose: lo que paga el cliente y lo que te llega ───────────────────────
+class _OfferBreakdown extends StatelessWidget {
+  const _OfferBreakdown({
+    required this.labor,
+    required this.materials,
+    required this.serviceFee,
+    required this.serviceFeePercent,
+  });
+
+  final double labor;
+  final double materials;
+  final double serviceFee;
+  final double serviceFeePercent;
+
+  static String _bs(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+
+  @override
+  Widget build(BuildContext context) {
+    final clientPays = labor + materials;
+    final youGet = clientPays - serviceFee;
+    Widget row(String label, String value,
+        {Color color = AppTheme.colorMuted, bool bold = false}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 13.5,
+                      fontWeight: bold ? FontWeight.w800 : FontWeight.w500)),
+            ),
+            Text(value,
+                style: TextStyle(
+                    color: color,
+                    fontSize: bold ? 16 : 13.5,
+                    fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: AppTheme.colorPrimaryTint,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          if (materials > 0) ...[
+            row('Mano de obra', 'Bs ${_bs(labor)}'),
+            row('Materiales', 'Bs ${_bs(materials)}'),
+          ],
+          row('El cliente paga', 'Bs ${_bs(clientPays)}',
+              color: AppTheme.colorText, bold: true),
+          row(
+            serviceFeePercent > 0
+                ? 'Gastos de servicio (${_bs(serviceFeePercent)}% de la mano de obra)'
+                : 'Gastos de servicio',
+            serviceFeePercent > 0 ? '− Bs ${_bs(serviceFee)}' : 'Bs 0',
+          ),
+          const Divider(height: 12),
+          row('Te llega a ti', 'Bs ${_bs(youGet)}',
+              color: AppTheme.colorSuccess, bold: true),
+          if (serviceFeePercent <= 0)
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Text(
+                'Por ahora Chamba no cobra comisión: recibes todo lo que paga el cliente.',
+                style: TextStyle(color: AppTheme.colorMuted, fontSize: 11.5),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

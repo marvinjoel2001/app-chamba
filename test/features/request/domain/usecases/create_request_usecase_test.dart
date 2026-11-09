@@ -48,6 +48,9 @@ class _CapturingRequestRepository extends Fake implements RequestRepository {
     int? days,
     double? dailyRate,
     String? startDate,
+    String? materialsMode,
+    String? materialsNote,
+    Map<String, String>? video,
   }) async {
     createRequestCalls++;
     lastModality = modality;

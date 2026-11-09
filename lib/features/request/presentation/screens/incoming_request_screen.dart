@@ -21,7 +21,10 @@ import '../../../messages/presentation/state/messages_dependencies.dart';
 import '../../../offers/presentation/screens/counter_offer_screen.dart';
 import '../../../worker/presentation/screens/verification_checkpoint_screen.dart';
 import '../state/request_dependencies.dart';
+import '../../../../core/utils/job_schedule_format.dart';
+import '../widgets/request_extras_widgets.dart';
 import 'job_in_progress_screen.dart';
+import 'worker_agenda_screen.dart';
 
 String _priceTypeLabel(dynamic value) {
   final label = value?.toString().trim() ?? '';
@@ -81,6 +84,42 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   String? _selectedModality; // 'hourly', 'daily', 'full'
 
   final Set<String> _notifiedAcceptedRequests = {};
+
+  /// Trabajos asignados para otro día (agenda). No bloquean la lista.
+  List<Map<String, dynamic>> _scheduledJobs = [];
+
+  /// Gastos de servicio de Chamba sobre la mano de obra (0 por ahora).
+  double _serviceFeePercent = 0;
+
+  Future<void> _loadServiceFee() async {
+    try {
+      final config = await MobileBackendService.instance.serviceFeeConfig();
+      final percent = (config['serviceFeePercent'] as num?)?.toDouble() ?? 0;
+      if (mounted) setState(() => _serviceFeePercent = percent);
+    } catch (_) {
+      // Sin dato se muestra como sin gastos; el backend es el que cobra.
+    }
+  }
+
+  /// Lo que le llega al trabajador de un monto de mano de obra.
+  double _netForWorker(double labor) =>
+      labor - (labor * _serviceFeePercent / 100);
+
+  void _openAgenda() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkerAgendaScreen(
+          jobs: [
+            ..._requests.where((r) =>
+                (r['workerOffer'] as Map?)?['status'] == 'accepted'),
+            ..._scheduledJobs,
+          ],
+          onOpenJob: _openJobInProgress,
+          onOpenChat: _openChat,
+        ),
+      ),
+    );
+  }
 
   bool get hasAcceptedRequest {
     for (final req in _requests) {
@@ -196,6 +235,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       curve: Curves.easeIn,
     );
 
+    _loadServiceFee();
     final userId = SessionStore.currentUser?.id;
     _realtime.connect(userId: userId);
     _realtime.on('request.new', _onNewRequest);
@@ -796,6 +836,30 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         return st == 'completed' || st == 'cancelled';
       });
 
+      // Los trabajos asignados para otro día van a la agenda: no ocupan la
+      // lista ni bloquean nuevas solicitudes.
+      final scheduled = fetchedRequests
+          .where((r) => r['isScheduled'] == true)
+          .toList();
+      fetchedRequests.removeWhere((r) => r['isScheduled'] == true);
+      final newScheduled = scheduled
+          .map((r) => r['id']?.toString())
+          .whereType<String>()
+          .where((id) =>
+              _scheduledJobs.isNotEmpty &&
+              !_scheduledJobs.any((j) => j['id']?.toString() == id))
+          .toList();
+      if (newScheduled.isNotEmpty && mounted) {
+        final job = scheduled.firstWhere(
+            (r) => r['id']?.toString() == newScheduled.first);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Te eligieron para ${formatJobStart(job['startDate']?.toString())}. Quedó en tu agenda.'),
+          action: SnackBarAction(label: 'Ver agenda', onPressed: _openAgenda),
+        ));
+      }
+      _scheduledJobs = scheduled;
+
       // Chequear si alguna oferta fue aceptada
       bool newlyAccepted = false;
       for (final req in fetchedRequests) {
@@ -948,6 +1012,41 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       toggling: _togglingAvailability || hasAcceptedRequest,
                       onToggle: () => _toggleAvailability(!_available),
                     ),
+                    // Agenda pegada a la izquierda, con cuántos trabajos
+                    // programados hay.
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Tooltip(
+                        message: 'Mi agenda',
+                        child: Material(
+                          color: _scheduledJobs.isNotEmpty
+                              ? AppTheme.colorPrimary.withValues(alpha: 0.3)
+                              : AppTheme.colorGlassDarkSoft,
+                          elevation: 2,
+                          shadowColor: const Color(0x401E1B4B),
+                          borderRadius: BorderRadius.circular(14),
+                          child: InkWell(
+                            onTap: _openAgenda,
+                            borderRadius: BorderRadius.circular(14),
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Badge(
+                                isLabelVisible: _scheduledJobs.isNotEmpty,
+                                label: Text('${_scheduledJobs.length}'),
+                                backgroundColor: AppTheme.colorHighlight,
+                                textColor: AppTheme.colorText,
+                                child: const Icon(
+                                  Icons.calendar_month_outlined,
+                                  color: AppTheme.colorText,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     // Botón filtros pegado a la derecha
                     Positioned(
                       right: 0,
@@ -1075,7 +1174,19 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         ),
                       )
                     else if (_requests.isEmpty)
-                      _buildEmptyContent(navPadding)
+                      Column(
+                        children: [
+                          if (_scheduledJobs.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                              child: _ScheduledBanner(
+                                jobs: _scheduledJobs,
+                                onTap: _openAgenda,
+                              ),
+                            ),
+                          _buildEmptyContent(navPadding),
+                        ],
+                      )
                     else
                       Padding(
                         padding: EdgeInsets.only(bottom: navPadding),
@@ -1114,6 +1225,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                                               fontWeight: FontWeight.bold)),
                                     ),
                                   ],
+                                ),
+                              ),
+                            if (_scheduledJobs.isNotEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                                child: _ScheduledBanner(
+                                  jobs: _scheduledJobs,
+                                  onTap: _openAgenda,
                                 ),
                               ),
                             if (!hasAcceptedRequest)
@@ -1725,6 +1845,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                         fontSize: 14,
                       ),
                     ),
+                    if (requestTagChips(req).isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: requestTagChips(req),
+                      ),
+                    ],
                     if (startDateLabel(req['startDate']) != null) ...[
                       const SizedBox(height: 6),
                       Container(
@@ -1782,6 +1910,18 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       style: const TextStyle(
                           color: AppTheme.colorMuted, fontSize: 12),
                     ),
+                  // Lo que le queda al trabajador, antes de aceptar.
+                  const SizedBox(height: 2),
+                  Text(
+                    _serviceFeePercent > 0
+                        ? 'Te llega Bs. ${_netForWorker(currentBudget).toStringAsFixed(0)}'
+                        : 'Te llega todo',
+                    style: const TextStyle(
+                      color: AppTheme.colorSuccess,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -2130,6 +2270,14 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       _showVerificationRequired();
       return;
     }
+    // Si el cliente pidió que lleve los materiales, primero tiene que
+    // cotizarlos: se abre la oferta con el precio del cliente ya puesto.
+    final req = _requests.firstWhere((r) => r['id'].toString() == requestId,
+        orElse: () => const {});
+    if (req['materialsMode'] == 'worker') {
+      _showCounterOfferSheet(requestId);
+      return;
+    }
     final user = SessionStore.currentUser;
     if (user == null) return;
     try {
@@ -2173,6 +2321,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           requestId: requestId,
           originalBudget: currentBudget,
           requestData: req,
+          serviceFeePercent: _serviceFeePercent,
         ),
       ),
     );
@@ -2206,6 +2355,65 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         },
         onFailure: (failure) => ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(failure.message))));
+  }
+}
+
+/// "Tienes 2 trabajos programados · el próximo: mañana 08:00" sobre la
+/// lista de solicitudes. Abre la agenda.
+class _ScheduledBanner extends StatelessWidget {
+  const _ScheduledBanner({required this.jobs, required this.onTap});
+
+  final List<Map<String, dynamic>> jobs;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final next = jobs.first;
+    final count = jobs.length;
+    return Material(
+      color: AppTheme.colorPrimaryTint,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.event_available_rounded,
+                  color: AppTheme.colorPrimary, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count == 1
+                          ? 'Tienes 1 trabajo programado'
+                          : 'Tienes $count trabajos programados',
+                      style: const TextStyle(
+                        color: Color(0xFF4C1D95),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Próximo: ${formatJobStart(next['startDate']?.toString())} · ${next['title'] ?? next['category'] ?? ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Color(0xFF6D28D9), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppTheme.colorPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -2415,6 +2623,8 @@ class _JobDetailsSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
+
+              JobExtrasSection(request: requestData),
 
               // Dirección
               if (address.isNotEmpty) ...[
