@@ -78,12 +78,15 @@ class _WorkerAgendaTabState extends State<WorkerAgendaTab> {
     }
   }
 
-  void _openJob(String requestId) {
-    Navigator.of(context).push(
+  // Al volver del trabajo se recarga: pudo cancelarse o terminarse mientras
+  // estaba abierto.
+  Future<void> _openJob(String requestId) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => JobInProgressScreen(requestId: requestId),
       ),
     );
+    if (mounted) await _load(silent: true);
   }
 
   @override
