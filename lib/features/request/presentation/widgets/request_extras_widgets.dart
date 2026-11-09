@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../screens/guided_video_screen.dart';
 import 'request_form_widgets.dart';
 
@@ -12,7 +13,7 @@ enum MaterialsMode {
   client('client', 'Solo mano de obra', Icons.handyman_outlined,
       'Ya tienes los materiales. Te ofertan solo por el trabajo.'),
   worker('worker', 'Mano de obra + materiales', Icons.local_shipping_outlined,
-      'El trabajador los trae y te cotiza los materiales aparte.');
+      'El trabajador ve lo que hace falta y te cotiza los materiales aparte.');
 
   const MaterialsMode(this.code, this.label, this.icon, this.help);
   final String code;
@@ -28,20 +29,18 @@ enum MaterialsMode {
   }
 }
 
-/// Pregunta "¿Qué quieres que te coticen?" con 2 respuestas. Si pide
-/// materiales, puede anotar cuáles.
+/// Pregunta "¿Qué quieres que te coticen?" con 2 respuestas. El cliente no
+/// anota qué materiales hacen falta: eso lo cotiza el trabajador.
 class RequestMaterialsPicker extends StatelessWidget {
   const RequestMaterialsPicker({
     super.key,
     required this.mode,
     required this.onChanged,
-    required this.noteController,
     this.enabled = true,
   });
 
   final MaterialsMode? mode;
   final ValueChanged<MaterialsMode> onChanged;
-  final TextEditingController noteController;
   final bool enabled;
 
   @override
@@ -56,40 +55,6 @@ class RequestMaterialsPicker extends StatelessWidget {
             onTap: enabled ? () => onChanged(option) : null,
           ),
           const SizedBox(height: 6),
-        ],
-        if (mode == MaterialsMode.worker) ...[
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E5F0)),
-            ),
-            child: TextField(
-              controller: noteController,
-              enabled: enabled,
-              minLines: 1,
-              maxLines: 3,
-              maxLength: 300,
-              textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
-                  color: requestInk, fontSize: 13.5, height: 1.25),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                counterText: '',
-                hintText:
-                    '¿Qué materiales necesitas? Ej.: pintura látex blanca, 2 manos',
-                hintStyle:
-                    const TextStyle(color: requestMuted, height: 1.25),
-              ),
-            ),
-          ),
         ],
       ],
     );
@@ -558,6 +523,81 @@ class JobExtrasSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+}
+
+/// Precio de una oferta en la tarjeta que ve el cliente. Con materiales, lo
+/// grande es la mano de obra (lo que compara entre trabajadores) y los
+/// materiales van debajo, más chicos y en el ámbar de materiales.
+/// [amount] es lo que paga el cliente: ya incluye los materiales.
+class OfferPrice extends StatelessWidget {
+  const OfferPrice({
+    super.key,
+    required this.amount,
+    this.materials = 0,
+    this.hours = 0,
+  });
+
+  final double amount;
+  final double materials;
+
+  /// Horas estimadas si la modalidad es por hora; 0 si no.
+  final double hours;
+
+  static String _bs(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+
+  @override
+  Widget build(BuildContext context) {
+    final withMaterials = materials > 0;
+    final labor = withMaterials ? amount - materials : amount;
+    final hourly = hours > 0;
+    const small = TextStyle(color: AppTheme.colorMuted, fontSize: 11.5);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          hourly ? 'Bs ${_bs(labor / hours)}/h' : 'Bs ${_bs(labor)}',
+          style: const TextStyle(
+            color: AppTheme.colorText,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (withMaterials)
+          Text(hourly ? 'mano de obra, Bs ${_bs(labor)}' : 'mano de obra',
+              style: small)
+        else if (hourly)
+          Text('Total Bs ${_bs(amount)}', style: small),
+        if (withMaterials) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAEEDA),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_shipping_outlined,
+                    size: 13, color: Color(0xFF854F0B)),
+                const SizedBox(width: 4),
+                Text(
+                  '+ Bs ${_bs(materials)} materiales',
+                  style: const TextStyle(
+                    color: Color(0xFF854F0B),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );

@@ -20,6 +20,7 @@ import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../offers/presentation/screens/worker_profile_screen.dart';
 import '../../../payment/presentation/payment_flow.dart';
+import '../widgets/request_extras_widgets.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen(
@@ -1846,29 +1847,6 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
 
   /// Precio de una oferta. En "por hora" lo que se negocia es la tarifa, así
   /// que se muestra Bs/h grande y el total (lo que se paga) debajo.
-  List<Widget> _offerPriceLines(String amountText) {
-    final total = double.tryParse(amountText) ?? 0;
-    final hours =
-        double.tryParse(_request?['estimatedHours']?.toString() ?? '') ?? 0;
-    String bs(double v) =>
-        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
-    const big = TextStyle(
-      color: AppTheme.colorText,
-      fontSize: 18,
-      fontWeight: FontWeight.bold,
-    );
-    if (_request?['modality']?.toString() != 'hourly' || hours <= 0) {
-      return [Text('Bs ${bs(total)}', style: big)];
-    }
-    return [
-      Text('Bs ${bs(total / hours)}/h', style: big),
-      Text(
-        'Total Bs ${bs(total)}',
-        style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11.5),
-      ),
-    ];
-  }
-
   Widget _buildOfferItem(dynamic offerData) {
     final offer = offerData as Map<String, dynamic>;
     final worker = offer['worker'] as Map<String, dynamic>? ?? {};
@@ -1989,18 +1967,16 @@ class _RequestStatusScreenState extends State<RequestStatusScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              ..._offerPriceLines(amount),
-              // Si el trabajador trae los materiales, se ve cuánto es de
-              // materiales dentro del total.
-              if (((offer['materialsAmount'] as num?)?.toDouble() ?? 0) > 0)
-                Text(
-                  'incluye Bs ${(offer['materialsAmount'] as num).toStringAsFixed(0)} de materiales',
-                  style: const TextStyle(
-                    color: Color(0xFF854F0B),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              OfferPrice(
+                amount: double.tryParse(amount) ?? 0,
+                materials:
+                    (offer['materialsAmount'] as num?)?.toDouble() ?? 0,
+                hours: _request?['modality']?.toString() == 'hourly'
+                    ? double.tryParse(
+                            _request?['estimatedHours']?.toString() ?? '') ??
+                        0
+                    : 0,
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [

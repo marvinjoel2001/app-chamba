@@ -80,7 +80,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final _dailyRateController = TextEditingController();
   RecordedJobVideo? _video;
   MaterialsMode _materialsMode = MaterialsMode.client;
-  final _materialsNoteController = TextEditingController();
   String? _startDate;
   TimeOfDay? _startTime;
 
@@ -159,7 +158,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     _hourlyRateController.dispose();
     _daysController.dispose();
     _dailyRateController.dispose();
-    _materialsNoteController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -723,9 +721,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         dailyRate: dailyRate,
         startDate: _startDateForBackend,
         materialsMode: _materialsMode.code,
-        materialsNote: _materialsMode == MaterialsMode.worker
-            ? _materialsNoteController.text.trim()
-            : null,
         video: uploadedVideo,
       ))
           .fold(
@@ -936,7 +931,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           color: requestOrange,
           child: RequestMaterialsPicker(
             mode: _materialsMode,
-            noteController: _materialsNoteController,
             enabled: !_loading,
             onChanged: (mode) => setState(() => _materialsMode = mode),
           ),
