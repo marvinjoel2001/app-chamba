@@ -5,8 +5,13 @@ import '../../domain/entities/request_retry_draft.dart';
 import '../screens/request_form_screen.dart';
 
 class RetryCancelledRequestButton extends StatefulWidget {
-  const RetryCancelledRequestButton({required this.requestId, super.key});
+  const RetryCancelledRequestButton({
+    required this.requestId,
+    this.paymentStatus,
+    super.key,
+  });
   final String requestId;
+  final String? paymentStatus;
   @override
   State<RetryCancelledRequestButton> createState() =>
       _RetryCancelledRequestButtonState();
@@ -98,15 +103,48 @@ class _RetryCancelledRequestButtonState
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+  Widget build(BuildContext context) {
+    final status = widget.paymentStatus?.toLowerCase().trim() ?? '';
+    final hasPendingRefund = status == 'paid' || status == 'refund_pending';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           const Text('¿Todavía necesitas el trabajo?',
               style: TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           const Text(
               'Preparamos una nueva solicitud con los datos anteriores para que otro trabajador pueda tomarla. Revisa la ubicación y el pago antes de publicar.'),
+          if (hasPendingRefund) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 16, color: Color(0xFFD97706)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Nota: El pago de tu solicitud anterior está en proceso de reembolso.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           FilledButton.icon(
               onPressed: _loading ? null : _prepare,
@@ -119,6 +157,8 @@ class _RetryCancelledRequestButtonState
               label: Text(_loading
                   ? 'Preparando solicitud…'
                   : 'Buscar otro trabajador')),
-        ]),
-      );
+        ],
+      ),
+    );
+  }
 }

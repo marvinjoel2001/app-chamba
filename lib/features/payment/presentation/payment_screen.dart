@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_exceptions.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../support/presentation/screens/support_screen.dart';
 import '../domain/payment_checkout.dart';
 
 /// Pantalla genérica para pagos que se completan fuera de la app (QR del
@@ -372,6 +373,18 @@ class _DeadNotice extends StatelessWidget {
               key: const Key('payment-retry'),
               onPressed: busy ? null : onRetry,
               child: const Text('Generar un cobro nuevo'),
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SupportScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.support_agent_rounded, size: 18),
+              label: const Text('Contactar a soporte'),
             ),
           ],
         ),

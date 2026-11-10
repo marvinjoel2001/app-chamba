@@ -99,6 +99,8 @@ class SupportScreen extends StatefulWidget {
 class _SupportScreenState extends State<SupportScreen> {
   String? _disputeId;
   String? _selectedReason;
+  String? _disputeStatus;
+  String? _disputeResolution;
   List<dynamic> _activeDisputes = [];
   bool _isLoadingDisputes = true;
 
@@ -122,12 +124,47 @@ class _SupportScreenState extends State<SupportScreen> {
         setState(() {
           _activeDisputes = result['disputes'] ?? [];
           _isLoadingDisputes = false;
+          if (_disputeId != null && _disputeStatus == null) {
+            for (final d in _activeDisputes) {
+              if (d['id']?.toString() == _disputeId) {
+                _disputeStatus = d['status']?.toString();
+                _disputeResolution = d['resolution']?.toString();
+                break;
+              }
+            }
+          }
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() => _isLoadingDisputes = false);
       }
+    }
+  }
+
+  Future<void> _confirmAndSubmitReason(String reason) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Iniciar reporte a soporte?'),
+        content: Text(
+          'Se abrirá un caso con el motivo:\n\n"$reason"\n\nUn agente de soporte revisará la situación.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _submitReason(reason);
     }
   }
 
@@ -176,6 +213,8 @@ class _SupportScreenState extends State<SupportScreen> {
         backend: widget.backend,
         disputeId: _disputeId!,
         reason: _selectedReason ?? '',
+        status: _disputeStatus,
+        resolution: _disputeResolution,
       );
     }
 
@@ -214,6 +253,8 @@ class _SupportScreenState extends State<SupportScreen> {
                                 setState(() {
                                   _disputeId = d['id'].toString();
                                   _selectedReason = d['reason'].toString();
+                                  _disputeStatus = d['status']?.toString();
+                                  _disputeResolution = d['resolution']?.toString();
                                 });
                               },
                               title: Text(
@@ -311,7 +352,7 @@ class _SupportScreenState extends State<SupportScreen> {
                             ),
                       onTap: _selectedReason != null
                           ? null
-                          : () => _submitReason(r.title),
+                          : () => _confirmAndSubmitReason(r.title),
                     ),
                   ),
                 ),
@@ -330,10 +371,14 @@ class _SupportChatView extends StatefulWidget {
     required this.backend,
     required this.disputeId,
     required this.reason,
+    this.status,
+    this.resolution,
   });
 
   final String disputeId;
   final String reason;
+  final String? status;
+  final String? resolution;
   final MobileBackendService backend;
 
   @override
@@ -350,10 +395,14 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
   bool _sending = false;
   bool _isNearBottom = true;
   Timer? _pollTimer;
+  String? _disputeStatus;
+  String? _disputeResolution;
 
   @override
   void initState() {
     super.initState();
+    _disputeStatus = widget.status;
+    _disputeResolution = widget.resolution;
     RealtimeService.instance.on('dispute.message', _onDisputeMessage);
     RealtimeService.instance.reconnectCount.addListener(_onReconnect);
     _loadMessages();
@@ -481,6 +530,22 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
 
   Future<void> _loadMessages() async {
     try {
+      final user = SessionStore.currentUser;
+      if (user != null && _disputeStatus == null) {
+        try {
+          final disputesRes =
+              await widget.backend.getUserActiveDisputes(user.id);
+          final disputes = disputesRes['disputes'] as List<dynamic>? ?? [];
+          for (final d in disputes) {
+            if (d['id']?.toString() == widget.disputeId) {
+              _disputeStatus = d['status']?.toString();
+              _disputeResolution = d['resolution']?.toString();
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
       final result = await widget.backend.getDisputeMessages(
         disputeId: widget.disputeId,
         readBy: _readBy,
@@ -570,25 +635,73 @@ class _SupportChatViewState extends State<_SupportChatView> with RouteAware {
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          // Info banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: AppTheme.colorPrimary.withValues(alpha: 0.1),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline,
-                    color: AppTheme.colorPrimary, size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Un agente de soporte revisará tu caso pronto.',
-                    style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+          // Banner de resolución o info
+          if ((_disputeStatus == 'resolved' || widget.status == 'resolved') ||
+              (_disputeResolution != null && _disputeResolution!.isNotEmpty) ||
+              (widget.resolution != null && widget.resolution!.isNotEmpty)) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFFDCFCE7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF16A34A),
+                    size: 20,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Caso resuelto',
+                          style: TextStyle(
+                            color: Color(0xFF15803D),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if ((_disputeResolution ?? widget.resolution) != null &&
+                            (_disputeResolution ?? widget.resolution)!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            (_disputeResolution ?? widget.resolution)!,
+                            style: const TextStyle(
+                              color: Color(0xFF166534),
+                              fontSize: 12.5,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: AppTheme.colorPrimary.withValues(alpha: 0.1),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      color: AppTheme.colorPrimary, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Un agente de soporte revisará tu caso pronto.',
+                      style: TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // Messages
           Expanded(

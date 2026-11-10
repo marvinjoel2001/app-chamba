@@ -239,12 +239,12 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   ),
                 if (widget.forceToHomeAfterSave) ...[
                   const Text(
-                    'Paso 2 de 5',
+                    'Paso 1 de 3',
                     style: TextStyle(color: AppTheme.colorMuted),
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: 0.4,
+                    value: 1 / 3,
                     backgroundColor:
                         AppTheme.colorPrimary.withValues(alpha: 0.2),
                     color: AppTheme.colorPrimary,
@@ -268,6 +268,19 @@ class _SkillsSelectionScreenState extends State<SkillsSelectionScreen> {
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.colorMuted,
                       ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${selected.length}/5 seleccionados',
+                  style: TextStyle(
+                    color: selected.length > 5
+                        ? AppTheme.colorError
+                        : selected.isNotEmpty
+                            ? AppTheme.colorPrimary
+                            : AppTheme.colorMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Expanded(

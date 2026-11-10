@@ -396,15 +396,17 @@ class _WalletScreenState extends State<WalletScreen>
                                       size: 16,
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'Cada trabajo lo cobras directo al cliente',
-                                      style: TextStyle(
-                                        color: total > 0
-                                            ? const Color(0xFFBBF7D0)
-                                            : Colors.white
-                                                .withValues(alpha: 0.7),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+                                    Expanded(
+                                      child: Text(
+                                        'Efectivo: cobras al cliente · QR/Tarjeta: te liquida Chamba',
+                                        style: TextStyle(
+                                          color: total > 0
+                                              ? const Color(0xFFBBF7D0)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.7),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -431,7 +433,7 @@ class _WalletScreenState extends State<WalletScreen>
                                   onTap: () => ToastService.show(
                                       title: 'Importes de trabajos',
                                       body:
-                                          'No es un saldo para retirar: cada trabajo lo cobras directo al cliente.',
+                                          'Efectivo: cobras al cliente · QR/Tarjeta: te liquida Chamba',
                                       type: ToastType.info),
                                 ),
                               ),

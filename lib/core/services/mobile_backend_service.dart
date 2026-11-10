@@ -625,6 +625,21 @@ class MobileBackendService {
     );
   }
 
+  Future<Map<String, dynamic>> clientRejectArrival({
+    required String requestId,
+    required String clientUserId,
+    String? reason,
+  }) {
+    return _api.post(
+      '/mobile/tracking/client-reject-arrival',
+      body: {
+        'requestId': requestId,
+        'clientUserId': clientUserId,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> completeJob({
     required String requestId,
     required String workerUserId,
@@ -638,10 +653,15 @@ class MobileBackendService {
   Future<Map<String, dynamic>> cancelJob({
     required String requestId,
     required String userId,
+    String? reason,
   }) {
     return _api.post(
       '/mobile/tracking/cancel',
-      body: {'requestId': requestId, 'userId': userId},
+      body: {
+        'requestId': requestId,
+        'userId': userId,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
     );
   }
 
@@ -791,5 +811,17 @@ class MobileBackendService {
 
   Future<Map<String, dynamic>> paymentStatus(String paymentId) {
     return _api.get('/mobile/payments/$paymentId');
+  }
+
+  Future<List<Map<String, dynamic>>> getClientPayments() async {
+    final res = await _api.get('/mobile/payments');
+    final raw = res['data'] ?? res['payments'] ?? res['items'] ?? (res is List ? res : null);
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+    return [];
   }
 }

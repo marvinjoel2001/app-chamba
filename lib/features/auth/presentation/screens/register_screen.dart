@@ -191,7 +191,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           },
                           style: const TextStyle(color: AppTheme.colorText),
                           decoration: AppTheme.glassInputDecoration(
-                            labelText: 'Teléfono (opcional)',
+                            labelText: 'Número de celular',
                             icon: Icons.phone_android_outlined,
                           ),
                         ),

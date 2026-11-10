@@ -598,7 +598,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     final activeStatus = _activeRequest?['status']?.toString();
 
     // Trabajo asignado (en curso) → banner verde → TrackingScreen
-    if (activeStatus == 'assigned') {
+    if (activeStatus == 'assigned' || activeStatus == 'in_progress') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: GestureDetector(

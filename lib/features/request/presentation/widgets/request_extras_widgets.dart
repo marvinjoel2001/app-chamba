@@ -569,13 +569,17 @@ class OfferPrice extends StatelessWidget {
           ),
         ),
         if (withMaterials)
-          Text(hourly ? 'mano de obra, Bs ${_bs(labor)}' : 'mano de obra',
-              style: small)
+          Text(
+            hourly ? 'mano de obra, Bs ${_bs(labor)}' : 'mano de obra',
+            style: small,
+          )
         else if (hourly)
           Text('Total Bs ${_bs(amount)}', style: small),
         if (withMaterials) ...[
           const SizedBox(height: 4),
           MaterialsPill(amount: materials),
+          const SizedBox(height: 2),
+          Text('Total Bs ${_bs(amount)}', style: small),
         ],
       ],
     );

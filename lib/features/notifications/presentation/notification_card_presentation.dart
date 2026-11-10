@@ -26,7 +26,9 @@ class NotificationCardPresentation {
           NotificationCategory.messages,
         'verification_update' ||
         'dispute_created' ||
-        'dispute_resolved' =>
+        'dispute_resolved' ||
+        'payment_refund' ||
+        'payment' =>
           NotificationCategory.system,
         'offer_new' ||
         'counter_offer' ||
@@ -93,6 +95,9 @@ class NotificationCardPresentation {
     final hasRequest = ['requestId', 'jobId']
             .any((key) => data?[key]?.toString().trim().isNotEmpty ?? false) ||
         (data?['deep_link']?.toString().startsWith('/request/') ?? false);
+    if (notification.type == 'payment_refund') {
+      return 'Ver reembolso';
+    }
     if (categoryOf(notification.type) == NotificationCategory.messages) {
       return notification.type == 'support_message'
           ? 'Ver soporte'
@@ -116,12 +121,12 @@ class NotificationCardPresentation {
       'offer_client_counter' =>
         role == 'worker' ? 'Ver propuesta' : 'Ver ofertas',
       'agency_offer_sent' => 'Ver oferta',
+      'payment_refund' => 'Ver reembolso',
       'job_finished' ||
       'job_cancelled' ||
       'request_timeout' ||
       'request_closed' ||
       'offer_rejected' ||
-      'payment' ||
       'payment_received' =>
         'Ver resumen',
       _ => 'Ver trabajo',

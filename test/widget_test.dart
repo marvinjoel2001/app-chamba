@@ -186,7 +186,7 @@ void main() {
         'juan@test.com',
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Teléfono (opcional)'),
+        find.widgetWithText(TextFormField, 'Número de celular'),
         '70000000',
       );
       await tester.enterText(

@@ -15,6 +15,7 @@ import '../../../request/presentation/screens/job_in_progress_screen.dart';
 import '../../../tracking/presentation/screens/tracking_screen.dart';
 import '../../domain/entities/chat_thread.dart';
 import '../state/messages_dependencies.dart';
+import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen(
@@ -158,6 +159,30 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (mounted) _reload();
   }
 
+  Future<void> _openChat(ChatThread thread) async {
+    if (!thread.chatEnabled) return;
+    final isWorker = SessionStore.currentUser?.type == 'worker';
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatScreen(
+          threadId: thread.id,
+          jobId: thread.jobId,
+          jobTitle: thread.jobTitle,
+          jobStatus: thread.jobStatus,
+          agreedPrice: thread.agreedPrice,
+          counterpartName: thread.counterpartName,
+          counterpartId: isWorker ? thread.clientId : thread.workerId,
+          counterpartAvatarUrl: thread.counterpartProfilePhotoUrl,
+          counterpartPhone: thread.counterpartPhone,
+          category: thread.category,
+          workerId: thread.workerId,
+          isArchived: !thread.isActive,
+        ),
+      ),
+    );
+    if (mounted) _reload();
+  }
+
   @override
   Widget build(BuildContext context) => NotificationsScreen(
         isActive: widget.isActive,
@@ -171,6 +196,7 @@ class _MessagesScreenState extends State<MessagesScreen>
           onRefresh: _load,
           onNotification: (_) {},
           onThread: _openThread,
+          onChat: _openChat,
         ).conversations,
       );
 }
@@ -185,6 +211,7 @@ class MessagesInbox extends StatelessWidget {
       required this.onRefresh,
       required this.onNotification,
       required this.onThread,
+      this.onChat,
       this.onLoadMore,
       this.hasMore = false,
       this.loadingMore = false,
@@ -200,6 +227,7 @@ class MessagesInbox extends StatelessWidget {
   final VoidCallback? onLoadMore;
   final ValueChanged<AppNotification> onNotification;
   final ValueChanged<ChatThread> onThread;
+  final ValueChanged<ChatThread>? onChat;
   static const _ink = AppTheme.colorText, _muted = AppTheme.colorMuted;
 
   /// Shared conversation section inside the visual notification center.
@@ -483,7 +511,13 @@ class MessagesInbox extends StatelessWidget {
               label: Text(
                   thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}'),
               backgroundColor: AppTheme.colorPrimary),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: 'Chatear',
+          icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+          color: AppTheme.colorPrimary,
+          onPressed: onChat != null ? () => onChat!(thread) : () => onThread(thread),
+        ),
         Icon(
             thread.isActive
                 ? Icons.chevron_right_rounded

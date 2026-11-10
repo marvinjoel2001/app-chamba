@@ -19,6 +19,7 @@ import 'skills_selection_screen.dart';
 import 'work_modalities_screen.dart';
 import 'worker_portfolio_screen.dart';
 import '../../../history/presentation/screens/job_history_screen.dart';
+import '../../../payment/presentation/client_payments_screen.dart';
 import 'verification_checkpoint_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../../core/services/mobile_backend_service.dart';
@@ -536,8 +537,8 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
               ),
               if (_isWorker) ...[
                 _NavTile(
-                  title: 'Mis trabajos',
-                  subtitle: 'Fotos de trabajos realizados',
+                  title: 'Mi portafolio de fotos',
+                  subtitle: 'Fotos de trabajos que realizaste',
                   icon: Icons.photo_library_outlined,
                   onTap: () {
                     Navigator.of(context).push(
@@ -550,7 +551,7 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                 _NavTile(
                   title: 'Historial de trabajos',
                   subtitle: 'Trabajos cerrados, chat y detalles',
-                  icon: Icons.payments_outlined,
+                  icon: Icons.history_rounded,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -605,6 +606,18 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const JobHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _NavTile(
+                  title: 'Pagos y reembolsos',
+                  subtitle: 'Estado de tus pagos por QR/tarjeta y devoluciones',
+                  icon: Icons.currency_exchange_rounded,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ClientPaymentsScreen(),
                       ),
                     );
                   },

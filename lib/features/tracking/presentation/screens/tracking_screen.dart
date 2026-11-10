@@ -11,6 +11,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
+import '../../../../core/services/mobile_backend_service.dart';
 import '../../../../core/services/sound_effect_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/job_schedule_format.dart';
@@ -318,7 +319,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  Future<void> _cancelJob() async {
+  Future<void> _rejectWorkerArrival() async {
     final user = SessionStore.currentUser;
     final requestId = _requestId;
     if (user == null || requestId == null) return;
@@ -327,18 +328,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.colorBackgroundAccent,
-        title: const Text('Cancelar trabajo'),
-        content: const Text('¿Estás seguro de que deseas cancelar?'),
+        title: const Text('¿El trabajador aún no llegó?'),
+        content: const Text(
+          'Le avisaremos al trabajador que todavía no lo ves en el punto de encuentro.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
+            child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
-              'Sí, cancelar',
-              style: TextStyle(color: AppTheme.colorError),
+              'Avisar al trabajador',
+              style: TextStyle(color: AppTheme.colorWarning),
             ),
           ),
         ],
@@ -347,23 +350,155 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (confirmed != true) return;
 
     try {
-      (await TrackingDependencies.cancelJob(
+      await MobileBackendService.instance.clientRejectArrival(
+        requestId: requestId,
+        clientUserId: user.id,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    _load();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Avisamos al trabajador que aún no lo ves en el punto.'),
+      ),
+    );
+  }
+
+  Future<void> _cancelJob() async {
+    final user = SessionStore.currentUser;
+    final requestId = _requestId;
+    if (user == null || requestId == null) return;
+
+    final isDigitalPayment = _tracking?['isDigitalPayment'] == true ||
+        _tracking?['paymentStatus'] == 'paid';
+
+    String? selectedReason;
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: AppTheme.colorBackgroundAccent,
+          title: const Text('Cancelar trabajo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '¿Estás seguro de que deseas cancelar este trabajo?',
+                  style: TextStyle(color: AppTheme.colorText, fontSize: 14),
+                ),
+                if (isDigitalPayment) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF065F46).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF059669).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('💡 ', style: TextStyle(fontSize: 14)),
+                        Expanded(
+                          child: Text(
+                            'Tu pago realizado en la app pasará automáticamente a proceso de reembolso.',
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const Text(
+                  'Motivo de cancelación (opcional):',
+                  style: TextStyle(
+                    color: AppTheme.colorMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 2,
+                  style: const TextStyle(color: AppTheme.colorText, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Explica el motivo (opcional)...',
+                    hintStyle:
+                        const TextStyle(color: AppTheme.colorMuted, fontSize: 12),
+                    filled: true,
+                    fillColor: AppTheme.colorSurfaceSoft,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: AppTheme.colorGlassBorderSoft),
+                    ),
+                  ),
+                  onChanged: (val) => selectedReason = val.trim(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text(
+                'Sí, cancelar',
+                style: TextStyle(color: AppTheme.colorError),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final finalReason = selectedReason?.isNotEmpty == true
+        ? selectedReason
+        : reasonController.text.trim();
+
+    try {
+      // Cliente autenticado (token) y con motivo; si falla, lanza y se
+      // muestra el error en vez de simular una cancelación exitosa.
+      await MobileBackendService.instance.cancelJob(
         requestId: requestId,
         userId: user.id,
-      ))
-          .fold(
-        onSuccess: (value) => value,
-        onFailure: (failure) => throw Exception(failure.message),
+        reason: finalReason,
       );
       if (!mounted) return;
       // Limpiar sesión del cliente
       SessionStore.clearActiveJob(requestId: _requestId);
-      // Volver al inicio usando AppFlows para evitar doble pop (y pantalla negra) al recibir el socket
+      // Volver al inicio o a RequestOutcomeScreen para ver reembolso
       AppFlows.goHomeAfterCancellation(
-          requestId: _requestId,
-          showNotice: true,
-          message: 'Trabajo cancelado exitosamente',
-          offerRetry: false);
+        requestId: _requestId,
+        showNotice: true,
+        message: 'Trabajo cancelado exitosamente',
+        offerRetry: true,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -952,13 +1087,37 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                   Expanded(
                                     flex: 3,
                                     child: workerArrived && !clientConfirmed
-                                        ? ChambaPrimaryButton(
-                                            label: 'CONFIRMAR LLEGADA',
-                                            icon: Icons.where_to_vote,
-                                            isYellow: true,
-                                            onPressed: _confirmingArrival
-                                                ? null
-                                                : _confirmArrival,
+                                        ? Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ChambaPrimaryButton(
+                                                label: 'CONFIRMAR LLEGADA',
+                                                icon: Icons.where_to_vote,
+                                                isYellow: true,
+                                                onPressed: _confirmingArrival
+                                                    ? null
+                                                    : _confirmArrival,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              TextButton.icon(
+                                                onPressed: _confirmingArrival
+                                                    ? null
+                                                    : _rejectWorkerArrival,
+                                                icon: const Icon(
+                                                  Icons.help_outline,
+                                                  size: 16,
+                                                  color: AppTheme.colorMuted,
+                                                ),
+                                                label: const Text(
+                                                  'El trabajador aún no está aquí',
+                                                  style: TextStyle(
+                                                    color: AppTheme.colorMuted,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           )
                                         : _ArrivalStatusBanner(
                                             confirmed: clientConfirmed,

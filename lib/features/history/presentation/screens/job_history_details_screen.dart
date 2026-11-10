@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../messages/domain/entities/chat_thread.dart';
 import '../../../messages/presentation/screens/chat_screen.dart';
+import '../../../payment/presentation/client_payments_screen.dart';
 import '../../../review/presentation/screens/rating_screen.dart';
 import '../../../request/presentation/widgets/retry_cancelled_request_button.dart';
 
@@ -30,8 +31,14 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     final category = (job['category'] as String?)?.trim() ?? 'General';
     final requestStatus =
         (job['requestStatus'] as String?)?.toLowerCase().trim() ?? '';
-    final amount = job['amount'] != null
-        ? NumberFormat.currency(symbol: 'Bs ').format(job['amount'])
+    final paymentStatus =
+        (job['paymentStatus'] as String?)?.toLowerCase().trim() ?? '';
+    final paidAmount = job['paidAmount'] ?? job['amount'];
+    final refundNote = (job['refundNote'] as String?)?.trim();
+    final cancelReason = (job['cancelReason'] as String?)?.trim();
+    final cancelledByRole = (job['cancelledByRole'] as String?)?.trim();
+    final amount = paidAmount != null
+        ? NumberFormat.currency(symbol: 'Bs ').format(paidAmount)
         : 'N/A';
 
     final isCompleted = requestStatus == 'completed';
@@ -109,7 +116,7 @@ class JobHistoryDetailsScreen extends StatelessWidget {
     }
 
     // Payment status & badge
-    final isPaid = job['paymentStatus'] == 'paid' || job['paid'] == true;
+    final isPaid = paymentStatus == 'paid' || job['paid'] == true;
 
     // Counterpart (Worker / Client)
     final otherUser = isClient ? job['worker'] : job['client'];
@@ -273,7 +280,10 @@ class JobHistoryDetailsScreen extends StatelessWidget {
           children: [
             // 1. Tarjeta Resumen / Encabezado
             if (isClient && isCancelled && (customRequestId ?? job['requestId']) != null)
-              RetryCancelledRequestButton(requestId: (customRequestId ?? job['requestId']).toString()),
+              RetryCancelledRequestButton(
+                requestId: (customRequestId ?? job['requestId']).toString(),
+                paymentStatus: paymentStatus,
+              ),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: _cardDecoration(),
@@ -367,6 +377,21 @@ class JobHistoryDetailsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            // Tarjeta destacada de Estado de Reembolso
+            if (isCancelled &&
+                (paymentStatus == 'refund_pending' ||
+                    paymentStatus == 'paid' ||
+                    paymentStatus == 'refunded' ||
+                    paymentStatus == 'refund_declined')) ...[
+              _buildRefundHighlightCard(
+                context,
+                paymentStatus: paymentStatus,
+                refundNote: refundNote,
+                isClient: isClient,
+              ),
+              const SizedBox(height: 12),
+            ],
+
             // 2. Fecha y hora
             Container(
               padding: const EdgeInsets.all(16),
@@ -443,52 +468,72 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                     ],
                   ),
                   const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: isPaid
-                          ? const Color(0xFFDCFCE7)
-                          : isCancelled
-                              ? const Color(0xFFFEE2E2)
-                              : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPaid
-                              ? Icons.check_circle_rounded
-                              : isCancelled
-                                  ? Icons.cancel_rounded
-                                  : Icons.schedule_rounded,
-                          size: 14,
-                          color: isPaid
-                              ? const Color(0xFF16A34A)
-                              : isCancelled
-                                  ? const Color(0xFFDC2626)
-                                  : const Color(0xFFD97706),
+                  Builder(
+                    builder: (context) {
+                      final isRefunded = paymentStatus == 'refunded';
+                      final isPendingRefund = isCancelled &&
+                          (paymentStatus == 'refund_pending' || paymentStatus == 'paid');
+
+                      Color amountBadgeBg;
+                      Color amountBadgeText;
+                      IconData amountBadgeIcon;
+                      String amountBadgeLabel;
+
+                      if (isRefunded) {
+                        amountBadgeBg = const Color(0xFFDCFCE7);
+                        amountBadgeText = const Color(0xFF16A34A);
+                        amountBadgeIcon = Icons.check_circle_rounded;
+                        amountBadgeLabel = 'Reembolsado';
+                      } else if (isPendingRefund) {
+                        amountBadgeBg = const Color(0xFFFEF3C7);
+                        amountBadgeText = const Color(0xFFD97706);
+                        amountBadgeIcon = Icons.currency_exchange_rounded;
+                        amountBadgeLabel = 'En reembolso';
+                      } else if (isPaid) {
+                        amountBadgeBg = const Color(0xFFDCFCE7);
+                        amountBadgeText = const Color(0xFF16A34A);
+                        amountBadgeIcon = Icons.check_circle_rounded;
+                        amountBadgeLabel = 'Pagado';
+                      } else if (isCancelled) {
+                        amountBadgeBg = const Color(0xFFFEE2E2);
+                        amountBadgeText = const Color(0xFFDC2626);
+                        amountBadgeIcon = Icons.cancel_rounded;
+                        amountBadgeLabel = 'Cancelado';
+                      } else {
+                        amountBadgeBg = const Color(0xFFFEF3C7);
+                        amountBadgeText = const Color(0xFFD97706);
+                        amountBadgeIcon = Icons.schedule_rounded;
+                        amountBadgeLabel = 'Sin confirmar';
+                      }
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: amountBadgeBg,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isPaid
-                              ? 'Pagado'
-                              : isCancelled
-                                  ? 'Cancelado'
-                                  : 'Sin confirmar',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isPaid
-                                ? const Color(0xFF16A34A)
-                                : isCancelled
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFFD97706),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              amountBadgeIcon,
+                              size: 14,
+                              color: amountBadgeText,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              amountBadgeLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: amountBadgeText,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -722,6 +767,32 @@ class JobHistoryDetailsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (isCancelled &&
+                      cancelReason != null &&
+                      cancelReason.isNotEmpty) ...[
+                    const Divider(
+                        height: 24, thickness: 1, color: Color(0xFFF1F5F9)),
+                    _buildDetailItem(
+                      icon: Icons.person_off_rounded,
+                      iconColor: const Color(0xFFDC2626),
+                      iconBg: const Color(0xFFFEE2E2),
+                      label: 'Cancelado por',
+                      value: cancelledByRole == 'worker'
+                          ? 'Trabajador'
+                          : cancelledByRole == 'client'
+                              ? 'Cliente'
+                              : 'Sistema/Soporte',
+                    ),
+                    const Divider(
+                        height: 24, thickness: 1, color: Color(0xFFF1F5F9)),
+                    _buildDetailItem(
+                      icon: Icons.cancel_outlined,
+                      iconColor: const Color(0xFFDC2626),
+                      iconBg: const Color(0xFFFEE2E2),
+                      label: 'Motivo de cancelación',
+                      value: cancelReason,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -981,6 +1052,193 @@ class JobHistoryDetailsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  static Widget _buildRefundHighlightCard(
+    BuildContext context, {
+    required String paymentStatus,
+    required String? refundNote,
+    required bool isClient,
+  }) {
+    if (paymentStatus == 'refunded') {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFDCFCE7),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF86EFAC)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF16A34A),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Reembolso completado',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF15803D),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Te devolvimos el pago de este trabajo.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF166534),
+                      height: 1.35,
+                    ),
+                  ),
+                  if (refundNote != null && refundNote.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Referencia: $refundNote',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF166534),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (paymentStatus == 'refund_declined') {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.cancel_rounded,
+              color: Color(0xFFDC2626),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Reembolso rechazado',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    refundNote != null && refundNote.isNotEmpty
+                        ? 'Detalle: $refundNote'
+                        : 'La solicitud de reembolso no pudo procesarse.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF991B1B),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // refund_pending o paid
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.currency_exchange_rounded,
+                color: Color(0xFFD97706),
+                size: 24,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reembolso en proceso',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Tu pago está seguro. Como el trabajo se canceló, estamos procesando tu devolución y te avisaremos cuando esté lista.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF92400E),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (isClient) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ClientPaymentsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.arrow_forward_rounded,
+                    size: 16, color: Color(0xFFB45309)),
+                label: const Text(
+                  'Ver mis reembolsos',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

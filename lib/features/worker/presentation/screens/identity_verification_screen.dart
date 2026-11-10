@@ -26,6 +26,15 @@ class _IdentityVerificationScreenState
   int _currentStep = 1; // 1: Carnet, 2: Rostro
 
   @override
+  void initState() {
+    super.initState();
+    final user = SessionStore.currentUser;
+    if (user?.idPhotoVerified == true && user?.facePhotoVerified != true) {
+      _currentStep = 2;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: ChambaBackground(
@@ -81,6 +90,14 @@ class _IdentityVerificationScreenState
                   ],
                 ),
                 const SizedBox(height: 16),
+                const Text(
+                  'Paso 3 de 3 · Verificación',
+                  style: TextStyle(
+                    color: AppTheme.colorPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(
                   'Paso $_currentStep de 2',
                   style: Theme.of(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/navigation/app_flows.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -172,8 +173,13 @@ class _RatingScreenState extends State<RatingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: ChambaBackground(
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) AppFlows.goHome();
+      },
+      child: Scaffold(
+        body: ChambaBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -307,6 +313,7 @@ class _RatingScreenState extends State<RatingScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

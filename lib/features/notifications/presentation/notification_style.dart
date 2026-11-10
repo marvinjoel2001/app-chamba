@@ -14,6 +14,7 @@ class NotificationStyle {
   static const _violet = AppTheme.colorPrimary;
   static const _blue = Color(0xFF2563EB);
   static const _green = Color(0xFF16A34A);
+  static const _emerald = Color(0xFF059669);
   static const _amber = Color(0xFFD97706);
   static const _red = Color(0xFFE5484D);
   static const _teal = Color(0xFF0D9488);
@@ -35,6 +36,13 @@ class NotificationStyle {
           const NotificationStyle(Icons.work_outline_rounded, _amber),
         'request_timeout' =>
           const NotificationStyle(Icons.timer_off_rounded, _red),
+        'request_closed' =>
+          const NotificationStyle(Icons.cancel_outlined, _red),
+        'improve_offer_reminder' =>
+          const NotificationStyle(Icons.trending_up_rounded, _amber),
+        'agency_link_invite' ||
+        'agency_offer_sent' =>
+          const NotificationStyle(Icons.business_center_rounded, _blue),
         'job_starting_soon' =>
           const NotificationStyle(Icons.event_available_rounded, _blue),
         'worker_arrived' =>
@@ -50,8 +58,10 @@ class NotificationStyle {
           const NotificationStyle(Icons.gavel_rounded, _teal),
         'verification_update' =>
           const NotificationStyle(Icons.badge_rounded, _violet),
-        'payment_received' ||
-        'payment' =>
+        'payment' ||
+        'payment_refund' =>
+          const NotificationStyle(Icons.currency_exchange_rounded, _emerald),
+        'payment_received' =>
           const NotificationStyle(Icons.payments_rounded, _green),
         'message_new' ||
         'chat_message' =>

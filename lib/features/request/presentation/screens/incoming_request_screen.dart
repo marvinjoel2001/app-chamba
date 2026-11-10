@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/services/mobile_backend_service.dart';
+import '../../../../core/services/toast_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/services/new_request_alert.dart';
 import '../../../../core/services/volume_service.dart';
@@ -671,6 +672,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
       return;
     }
     if (mounted) {
+      ToastService.show(
+        title: '¡Presupuesto mejorado!',
+        body: 'El cliente subió el presupuesto de la solicitud.',
+        type: ToastType.info,
+      );
       setState(() {
         final currentIdx =
             _requests.indexWhere((r) => r['id']?.toString() == eventRequestId);
@@ -2053,6 +2059,28 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                               : AppTheme.colorPrimary,
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Esperando respuesta del cliente',
+                          style: TextStyle(
+                            color: AppTheme.colorMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (secondsRemaining != null && secondsRemaining > 0)
+                          Text(
+                            'Tiempo restante: ${secondsRemaining}s',
+                            style: const TextStyle(
+                              color: AppTheme.colorPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               )
@@ -2135,7 +2163,11 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     child: FilledButton(
                       onPressed: () =>
                           _acceptBudget(req['id'].toString(), currentBudget),
-                      child: const Text('Aceptar trabajo'),
+                      child: Text(
+                        req['materialsMode'] == 'worker'
+                            ? 'Cotizar con materiales'
+                            : 'Aceptar trabajo',
+                      ),
                     ),
                   ),
                 ],

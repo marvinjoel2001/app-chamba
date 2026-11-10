@@ -197,12 +197,12 @@ class _WorkModalitiesScreenState extends State<WorkModalitiesScreen> {
                 const SizedBox(height: 10),
                 if (widget.forceToHomeAfterSave) ...[
                   const Text(
-                    'Paso 3 de 5',
+                    'Paso 2 de 3',
                     style: TextStyle(color: AppTheme.colorMuted),
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: 0.6,
+                    value: 2 / 3,
                     backgroundColor:
                         AppTheme.colorPrimary.withValues(alpha: 0.2),
                     color: AppTheme.colorPrimary,

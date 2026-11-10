@@ -13,6 +13,8 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/network/realtime_service.dart';
 import '../../../../core/session/session_store.dart';
 import '../../../../core/session/unread_messages_notifier.dart';
+import '../../../../core/services/mobile_backend_service.dart';
+import '../../../../core/services/toast_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/job_schedule_format.dart';
 import '../../../../core/widgets/chamba_widgets.dart';
@@ -60,6 +62,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   void initState() {
     super.initState();
     _realtime.on('job.client_confirmed', _onClientConfirmed);
+    _realtime.on('job.arrival_rejected', _onArrivalRejected);
     _realtime.on('job.clock.updated', _onClientConfirmed);
     _realtime.on('job.completed', _onJobCompleted);
     _realtime.on('job.cancelled', _onJobCancelled);
@@ -82,6 +85,7 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   void dispose() {
     _realtime.reconnectCount.removeListener(_onReconnect);
     _realtime.off('job.client_confirmed', _onClientConfirmed);
+    _realtime.off('job.arrival_rejected', _onArrivalRejected);
     _realtime.off('job.clock.updated', _onClientConfirmed);
     _realtime.off('job.completed', _onJobCompleted);
     _realtime.off('job.cancelled', _onJobCancelled);
@@ -92,6 +96,9 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
 
   Future<void> _updateDeviceLocation() async {
     try {
+      if (isJobForLaterDay(_tracking?['startDate'])) {
+        return;
+      }
       final isEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isEnabled) return;
 
@@ -149,12 +156,36 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     _load();
   }
 
+  void _onArrivalRejected(dynamic payload) {
+    if (payload is Map && payload['requestId'] != widget.requestId) return;
+    ToastService.show(
+      title: 'Llegada no confirmada',
+      body:
+          'El cliente indicó que aún no te ve en el punto de encuentro. Acércate a la ubicación y vuelve a marcar tu llegada.',
+      type: ToastType.error,
+    );
+    _load();
+  }
+
   void _onJobCompleted(dynamic payload) {
     if (payload is Map && payload['requestId'] != (widget.requestId)) return;
     if (mounted && !_endHandled) {
       _endHandled = true;
       // Limpiar sesión del trabajo activo
       SessionStore.clearActiveJob(requestId: widget.requestId);
+
+      final isDigitalPayment = _tracking?['isDigitalPayment'] == true ||
+          _tracking?['paymentStatus'] == 'paid';
+      final paymentMethodLabel =
+          (_tracking?['paymentMethod'] as String?)?.trim() ?? 'Efectivo';
+      final totalAmount = (_tracking?['finalAmount'] ??
+              _tracking?['totalAmount'] ??
+              _tracking?['agreedAmount'] ??
+              _tracking?['amount'] as num?)
+          ?.toDouble();
+      final amountText = totalAmount != null
+          ? 'Bs ${totalAmount.toStringAsFixed(0)}'
+          : 'el monto acordado';
 
       showDialog<void>(
         context: context,
@@ -165,9 +196,43 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
             '¡Trabajo completado!',
             style: TextStyle(color: AppTheme.colorSuccess),
           ),
-          content: const Text(
-            'El trabajo ha sido marcado como completado. ¡Buen trabajo!',
-            style: TextStyle(color: AppTheme.colorMuted),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'El trabajo ha sido marcado como completado. ¡Buen trabajo!',
+                style: TextStyle(color: AppTheme.colorMuted),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDigitalPayment
+                      ? const Color(0xFF065F46).withValues(alpha: 0.15)
+                      : const Color(0xFFD97706).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDigitalPayment
+                        ? const Color(0xFF059669).withValues(alpha: 0.3)
+                        : const Color(0xFFD97706).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  isDigitalPayment
+                      ? '✅ El cliente ya pagó por $paymentMethodLabel en la app ($amountText). NO le cobres en efectivo; Chamba acreditará tu pago.'
+                      : '💵 Cobra $amountText en efectivo directamente al cliente.',
+                  style: TextStyle(
+                    color: isDigitalPayment
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -198,8 +263,15 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     if (mounted && !_endHandled) {
       _endHandled = true;
       SessionStore.clearActiveJob(requestId: widget.requestId);
-      // El aviso visual lo muestra IncomingRequestScreen (siempre montada en
-      // el shell del worker); aquí solo volvemos al inicio para no duplicar.
+      final cancelReason =
+          payload is Map ? payload['reason']?.toString() : null;
+      ToastService.show(
+        title: 'Trabajo cancelado',
+        body: cancelReason != null && cancelReason.trim().isNotEmpty
+            ? 'El cliente canceló la solicitud: $cancelReason'
+            : 'El cliente canceló la solicitud.',
+        type: ToastType.info,
+      );
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
@@ -250,7 +322,8 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
             (workerLat != null && workerLng != null
                 ? LatLng(workerLat, workerLng)
                 : null);
-        if (workerPos != null && destLat != null && destLng != null) {
+        final scheduledLater = isJobForLaterDay(_tracking?['startDate']);
+        if (!scheduledLater && workerPos != null && destLat != null && destLng != null) {
           final destPos = LatLng(destLat, destLng);
           if (_lastRouteFetchPos == null ||
               (workerPos.latitude - _lastRouteFetchPos!.latitude).abs() >
@@ -474,6 +547,19 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
       if (_endHandled) return;
       _endHandled = true;
 
+      final isDigitalPayment = _tracking?['isDigitalPayment'] == true ||
+          _tracking?['paymentStatus'] == 'paid';
+      final paymentMethodLabel =
+          (_tracking?['paymentMethod'] as String?)?.trim() ?? 'Efectivo';
+      final totalAmount = (_tracking?['finalAmount'] ??
+              _tracking?['totalAmount'] ??
+              _tracking?['agreedAmount'] ??
+              _tracking?['amount'] as num?)
+          ?.toDouble();
+      final amountText = totalAmount != null
+          ? 'Bs ${totalAmount.toStringAsFixed(0)}'
+          : 'el monto acordado';
+
       showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -483,9 +569,43 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
             '¡Trabajo completado!',
             style: TextStyle(color: AppTheme.colorSuccess),
           ),
-          content: const Text(
-            '¡Excelente trabajo!',
-            style: TextStyle(color: AppTheme.colorMuted),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '¡Excelente trabajo!',
+                style: TextStyle(color: AppTheme.colorMuted),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDigitalPayment
+                      ? const Color(0xFF065F46).withValues(alpha: 0.15)
+                      : const Color(0xFFD97706).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDigitalPayment
+                        ? const Color(0xFF059669).withValues(alpha: 0.3)
+                        : const Color(0xFFD97706).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  isDigitalPayment
+                      ? '✅ El cliente ya pagó por $paymentMethodLabel en la app ($amountText). NO le cobres en efectivo; Chamba acreditará tu pago.'
+                      : '💵 Cobra $amountText en efectivo directamente al cliente.',
+                  style: TextStyle(
+                    color: isDigitalPayment
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -575,38 +695,176 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
   Future<void> _cancelJob() async {
     final user = SessionStore.currentUser;
     if (user == null) return;
-    final confirmed = await showDialog<bool>(
+
+    final reasons = [
+      'Tuve una emergencia o imprevisto personal',
+      'El cliente no responde o la dirección es incorrecta',
+      'El trabajo en el sitio es distinto a lo acordado',
+      'Problema con mi transporte o herramientas',
+      'Otro motivo',
+    ];
+
+    String? selectedReason;
+    final detailController = TextEditingController();
+
+    final confirmedReason = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.colorBackgroundAccent,
-        title: const Text('Cancelar trabajo'),
-        content: const Text(
-          '¿Estás seguro de que deseas cancelar este trabajo?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Sí, cancelar',
-              style: TextStyle(color: AppTheme.colorError),
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final isOther = selectedReason == 'Otro motivo';
+          final canConfirm = selectedReason != null &&
+              (!isOther || detailController.text.trim().isNotEmpty);
+
+          return AlertDialog(
+            backgroundColor: AppTheme.colorBackgroundAccent,
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppTheme.colorWarning, size: 26),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '¿Seguro que deseas cancelar este trabajo?',
+                    style: TextStyle(
+                      color: AppTheme.colorText,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.colorWarning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.colorWarning.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Text(
+                      '⚠️ Atención: Esta cancelación quedará registrada en el historial de la solicitud, será analizada por Chamba y podría afectar tu calificación y visibilidad para recibir nuevos trabajos.',
+                      style: TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Selecciona el motivo:',
+                    style: TextStyle(
+                      color: AppTheme.colorText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final r in reasons)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => setStateDialog(() => selectedReason = r),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              selectedReason == r
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_off_rounded,
+                              size: 20,
+                              color: selectedReason == r
+                                  ? AppTheme.colorError
+                                  : AppTheme.colorMuted,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                r,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.colorText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (selectedReason != null) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: detailController,
+                      maxLines: 2,
+                      style: const TextStyle(color: AppTheme.colorText, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: isOther
+                            ? 'Explica el motivo (obligatorio)...'
+                            : 'Detalle adicional (opcional)...',
+                        hintStyle: const TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.colorSurfaceSoft,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: AppTheme.colorGlassBorderSoft,
+                          ),
+                        ),
+                      ),
+                      onChanged: (_) => setStateDialog(() {}),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Volver'),
+              ),
+              FilledButton(
+                onPressed: canConfirm
+                    ? () {
+                        final detail = detailController.text.trim();
+                        final finalReason = isOther
+                            ? detail
+                            : (detail.isNotEmpty
+                                ? '$selectedReason: $detail'
+                                : selectedReason!);
+                        Navigator.pop(dialogCtx, finalReason);
+                      }
+                    : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.colorError,
+                  disabledBackgroundColor: AppTheme.colorSurfaceSoft,
+                ),
+                child: const Text('Confirmar cancelación'),
+              ),
+            ],
+          );
+        },
       ),
     );
-    if (confirmed != true) return;
+
+    if (confirmedReason == null) return;
+
     try {
-      (await RequestDependencies.cancelJob(
+      // Petición autenticada con el motivo; si el backend la rechaza se
+      // muestra el error y el trabajo NO se da por cancelado localmente.
+      await MobileBackendService.instance.cancelJob(
         requestId: widget.requestId,
         userId: user.id,
-      ))
-          .fold(
-        onSuccess: (value) => value,
-        onFailure: (failure) => throw Exception(failure.message),
+        reason: confirmedReason,
       );
       if (!mounted) return;
       SessionStore.clearActiveJob(requestId: widget.requestId);
@@ -664,6 +922,10 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
     final totalAmount = (amount as num?)?.toDouble();
     final materialsAmount =
         (_tracking?['materialsAmount'] as num?)?.toDouble() ?? 0;
+    final isDigitalPayment = _tracking?['isDigitalPayment'] == true ||
+        _tracking?['paymentStatus'] == 'paid';
+    final paymentMethodLabel =
+        (_tracking?['paymentMethod'] as String?)?.trim() ?? 'Efectivo';
 
     final workerLat = (_tracking?['worker']?['latitude'] as num?)?.toDouble();
     final workerLng = (_tracking?['worker']?['longitude'] as num?)?.toDouble();
@@ -1144,6 +1406,53 @@ class _JobInProgressScreenState extends State<JobInProgressScreen> {
                                       days: days,
                                     ),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDigitalPayment
+                                      ? const Color(0xFF065F46).withValues(alpha: 0.12)
+                                      : const Color(0xFFD97706).withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDigitalPayment
+                                        ? const Color(0xFF059669).withValues(alpha: 0.3)
+                                        : const Color(0xFFD97706).withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isDigitalPayment
+                                          ? Icons.verified_rounded
+                                          : Icons.payments_outlined,
+                                      size: 18,
+                                      color: isDigitalPayment
+                                          ? const Color(0xFF059669)
+                                          : const Color(0xFFD97706),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        isDigitalPayment
+                                            ? 'PAGADO EN LA APP ($paymentMethodLabel) · No cobrar en efectivo al cliente'
+                                            : 'COBRO EN EFECTIVO · Cobrar directo al cliente al terminar',
+                                        style: TextStyle(
+                                          color: isDigitalPayment
+                                              ? const Color(0xFF059669)
+                                              : const Color(0xFFB45309),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Text(
