@@ -84,6 +84,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   String? _selectedModality; // 'hourly', 'daily', 'full'
 
   final Set<String> _notifiedAcceptedRequests = {};
+  final Set<String> _pendingDismissIds = {};
 
   /// Trabajos asignados para otro día (agenda). No bloquean la lista.
   List<Map<String, dynamic>> _scheduledJobs = [];
@@ -156,6 +157,134 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     }
     return 'Bs. ${bs(budget)}';
   }
+
+  /// Pestaña de la hoja: `false` = trabajos para hoy, `true` = programados
+  /// para otros días.
+  bool _showLater = false;
+
+  /// Día en que el cliente quiere que empiece el trabajo (sin hora), o null
+  /// si no puso fecha.
+  static DateTime? _startDay(Map<String, dynamic> req) {
+    final parsed = DateTime.tryParse(req['startDate']?.toString().trim() ?? '');
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  /// Programado: empieza mañana o después. Sin fecha, o con fecha de hoy o
+  /// ya pasada, es un trabajo para hoy.
+  static bool _isForLater(Map<String, dynamic> req) {
+    final day = _startDay(req);
+    if (day == null) return false;
+    final now = DateTime.now();
+    return day.isAfter(DateTime(now.year, now.month, now.day));
+  }
+
+  /// Solicitudes de una pestaña, con los filtros de categoría y modalidad.
+  /// Las de hoy conservan el orden del servidor (más cerca primero); las
+  /// programadas van por fecha, la más próxima arriba.
+  List<Map<String, dynamic>> _requestsFor({required bool later}) {
+    final list = _requests.where((req) {
+      if (_isForLater(req) != later) return false;
+      if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
+        if (_categoryKey(req['category']?.toString()) !=
+            _categoryKey(_selectedCategory)) {
+          return false;
+        }
+      }
+      final mod = req['modality']?.toString();
+      if (_selectedModality == 'hourly' && mod != 'hourly') return false;
+      if (_selectedModality == 'daily' && mod != 'daily') return false;
+      if (_selectedModality == 'full' && mod != 'fixed') return false;
+      return true;
+    }).toList();
+    if (later) {
+      // Orden estable: a igual día se mantiene el orden del servidor.
+      final order = {for (var i = 0; i < list.length; i++) list[i]: i};
+      list.sort((a, b) {
+        final byDay = _startDay(a)!.compareTo(_startDay(b)!);
+        return byDay != 0 ? byDay : order[a]!.compareTo(order[b]!);
+      });
+    }
+    return list;
+  }
+
+  /// La pestaña elegida no tiene solicitudes, pero la otra puede que sí.
+  Widget _buildTabEmpty() {
+    final other = _requestsFor(later: !_showLater).length;
+    final String title;
+    final String body;
+    if (_showLater) {
+      title = 'No hay trabajos programados';
+      body =
+          'Aquí verás ofertas nuevas para mañana o más adelante. Tus trabajos ya aceptados están en Agenda (arriba a la izquierda).';
+    } else {
+      title = 'No hay trabajos para hoy';
+      body = other == 0
+          ? 'Las solicitudes nuevas aparecerán aquí.'
+          : other == 1
+              ? 'Hay 1 trabajo programado para otro día.'
+              : 'Hay $other trabajos programados para otros días.';
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
+      child: Column(
+        children: [
+          Icon(
+            _showLater ? Icons.event_available : Icons.bolt,
+            color: AppTheme.colorMuted,
+            size: 40,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.colorText,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 14),
+          ),
+          if (other > 0) ...[
+            const SizedBox(height: 14),
+            OutlinedButton(
+              onPressed: () => setState(() => _showLater = !_showLater),
+              child: Text(_showLater ? 'Ver los de hoy' : 'Ver programados'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Icono del oficio en la tarjeta. Lo que no se reconoce va con el
+  /// genérico de herramientas.
+  static IconData _categoryIcon(String? category) {
+    final key = _categoryKey(category);
+    if (key.contains('pint')) return Icons.format_paint;
+    if (key.contains('plom') || key.contains('gasf')) return Icons.plumbing;
+    if (key.contains('electr')) return Icons.electrical_services;
+    if (key.contains('limp')) return Icons.cleaning_services;
+    if (key.contains('jard')) return Icons.yard;
+    if (key.contains('carp') || key.contains('mueble')) return Icons.carpenter;
+    if (key.contains('mudan') || key.contains('carga')) {
+      return Icons.local_shipping;
+    }
+    if (key.contains('alba') || key.contains('constr')) {
+      return Icons.construction;
+    }
+    if (key.contains('cerraj')) return Icons.key;
+    return Icons.handyman;
+  }
+
+  /// Hoja de solicitudes abierta del todo: la primera tarjeta entra con sus
+  /// botones de ofertar.
+  static const double _sheetExpandedSize = 0.85;
 
   static String _categoryKey(String? value) => (value ?? '')
       .trim()
@@ -633,11 +762,31 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   }
 
   void _showJobDetails(Map<String, dynamic> req) {
+    final reqId = req['id']?.toString() ?? '';
+    final budget = (req['budget'] as num?)?.toDouble() ?? 0;
+    final workerOffer = req['workerOffer'] as Map<String, dynamic>?;
+    final offerStatus = workerOffer?['status']?.toString();
+    final canOffer =
+        reqId.isNotEmpty && offerStatus != 'pending' && offerStatus != 'accepted';
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _JobDetailsSheet(requestData: req),
+      builder: (modalCtx) => _JobDetailsSheet(
+        requestData: req,
+        onAcceptBudget: canOffer
+            ? () {
+                Navigator.of(modalCtx).pop();
+                _acceptBudget(reqId, budget);
+              }
+            : null,
+        onCounterOffer: canOffer
+            ? () {
+                Navigator.of(modalCtx).pop();
+                _showCounterOfferSheet(reqId);
+              }
+            : null,
+      ),
     );
   }
 
@@ -842,10 +991,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         fetchedRequests.removeWhere((r) => r['status']?.toString() != 'assigned');
       }
 
-      // Filtrar completados o cancelados
+      // Filtrar completados, cancelados o en espera de confirmación de descarte
       fetchedRequests.removeWhere((r) {
         final st = r['status']?.toString();
-        return st == 'completed' || st == 'cancelled';
+        final id = r['id']?.toString();
+        return st == 'completed' ||
+            st == 'cancelled' ||
+            (id != null && _pendingDismissIds.contains(id));
       });
 
       // Los trabajos asignados para otro día van a la agenda: no ocupan la
@@ -894,6 +1046,33 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
           if (mounted && _sheetCtrl.isAttached) {
             _sheetCtrl.animateTo(
               0.35,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+
+      // Cuando aparecen solicitudes para ofertar (antes no había ninguna), la
+      // hoja se abre sola: en su posición de reposo los botones de ofertar
+      // quedan bajo la barra inferior y la oferta caduca mientras tanto. Solo
+      // en ese paso de "ninguna" a "alguna", para no pelear con el trabajador
+      // si después la baja para ver el mapa.
+      bool awaitsOffer(Map<String, dynamic> r) =>
+          r['status']?.toString() != 'assigned' &&
+          (r['workerOffer'] as Map?)?['status'] == null;
+      final hasAccepted = fetchedRequests.any(
+          (r) => (r['workerOffer'] as Map?)?['status']?.toString() == 'accepted');
+      if (mounted &&
+          !hasAccepted &&
+          !_requests.any(awaitsOffer) &&
+          fetchedRequests.any(awaitsOffer)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _sheetCtrl.isAttached &&
+              _sheetCtrl.size < _sheetExpandedSize) {
+            _sheetCtrl.animateTo(
+              _sheetExpandedSize,
               duration: const Duration(milliseconds: 350),
               curve: Curves.easeOut,
             );
@@ -976,6 +1155,50 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                           'accessToken': AppConfig.mapboxAccessToken,
                         },
                       ),
+                      // Pines de solicitudes cercanas
+                      if (_requests.any((r) =>
+                          r['latitude'] is num && r['longitude'] is num))
+                        MarkerLayer(
+                          markers: [
+                            for (final req in _requests)
+                              if (req['latitude'] is num &&
+                                  req['longitude'] is num)
+                                Marker(
+                                  point: LatLng(
+                                    (req['latitude'] as num).toDouble(),
+                                    (req['longitude'] as num).toDouble(),
+                                  ),
+                                  width: 40,
+                                  height: 40,
+                                  child: GestureDetector(
+                                    onTap: () => _showJobDetails(req),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppTheme.colorPrimary,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2.5,
+                                        ),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x407C3AED),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        _categoryIcon(
+                                            req['category']?.toString()),
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          ],
+                        ),
                       // Marcador del worker (punto azul)
                       if (_workerLocation != null)
                         MarkerLayer(
@@ -1101,298 +1324,359 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
             controller: _sheetCtrl,
             initialChildSize: 0.32,
             minChildSize: 0.15,
-            maxChildSize: 0.85,
+            maxChildSize: _sheetExpandedSize,
             snap: true,
-            snapSizes: const [0.15, 0.32, 0.85],
+            snapSizes: const [0.15, 0.32, _sheetExpandedSize],
             builder: (context, scrollController) {
               final navPadding =
                   92.0 + MediaQuery.viewPaddingOf(context).bottom;
+              final screenHeight = MediaQuery.sizeOf(context).height;
+
+              void toggleSheet() {
+                if (!_sheetCtrl.isAttached) return;
+                final current = _sheetCtrl.size;
+                final target = current > 0.45 ? 0.32 : _sheetExpandedSize;
+                _sheetCtrl.animateTo(
+                  target,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                );
+              }
+
+              void onHeaderVerticalDragUpdate(DragUpdateDetails details) {
+                if (!_sheetCtrl.isAttached || screenHeight <= 0) return;
+                final delta = -(details.primaryDelta ?? 0) / screenHeight;
+                final next = (_sheetCtrl.size + delta)
+                    .clamp(0.15, _sheetExpandedSize);
+                _sheetCtrl.jumpTo(next);
+              }
+
+              void onHeaderVerticalDragEnd(DragEndDetails details) {
+                if (!_sheetCtrl.isAttached) return;
+                final velocity = details.primaryVelocity ?? 0;
+                final current = _sheetCtrl.size;
+                const snaps = [0.15, 0.32, _sheetExpandedSize];
+                double target;
+                if (velocity < -350) {
+                  target = snaps.firstWhere(
+                    (s) => s > current + 0.02,
+                    orElse: () => _sheetExpandedSize,
+                  );
+                } else if (velocity > 350) {
+                  target = snaps.lastWhere(
+                    (s) => s < current - 0.02,
+                    orElse: () => 0.15,
+                  );
+                } else {
+                  target = snaps.reduce((a, b) =>
+                      (a - current).abs() < (b - current).abs() ? a : b);
+                }
+                _sheetCtrl.animateTo(
+                  target,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                );
+              }
+
               return Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                // Un único ListView con el scrollController del sheet.
-                // Esto hace que arrastrar desde cualquier parte expanda el sheet.
-                child: ListView(
-                  controller: scrollController,
-                  padding: EdgeInsets.zero,
-                  physics: const ClampingScrollPhysics(),
-                  children: [
-                    // ── Handle ──────────────────────────────────────
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppTheme.colorMuted.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    // ── Contenido ────────────────────────────────────
-                    if (_loading && _requests.isEmpty)
-                      const SkeletonList(
-                        count: 3,
-                        lines: 3,
-                        trailing: true,
-                        shrinkWrap: true,
-                        padding: EdgeInsets.only(top: 4),
-                      )
-                    else if (_error != null && _requests.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 32),
-                        child: Center(
+                child: LayoutBuilder(
+                  builder: (context, sheetConstraints) {
+                    final showPinnedTabs = _requests.isNotEmpty &&
+                        !hasAcceptedRequest &&
+                        sheetConstraints.maxHeight >= 96;
+                    return Column(
+                      children: [
+                        // ── Cabecera fija (Handle + Pestañas Para hoy / Programados) ──
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: toggleSheet,
+                          onVerticalDragUpdate: onHeaderVerticalDragUpdate,
+                          onVerticalDragEnd: onHeaderVerticalDragEnd,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorError.withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.cloud_off_rounded,
-                                    color: AppTheme.colorError, size: 40),
-                              ),
-                              const SizedBox(height: 14),
-                              const Text(
-                                'Error de conexión',
-                                style: TextStyle(
-                                  color: AppTheme.colorText,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              Center(
+                                child: Container(
+                                  width: 40,
+                                  height: 4,
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.colorMuted
+                                        .withValues(alpha: 0.4),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: AppTheme.colorText.withValues(alpha: 0.7),
-                                  fontSize: 13,
+                              if (showPinnedTabs)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                                  child: _WhenTabs(
+                                    showLater: _showLater,
+                                    todayCount:
+                                        _requestsFor(later: false).length,
+                                    laterCount:
+                                        _requestsFor(later: true).length,
+                                    onChanged: (later) {
+                                      setState(() => _showLater = later);
+                                      if (scrollController.hasClients) {
+                                        scrollController.jumpTo(0);
+                                      }
+                                    },
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              ChambaSecondaryButton(
-                                label: 'Reintentar',
-                                icon: Icons.refresh,
-                                onPressed: () => _load(),
-                              ),
                             ],
                           ),
                         ),
-                      )
-                    else if (_requests.isEmpty)
-                      Column(
-                        children: [
-                          if (_scheduledJobs.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                              child: _ScheduledBanner(
-                                jobs: _scheduledJobs,
-                                onTap: _openAgenda,
-                              ),
-                            ),
-                          _buildEmptyContent(navPadding),
-                        ],
-                      )
-                    else
-                      Padding(
-                        padding: EdgeInsets.only(bottom: navPadding),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_error != null)
-                              Container(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.colorError.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color:
-                                          AppTheme.colorError.withValues(alpha: 0.35)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.warning_amber_rounded,
-                                        color: AppTheme.colorWarning, size: 20),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        _error!,
-                                        style: const TextStyle(
-                                            color: AppTheme.colorText, fontSize: 13),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => _load(),
-                                      child: const Text('Reintentar',
-                                          style: TextStyle(
-                                              color: AppTheme.colorPrimary,
-                                              fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (_scheduledJobs.isNotEmpty)
-                              Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                                child: _ScheduledBanner(
-                                  jobs: _scheduledJobs,
-                                  onTap: _openAgenda,
-                                ),
-                              ),
-                            if (!hasAcceptedRequest)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    const Text(
-                                      'Solicitudes disponibles',
-                                      style: TextStyle(
-                                        color: AppTheme.colorText,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Builder(builder: (context) {
-                                      final filtered = _requests.where((req) {
-                                        if (_selectedCategory != null &&
-                                            _selectedCategory!.isNotEmpty) {
-                                          if (_categoryKey(
-                                                  req['category']?.toString()) !=
-                                              _categoryKey(_selectedCategory)) {
-                                            return false;
-                                          }
-                                        }
-                                        if (_selectedModality != null &&
-                                            _selectedModality!.isNotEmpty) {
-                                          final mod =
-                                              req['modality']?.toString();
-                                          if (_selectedModality == 'hourly' &&
-                                              mod != 'hourly') return false;
-                                          if (_selectedModality == 'daily' &&
-                                              mod != 'daily') return false;
-                                          if (_selectedModality == 'full' &&
-                                              mod != 'fixed') return false;
-                                        }
-                                        return true;
-                                      }).toList();
-
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.colorPrimary,
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                        // ── Contenido desplazable ────────────────────────────────────
+                        Expanded(
+                          child: ListView(
+                            controller: scrollController,
+                            padding: EdgeInsets.zero,
+                            physics: const ClampingScrollPhysics(),
+                            children: [
+                              if (_loading && _requests.isEmpty)
+                                const SkeletonList(
+                                  count: 3,
+                                  lines: 3,
+                                  trailing: true,
+                                  shrinkWrap: true,
+                                  padding: EdgeInsets.only(top: 4),
+                                )
+                              else if (_error != null && _requests.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 32),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(14),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.colorError
+                                                .withValues(alpha: 0.12),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                              Icons.cloud_off_rounded,
+                                              color: AppTheme.colorError,
+                                              size: 40),
                                         ),
-                                        child: Text(
-                                          '${filtered.length}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 12,
+                                        const SizedBox(height: 14),
+                                        const Text(
+                                          'Error de conexión',
+                                          style: TextStyle(
+                                            color: AppTheme.colorText,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ),
-                            Builder(builder: (context) {
-                              if (hasAcceptedRequest) {
-                                final acceptedReq = _requests.firstWhere((req) {
-                                  final workerOffer = req['workerOffer']
-                                      as Map<String, dynamic>?;
-                                  return workerOffer?['status'] == 'accepted';
-                                });
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  child:
-                                      _buildFloatingAcceptedCard(acceptedReq),
-                                );
-                              }
-
-                              final filtered = _requests.where((req) {
-                                if (_selectedCategory != null &&
-                                    _selectedCategory!.isNotEmpty) {
-                                  if (req['category']?.toString() !=
-                                      _selectedCategory) return false;
-                                }
-                                if (_selectedModality != null &&
-                                    _selectedModality!.isNotEmpty) {
-                                  final mod = req['modality']?.toString();
-                                  if (_selectedModality == 'hourly' &&
-                                      mod != 'hourly') return false;
-                                  if (_selectedModality == 'daily' &&
-                                      mod != 'daily') return false;
-                                  if (_selectedModality == 'full' &&
-                                      mod != 'fixed') return false;
-                                }
-                                return true;
-                              }).toList();
-                              return ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                itemCount: filtered.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 16),
-                                itemBuilder: (context, index) {
-                                  final req = filtered[index];
-                                  final workerOffer = req['workerOffer']
-                                      as Map<String, dynamic>?;
-                                  final offerStatus =
-                                      workerOffer?['status']?.toString();
-                                  final secondsRemaining =
-                                      (workerOffer?['secondsRemaining'] as num?)
-                                          ?.toInt();
-                                  final hasPendingOffer =
-                                      offerStatus == 'pending';
-                                  final isAcceptedOffer =
-                                      offerStatus == 'accepted';
-                                  final card = _buildRequestCard(
-                                    req: req,
-                                    workerOffer: workerOffer,
-                                    offerStatus: offerStatus,
-                                    secondsRemaining: secondsRemaining,
-                                    hasPendingOffer: hasPendingOffer,
-                                    isAcceptedOffer: isAcceptedOffer,
-                                    clientCountered:
-                                        false, // You can enhance this if needed
-                                  );
-                                  // Destella solo la solicitud que acaba de
-                                  // anunciarse, para que se distinga del resto
-                                  // de la lista sin abrir nada.
-                                  return ValueListenableBuilder<int>(
-                                    valueListenable: NewRequestAlert
-                                        .instance.highlightRevision,
-                                    builder: (context, _, child) =>
-                                        NewRequestPulse(
-                                      active: NewRequestAlert.instance
-                                          .isHighlighted(req['id']?.toString()),
-                                      child: child!,
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _error!,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: AppTheme.colorText
+                                                .withValues(alpha: 0.7),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        ChambaSecondaryButton(
+                                          label: 'Reintentar',
+                                          icon: Icons.refresh,
+                                          onPressed: () => _load(),
+                                        ),
+                                      ],
                                     ),
-                                    child: card,
-                                  );
-                                },
-                              );
-                            }),
-                          ],
+                                  ),
+                                )
+                              else if (_requests.isEmpty)
+                                Column(
+                                  children: [
+                                    if (_scheduledJobs.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 4, 16, 0),
+                                        child: _ScheduledBanner(
+                                          jobs: _scheduledJobs,
+                                          onTap: _openAgenda,
+                                        ),
+                                      ),
+                                    _buildEmptyContent(navPadding),
+                                  ],
+                                )
+                              else
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: navPadding),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (_error != null)
+                                        Container(
+                                          margin: const EdgeInsets.symmetric(
+                                              horizontal: 20, vertical: 8),
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.colorError
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                                color: AppTheme.colorError
+                                                    .withValues(alpha: 0.35)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                  Icons.warning_amber_rounded,
+                                                  color: AppTheme.colorWarning,
+                                                  size: 20),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  _error!,
+                                                  style: const TextStyle(
+                                                      color: AppTheme.colorText,
+                                                      fontSize: 13),
+                                                ),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => _load(),
+                                                child: const Text('Reintentar',
+                                                    style: TextStyle(
+                                                        color: AppTheme
+                                                            .colorPrimary,
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (_scheduledJobs.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              16, 4, 16, 4),
+                                          child: _ScheduledBanner(
+                                            jobs: _scheduledJobs,
+                                            onTap: _openAgenda,
+                                          ),
+                                        ),
+                                      Builder(builder: (context) {
+                                        if (hasAcceptedRequest) {
+                                          final acceptedReq =
+                                              _requests.firstWhere((req) {
+                                            final workerOffer =
+                                                req['workerOffer']
+                                                    as Map<String, dynamic>?;
+                                            return workerOffer?['status'] ==
+                                                'accepted';
+                                          });
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 8),
+                                            child: _buildFloatingAcceptedCard(
+                                                acceptedReq),
+                                          );
+                                        }
+
+                                        final filtered =
+                                            _requestsFor(later: _showLater);
+                                        if (filtered.isEmpty) {
+                                          return _buildTabEmpty();
+                                        }
+                                        // En "Programados" cada día lleva su título,
+                                        // para que no se lean como trabajos de hoy.
+                                        final entries = <Object>[];
+                                        DateTime? lastDay;
+                                        for (final req in filtered) {
+                                          final day = _startDay(req);
+                                          if (_showLater &&
+                                              day != null &&
+                                              day != lastDay) {
+                                            entries.add(day);
+                                            lastDay = day;
+                                          }
+                                          entries.add(req);
+                                        }
+                                        return ListView.separated(
+                                          shrinkWrap: true,
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 8),
+                                          itemCount: entries.length,
+                                          separatorBuilder: (_, __) =>
+                                              const SizedBox(height: 16),
+                                          itemBuilder: (context, index) {
+                                            final entry = entries[index];
+                                            if (entry is DateTime) {
+                                              return _DayHeader(
+                                                day: entry,
+                                                count: filtered
+                                                    .where((r) =>
+                                                        _startDay(r) == entry)
+                                                    .length,
+                                              );
+                                            }
+                                            final req =
+                                                entry as Map<String, dynamic>;
+                                            final workerOffer =
+                                                req['workerOffer']
+                                                    as Map<String, dynamic>?;
+                                            final offerStatus = workerOffer?[
+                                                    'status']
+                                                ?.toString();
+                                            final secondsRemaining =
+                                                (workerOffer?[
+                                                            'secondsRemaining']
+                                                        as num?)
+                                                    ?.toInt();
+                                            final hasPendingOffer =
+                                                offerStatus == 'pending';
+                                            final isAcceptedOffer =
+                                                offerStatus == 'accepted';
+                                            final card = _buildRequestCard(
+                                              req: req,
+                                              workerOffer: workerOffer,
+                                              offerStatus: offerStatus,
+                                              secondsRemaining:
+                                                  secondsRemaining,
+                                              hasPendingOffer: hasPendingOffer,
+                                              isAcceptedOffer: isAcceptedOffer,
+                                              clientCountered: false,
+                                            );
+                                            return ValueListenableBuilder<int>(
+                                              valueListenable: NewRequestAlert
+                                                  .instance.highlightRevision,
+                                              builder: (context, _, child) =>
+                                                  NewRequestPulse(
+                                                active: NewRequestAlert.instance
+                                                    .isHighlighted(
+                                                        req['id']?.toString()),
+                                                child: child!,
+                                              ),
+                                              child: card,
+                                            );
+                                          },
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               );
             },
@@ -1408,33 +1692,42 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     builder: (context, _) {
                       final sheetFraction =
                           _sheetCtrl.isAttached ? _sheetCtrl.size : 0.32;
+                      final hideGpsButton = sheetFraction > 0.65;
                       return Stack(
                         children: [
                           Positioned(
                             right: 16,
-                            bottom: constraints.maxHeight * sheetFraction + 12,
-                            child: Material(
-                              color: AppTheme.colorPrimary,
-                              shape: const CircleBorder(),
-                              elevation: 4,
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: _centerOnMyLocation,
-                                child: SizedBox(
-                                  width: 48,
-                                  height: 48,
-                                  child: _locatingMe
-                                      ? const Padding(
-                                          padding: EdgeInsets.all(14),
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.my_location,
-                                          color: Colors.white,
-                                        ),
+                            bottom: (constraints.maxHeight * sheetFraction + 12)
+                                .clamp(12.0, constraints.maxHeight - 130.0),
+                            child: IgnorePointer(
+                              ignoring: hideGpsButton,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 180),
+                                opacity: hideGpsButton ? 0.0 : 1.0,
+                                child: Material(
+                                  color: AppTheme.colorPrimary,
+                                  shape: const CircleBorder(),
+                                  elevation: 4,
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: _centerOnMyLocation,
+                                    child: SizedBox(
+                                      width: 48,
+                                      height: 48,
+                                      child: _locatingMe
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(14),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.my_location,
+                                              color: Colors.white,
+                                            ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1691,113 +1984,159 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
     final isNew = parsedDate != null &&
         DateTime.now().difference(parsedDate).inMinutes < 2;
 
+    // Foto(s) y video del anuncio: primero el video, luego las fotos.
+    final media = <_RequestMedia>[];
+    final video = req['video'] is Map
+        ? Map<String, dynamic>.from(req['video'] as Map)
+        : null;
+    final videoUrl = video?['url']?.toString() ?? '';
+    if (videoUrl.isNotEmpty) {
+      media.add(_RequestMedia(
+        url: videoUrl,
+        previewUrl: video?['thumbnailUrl']?.toString(),
+        isVideo: true,
+      ));
+    }
+    for (final photo in req['photos'] as List<dynamic>? ?? const []) {
+      final url = photo is Map ? photo['url']?.toString() ?? '' : '';
+      if (url.isNotEmpty) media.add(_RequestMedia(url: url));
+    }
+    final startLabel = startDateLabel(req['startDate']);
+    final tagChips = requestTagChips(req);
+
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.colorSurfaceSoft,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isNew
-              ? AppTheme.colorSuccess.withValues(alpha: 0.5)
+              ? AppTheme.colorSuccess.withValues(alpha: 0.6)
               : AppTheme.colorGlassBorderSoft,
+          width: isNew ? 1.5 : 1,
         ),
-        gradient: isNew
-            ? LinearGradient(
-                colors: [
-                  AppTheme.colorSuccess.withValues(alpha: 0.15),
-                  AppTheme.colorSurfaceSoft,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F7C3AED),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppTheme.colorBackgroundAccent,
-                backgroundImage:
-                    clientPhoto != null ? NetworkImage(clientPhoto) : null,
-                child: clientPhoto == null
-                    ? const Icon(Icons.person, color: AppTheme.colorMuted)
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            clientName,
-                            style: const TextStyle(
-                              color: AppTheme.colorText,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+          if (media.isNotEmpty) ...[
+            _RequestMediaHeader(media: media, isNew: isNew),
+            const SizedBox(height: 12),
+          ],
+          // ── Cliente y precio ─────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppTheme.colorBackgroundAccent,
+                  backgroundImage:
+                      clientPhoto != null ? NetworkImage(clientPhoto) : null,
+                  child: clientPhoto == null
+                      ? const Icon(Icons.person, color: AppTheme.colorPrimary)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              clientName,
+                              style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        if (isVerified) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified,
-                              color: AppTheme.colorPrimary, size: 16),
+                          if (isVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified,
+                                color: AppTheme.colorPrimary, size: 16),
+                          ],
                         ],
-                      ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.star,
+                              color: AppTheme.colorHighlight, size: 14),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '$clientRating ($clientReviews)  |  ${isVerified ? 'Cliente verificado' : 'Nuevo cliente'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: AppTheme.colorMuted, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _unitPriceLabel(req, currentBudget),
+                      style: const TextStyle(
+                        color: AppTheme.colorPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, color: AppTheme.colorHighlight, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$clientRating ($clientReviews)',
-                          style: const TextStyle(
-                              color: AppTheme.colorMuted, fontSize: 12),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isVerified
-                              ? '| Cliente verificado'
-                              : '| Nuevo cliente',
-                          style: const TextStyle(
-                              color: AppTheme.colorMuted, fontSize: 12),
-                        ),
-                      ],
+                    if (req['modality'] != 'fixed' && req['modality'] != null)
+                      Text(
+                        'Total: Bs. ${formatBs(currentBudget)}',
+                        style: const TextStyle(
+                            color: AppTheme.colorMuted, fontSize: 11),
+                      )
+                    else
+                      Text(
+                        _priceTypeLabel(req['priceType']),
+                        style: const TextStyle(
+                            color: AppTheme.colorMuted, fontSize: 12),
+                      ),
+                    // Lo que le queda al trabajador, antes de aceptar.
+                    const SizedBox(height: 2),
+                    Text(
+                      _serviceFeePercent > 0
+                          ? 'Te llega Bs. ${_netForWorker(currentBudget).toStringAsFixed(0)}'
+                          : 'Te llega todo',
+                      style: const TextStyle(
+                        color: AppTheme.colorSuccess,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (createdAt != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8, top: 4),
-                      child: Text(
-                        _timeAgo(createdAt),
-                        style: TextStyle(
-                          color: isNew
-                              ? AppTheme.colorSuccess
-                              : AppTheme.colorMuted,
-                          fontSize: 10,
-                          fontWeight:
-                              isNew ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  PopupMenuButton<String>(
-                    icon:
-                        const Icon(Icons.more_vert, color: AppTheme.colorMuted),
-                    color: AppTheme.colorSurfaceSoft,
+                SizedBox(
+                  width: 32,
+                  child: PopupMenuButton<String>(
+                    tooltip: 'Más opciones',
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert,
+                        color: AppTheme.colorMuted),
+                    color: Colors.white,
                     onSelected: (val) {
                       final reqId = req['id'].toString();
                       final clientId = client['id'].toString();
@@ -1810,11 +2149,12 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'dismiss',
-                        child: Text('No me interesa',
-                            style: TextStyle(color: AppTheme.colorText)),
-                      ),
+                      if (!hasPendingOffer && !isAcceptedOffer)
+                        const PopupMenuItem(
+                          value: 'dismiss',
+                          child: Text('No me interesa',
+                              style: TextStyle(color: AppTheme.colorText)),
+                        ),
                       const PopupMenuItem(
                         value: 'block',
                         child: Text('Bloquear cliente',
@@ -1827,70 +2167,174 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      req['category']?.toString() ??
-                          req['title']?.toString() ??
-                          'Sin categoría',
-                      style: const TextStyle(
-                        color: AppTheme.colorText,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+          const SizedBox(height: 14),
+          // ── Qué hay que hacer ────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Builder(builder: (context) {
+              final rawCat = req['category']?.toString().trim() ?? '';
+              final rawTitle = req['title']?.toString().trim() ?? '';
+              final rawDesc = req['description']?.toString().trim() ?? '';
+              final isGeneralCat =
+                  rawCat.isEmpty || _categoryKey(rawCat) == 'general';
+              final headingText = isGeneralCat
+                  ? (rawTitle.isNotEmpty
+                      ? rawTitle
+                      : (rawCat.isNotEmpty ? rawCat : 'Trabajo general'))
+                  : rawCat;
+              final showSubTitle = !isGeneralCat &&
+                  rawTitle.isNotEmpty &&
+                  _categoryKey(rawTitle) != _categoryKey(rawCat) &&
+                  !rawDesc.toLowerCase().startsWith(rawTitle.toLowerCase());
+              final showDesc = rawDesc.isNotEmpty &&
+                  (!isGeneralCat ||
+                      rawDesc.toLowerCase() != headingText.toLowerCase());
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _categoryIcon(rawCat.isNotEmpty ? rawCat : rawTitle),
+                        color: AppTheme.colorPrimary,
+                        size: 24,
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          headingText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.colorText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (createdAt != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          _timeAgo(createdAt),
+                          style: TextStyle(
+                            color: isNew
+                                ? AppTheme.colorSuccess
+                                : AppTheme.colorMuted,
+                            fontSize: 12,
+                            fontWeight:
+                                isNew ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (showSubTitle) ...[
                     const SizedBox(height: 4),
                     Text(
-                      req['description']?.toString() ?? 'Sin descripción',
+                      rawTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.colorText,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (showDesc) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      rawDesc,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppTheme.colorMuted,
-                        fontSize: 14,
+                        fontSize: 15,
+                        height: 1.3,
                       ),
                     ),
-                    if (requestTagChips(req).isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: requestTagChips(req),
-                      ),
+                  ],
+                if (tagChips.isNotEmpty || startLabel != null) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ...tagChips,
+                      if (startLabel != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color:
+                                AppTheme.colorPrimary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.event,
+                                  size: 13, color: AppTheme.colorPrimary),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  startLabel,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppTheme.colorPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
-                    if (startDateLabel(req['startDate']) != null) ...[
-                      const SizedBox(height: 6),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on,
+                        color: AppTheme.colorMuted, size: 18),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        req['address']?.toString() ??
+                            'Dirección no disponible',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppTheme.colorText, fontSize: 14),
+                      ),
+                    ),
+                    if (distanceText != null) ...[
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: AppTheme.colorPrimary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
+                          color: AppTheme.colorBackgroundAccent,
+                          borderRadius: BorderRadius.circular(100),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.event,
-                                size: 13, color: AppTheme.colorPrimary),
+                            const Icon(Icons.directions_walk,
+                                color: AppTheme.colorPrimary, size: 14),
                             const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                startDateLabel(req['startDate'])!,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppTheme.colorPrimary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            Text(
+                              distanceText,
+                              style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -1899,98 +2343,47 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _unitPriceLabel(req, currentBudget),
-                    style: const TextStyle(
-                      color: AppTheme.colorPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (req['modality'] != 'fixed' && req['modality'] != null)
-                    Text(
-                      'Total: Bs. ${formatBs(currentBudget)}',
-                      style: const TextStyle(
-                          color: AppTheme.colorMuted, fontSize: 11),
-                    )
-                  else
-                    Text(
-                      _priceTypeLabel(req['priceType']),
-                      style: const TextStyle(
-                          color: AppTheme.colorMuted, fontSize: 12),
-                    ),
-                  // Lo que le queda al trabajador, antes de aceptar.
-                  const SizedBox(height: 2),
-                  Text(
-                    _serviceFeePercent > 0
-                        ? 'Te llega Bs. ${_netForWorker(currentBudget).toStringAsFixed(0)}'
-                        : 'Te llega todo',
-                    style: const TextStyle(
-                      color: AppTheme.colorSuccess,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.location_on,
-                  color: AppTheme.colorMuted, size: 16),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  req['address']?.toString() ?? 'Dirección no disponible',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      const TextStyle(color: AppTheme.colorText, fontSize: 14),
-                ),
-              ),
-              if (distanceText != null) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorBackgroundAccent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.directions_walk,
-                          color: AppTheme.colorPrimary, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        distanceText,
-                        style: const TextStyle(
-                            color: AppTheme.colorText, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
               ],
-            ],
+              );
+            }),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
               onPressed: () => _showJobDetails(req),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.colorText,
-                side: const BorderSide(color: AppTheme.colorGlassBorderSoft),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: AppTheme.colorPrimary,
+                backgroundColor:
+                    AppTheme.colorBackgroundAccent.withValues(alpha: 0.5),
+                side: BorderSide(
+                    color: AppTheme.colorPrimary.withValues(alpha: 0.3)),
+                shape: const StadiumBorder(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              child: const Text('Ver detalles del trabajo'),
+              child: const Row(
+                children: [
+                  SizedBox(width: 20),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.article_outlined, size: 20),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Ver detalles del trabajo',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 20),
+                ],
+              ),
             ),
           ),
           if (isAcceptedOffer) ...[
@@ -2163,11 +2556,23 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                     child: FilledButton(
                       onPressed: () =>
                           _acceptBudget(req['id'].toString(), currentBudget),
-                      child: Text(
-                        req['materialsMode'] == 'worker'
-                            ? 'Cotizar con materiales'
-                            : 'Aceptar trabajo',
-                      ),
+                      child: req['materialsMode'] == 'worker'
+                          ? const Text('Cotizar con materiales')
+                          // Solo envía una oferta al precio del cliente:
+                          // el trabajo es suyo cuando el cliente lo elige.
+                          // Si no entra (monto largo, pantalla angosta)
+                          // se achica entero en vez de cortar el precio.
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.handshake_outlined, size: 20),
+                                const SizedBox(width: 6),
+                                Text('Ofertar Bs. ${formatBs(currentBudget)}'),
+                              ],
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -2177,7 +2582,7 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () => _showCounterOfferSheet(req['id'].toString()),
-                  icon: const Icon(Icons.handshake),
+                  icon: const Icon(Icons.sell),
                   label: const Text(
                     'Proponer otro precio',
                     style: TextStyle(fontWeight: FontWeight.w700),
@@ -2199,25 +2604,61 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
   void _dismissRequest(String requestId) async {
     final user = SessionStore.currentUser;
     if (user == null) return;
+    final idx = _requests.indexWhere((r) => r['id'].toString() == requestId);
+    if (idx < 0) return;
+    final removedReq = _requests[idx];
+    var undone = false;
+
+    setState(() {
+      _pendingDismissIds.add(requestId);
+      _requests.removeAt(idx);
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Solicitud descartada'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Deshacer',
+            onPressed: () {
+              undone = true;
+              if (!mounted) return;
+              setState(() {
+                _pendingDismissIds.remove(requestId);
+                if (!_requests.any((r) => r['id'].toString() == requestId)) {
+                  final insertAt = idx.clamp(0, _requests.length);
+                  _requests.insert(insertAt, removedReq);
+                }
+              });
+            },
+          ),
+        ),
+      );
+    }
+
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (undone || !_pendingDismissIds.contains(requestId)) return;
+
     try {
       await RequestDependencies.dismissRequest(
         requestId: requestId,
         workerUserId: user.id,
       );
-      setState(() {
-        _requests.removeWhere((r) => r['id'].toString() == requestId);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Solicitud descartada')),
-        );
-      }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _pendingDismissIds.remove(requestId);
+          if (!_requests.any((r) => r['id'].toString() == requestId)) {
+            _requests.add(removedReq);
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
       }
+    } finally {
+      _pendingDismissIds.remove(requestId);
     }
   }
 
@@ -2477,9 +2918,15 @@ class _AvailabilityLabel extends StatelessWidget {
 
 // ── Modal de detalles del trabajo ─────────────────────────────────────────────
 class _JobDetailsSheet extends StatelessWidget {
-  const _JobDetailsSheet({required this.requestData});
+  const _JobDetailsSheet({
+    required this.requestData,
+    this.onAcceptBudget,
+    this.onCounterOffer,
+  });
 
   final Map<String, dynamic> requestData;
+  final VoidCallback? onAcceptBudget;
+  final VoidCallback? onCounterOffer;
 
   @override
   Widget build(BuildContext context) {
@@ -2487,8 +2934,14 @@ class _JobDetailsSheet extends StatelessWidget {
     final description = requestData['description']?.toString() ?? '';
     final address = requestData['address']?.toString() ?? '';
     final budget = requestData['budget'];
+    final currentBudget = (budget as num?)?.toDouble() ?? 0;
     final category = requestData['category']?.toString() ?? '';
     final photos = requestData['photos'] as List<dynamic>? ?? const [];
+    final video = requestData['video'] is Map
+        ? Map<String, dynamic>.from(requestData['video'] as Map)
+        : null;
+    final videoUrl = video?['url']?.toString() ?? '';
+    final videoThumb = video?['thumbnailUrl']?.toString() ?? '';
     final client = requestData['client'] as Map<String, dynamic>?;
     final detailClientName = (client?['name']?.toString() ??
             '${client?['firstName'] ?? ''} ${client?['lastName'] ?? ''}')
@@ -2496,7 +2949,7 @@ class _JobDetailsSheet extends StatelessWidget {
     final priceType = _priceTypeLabel(requestData['priceType']);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: 0.78,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
@@ -2505,298 +2958,441 @@ class _JobDetailsSheet extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorMuted.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Título
-              Text(
-                title,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  children: [
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.colorMuted.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-              ),
-              const SizedBox(height: 8),
 
-              // Categoría + presupuesto
-              Row(
-                children: [
-                  if (category.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+                    // Título
+                    Text(
+                      title,
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.colorText,
+                              ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Categoría + presupuesto
+                    Row(
+                      children: [
+                        if (category.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppTheme.colorPrimary.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              category,
+                              style: const TextStyle(
+                                color: AppTheme.colorPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        const Spacer(),
+                        if (budget != null)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                requestData['modality'] == 'hourly' &&
+                                        requestData['hourlyRate'] != null
+                                    ? 'Bs. ${requestData['hourlyRate']} por hora'
+                                    : requestData['modality'] == 'daily' &&
+                                            requestData['dailyRate'] != null
+                                        ? 'Bs. ${requestData['dailyRate']} por día'
+                                        : 'Bs. ${formatBs(currentBudget)}',
+                                style: const TextStyle(
+                                  color: AppTheme.colorPrimary,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (requestData['modality'] == 'hourly' &&
+                                  requestData['estimatedHours'] != null)
+                                Text(
+                                  'Total: Bs. $budget (${requestData['estimatedHours']} hrs)',
+                                  style: const TextStyle(
+                                      color: AppTheme.colorMuted, fontSize: 12),
+                                )
+                              else if (requestData['modality'] == 'daily' &&
+                                  requestData['days'] != null)
+                                Text(
+                                  'Total: Bs. $budget (${requestData['days']} días)',
+                                  style: const TextStyle(
+                                      color: AppTheme.colorMuted, fontSize: 12),
+                                )
+                              else
+                                Text(
+                                  priceType,
+                                  style: const TextStyle(
+                                    color: AppTheme.colorMuted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Cuándo empieza el trabajo (modalidad por día / programados)
+                    if (startDateLabel(requestData['startDate']) != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.colorPrimary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event,
+                                size: 18, color: AppTheme.colorPrimary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                startDateLabel(requestData['startDate'])!,
+                                style: const TextStyle(
+                                  color: AppTheme.colorPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.colorPrimary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        category,
-                        style: const TextStyle(
-                          color: AppTheme.colorPrimaryLight,
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Descripción
+                    if (description.isNotEmpty) ...[
+                      const Text(
+                        'Descripción',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          color: AppTheme.colorText,
+                          fontSize: 15,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    JobExtrasSection(request: requestData),
+
+                    // Dirección
+                    if (address.isNotEmpty) ...[
+                      const Text(
+                        'Dirección',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            color: AppTheme.colorPrimary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              address,
+                              style: const TextStyle(
+                                color: AppTheme.colorText,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Cliente
+                    if (client != null) ...[
+                      const Text(
+                        'Cliente',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundImage: client['profilePhotoUrl'] != null
+                                ? NetworkImage(
+                                    client['profilePhotoUrl'] as String)
+                                : null,
+                            child: client['profilePhotoUrl'] == null
+                                ? Text(
+                                    chambaInitial(detailClientName,
+                                        fallback: 'C'),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            detailClientName.isEmpty
+                                ? 'Cliente'
+                                : detailClientName,
+                            style: const TextStyle(
+                              color: AppTheme.colorText,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Video
+                    if (videoUrl.isNotEmpty) ...[
+                      const Text(
+                        'Video',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () => showVideoPreview(context, videoUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: SizedBox(
+                            height: 150,
+                            width: double.infinity,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (videoThumb.isNotEmpty)
+                                  Image.network(
+                                    videoThumb,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const ColoredBox(
+                                      color: Color(0xFF2A2340),
+                                    ),
+                                  )
+                                else
+                                  const ColoredBox(color: Color(0xFF2A2340)),
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xB31E1B4B),
+                                      borderRadius: BorderRadius.circular(100),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.play_arrow_rounded,
+                                            color: Colors.white, size: 22),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Reproducir video',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Fotos
+                    if (photos.isNotEmpty) ...[
+                      const Text(
+                        'Fotos',
+                        style: TextStyle(
+                          color: AppTheme.colorMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 120,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: photos.length,
+                          itemBuilder: (context, index) {
+                            final photo =
+                                photos[index] as Map<String, dynamic>?;
+                            final url = photo?['url']?.toString();
+                            if (url == null) return const SizedBox.shrink();
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => Scaffold(
+                                      backgroundColor: Colors.black,
+                                      body: SafeArea(
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            InteractiveViewer(
+                                              child: Image.network(
+                                                url,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 10,
+                                              right: 10,
+                                              child: IconButton(
+                                                onPressed: () =>
+                                                    Navigator.of(context).pop(),
+                                                icon: const Icon(
+                                                  Icons.close,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 120,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  image: DecorationImage(
+                                    image: NetworkImage(url),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (onAcceptBudget != null || onCounterOffer != null)
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        top: BorderSide(
+                          color: AppTheme.colorMuted.withValues(alpha: 0.15),
                         ),
                       ),
                     ),
-                  const Spacer(),
-                  if (budget != null)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    child: Row(
                       children: [
-                        Text(
-                          requestData['modality'] == 'hourly' &&
-                                  requestData['hourlyRate'] != null
-                              ? 'Bs. ${requestData['hourlyRate']} por hora'
-                              : requestData['modality'] == 'daily' &&
-                                      requestData['dailyRate'] != null
-                                  ? 'Bs. ${requestData['dailyRate']} por día'
-                                  : 'Bs. $budget',
-                          style: const TextStyle(
-                            color: AppTheme.colorHighlight,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                        if (onCounterOffer != null)
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: onCounterOffer,
+                              icon: const Icon(Icons.sell, size: 18),
+                              label: const Text(
+                                'Otro precio',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.colorHighlight,
+                                foregroundColor: AppTheme.colorText,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                              ),
+                            ),
                           ),
-                        ),
-                        if (requestData['modality'] == 'hourly' &&
-                            requestData['estimatedHours'] != null)
-                          Text(
-                            'Total: Bs. $budget (${requestData['estimatedHours']} hrs)',
-                            style: const TextStyle(
-                                color: AppTheme.colorMuted, fontSize: 12),
-                          )
-                        else if (requestData['modality'] == 'daily' &&
-                            requestData['days'] != null)
-                          Text(
-                            'Total: Bs. $budget (${requestData['days']} días)',
-                            style: const TextStyle(
-                                color: AppTheme.colorMuted, fontSize: 12),
-                          )
-                        else
-                          Text(
-                            priceType,
-                            style: const TextStyle(
-                              color: AppTheme.colorMuted,
-                              fontSize: 12,
+                        if (onCounterOffer != null && onAcceptBudget != null)
+                          const SizedBox(width: 12),
+                        if (onAcceptBudget != null)
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: onAcceptBudget,
+                              icon: const Icon(Icons.handshake_outlined,
+                                  size: 18),
+                              label: Text(
+                                requestData['materialsMode'] == 'worker'
+                                    ? 'Cotizar'
+                                    : 'Ofertar Bs. ${formatBs(currentBudget)}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                              style: FilledButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                              ),
                             ),
                           ),
                       ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Cuándo empieza el trabajo (modalidad por día / programados)
-              if (startDateLabel(requestData['startDate']) != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.colorPrimary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.event,
-                          size: 18, color: AppTheme.colorPrimaryLight),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          startDateLabel(requestData['startDate'])!,
-                          style: const TextStyle(
-                            color: AppTheme.colorPrimaryLight,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
-
-              // Descripción
-              if (description.isNotEmpty) ...[
-                const Text(
-                  'Descripción',
-                  style: TextStyle(
-                    color: AppTheme.colorMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              JobExtrasSection(request: requestData),
-
-              // Dirección
-              if (address.isNotEmpty) ...[
-                const Text(
-                  'Dirección',
-                  style: TextStyle(
-                    color: AppTheme.colorMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on,
-                      color: AppTheme.colorPrimary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        address,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Cliente
-              if (client != null) ...[
-                const Text(
-                  'Cliente',
-                  style: TextStyle(
-                    color: AppTheme.colorMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: client['profilePhotoUrl'] != null
-                          ? NetworkImage(client['profilePhotoUrl'] as String)
-                          : null,
-                      child: client['profilePhotoUrl'] == null
-                          ? Text(
-                              chambaInitial(detailClientName, fallback: 'C'),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      detailClientName.isEmpty ? 'Cliente' : detailClientName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Fotos
-              if (photos.isNotEmpty) ...[
-                const Text(
-                  'Fotos',
-                  style: TextStyle(
-                    color: AppTheme.colorMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 120,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
-                    itemBuilder: (context, index) {
-                      final photo = photos[index] as Map<String, dynamic>?;
-                      final url = photo?['url']?.toString();
-                      if (url == null) return const SizedBox.shrink();
-                      return GestureDetector(
-                        onTap: () {
-                          // Full screen view
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => Scaffold(
-                                backgroundColor: Colors.black,
-                                body: SafeArea(
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      InteractiveViewer(
-                                        child: Image.network(
-                                          url,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 10,
-                                        right: 10,
-                                        child: IconButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(),
-                                          icon: const Icon(
-                                            Icons.close,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 120,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(url),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
             ],
           ),
         );
@@ -3008,6 +3604,397 @@ class _PulsingAvailabilityToggleState extends State<_PulsingAvailabilityToggle>
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Pestañas de la hoja de solicitudes: lo que se puede hacer hoy y lo que
+/// está pedido para otros días. Cada una muestra cuántas hay.
+class _WhenTabs extends StatelessWidget {
+  const _WhenTabs({
+    required this.showLater,
+    required this.todayCount,
+    required this.laterCount,
+    required this.onChanged,
+  });
+
+  final bool showLater;
+  final int todayCount;
+  final int laterCount;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.colorBackgroundAccent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          _tab(
+            label: 'Para hoy',
+            icon: Icons.bolt,
+            count: todayCount,
+            selected: !showLater,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(width: 4),
+          _tab(
+            label: 'Programados',
+            icon: Icons.event,
+            count: laterCount,
+            selected: showLater,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab({
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final color = selected ? AppTheme.colorPrimary : AppTheme.colorMuted;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: '$label, $count',
+        excludeSemantics: true,
+        child: Material(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          elevation: selected ? 1 : 0,
+          shadowColor: const Color(0x401E1B4B),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: color),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? AppTheme.colorText : color,
+                        fontSize: 15,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 22),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppTheme.colorPrimary
+                          : AppTheme.colorMuted.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Text(
+                      '$count',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: selected ? Colors.white : AppTheme.colorText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Título de un día en "Programados": "Mañana, mié 11 nov" o "Sáb 14 nov",
+/// con cuánto falta y cuántos trabajos hay ese día.
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.day, required this.count});
+
+  final DateTime day;
+  final int count;
+
+  static const _weekdays = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+  static const _months = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final daysAway =
+        day.difference(DateTime(now.year, now.month, now.day)).inDays;
+    final date =
+        '${_weekdays[day.weekday - 1]} ${day.day} ${_months[day.month - 1]}';
+    final title = daysAway == 1
+        ? 'Mañana, $date'
+        : '${date[0].toUpperCase()}${date.substring(1)}';
+    final jobs = count == 1 ? '1 trabajo' : '$count trabajos';
+    final detail = daysAway == 1 ? jobs : 'En $daysAway días, $jobs';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+      child: Row(
+        children: [
+          const Icon(Icons.event, size: 18, color: AppTheme.colorPrimary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppTheme.colorText,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            detail,
+            style: const TextStyle(color: AppTheme.colorMuted, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Una foto o el video de un anuncio de trabajo.
+class _RequestMedia {
+  const _RequestMedia({
+    required this.url,
+    this.previewUrl,
+    this.isVideo = false,
+  });
+
+  final String url;
+
+  /// Miniatura del video (las fotos se muestran con su propia url).
+  final String? previewUrl;
+  final bool isVideo;
+}
+
+/// Cabecera de la tarjeta con las fotos y el video del anuncio. Se desliza
+/// de lado; tocar una foto la abre en grande y tocar el video lo reproduce.
+class _RequestMediaHeader extends StatefulWidget {
+  const _RequestMediaHeader({required this.media, required this.isNew});
+
+  final List<_RequestMedia> media;
+  final bool isNew;
+
+  @override
+  State<_RequestMediaHeader> createState() => _RequestMediaHeaderState();
+}
+
+class _RequestMediaHeaderState extends State<_RequestMediaHeader> {
+  int _page = 0;
+
+  void _open(_RequestMedia item) {
+    if (item.isVideo) {
+      showVideoPreview(context, item.url);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                InteractiveViewer(
+                  child: Image.network(item.url, fit: BoxFit.contain),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: IconButton(
+                    tooltip: 'Cerrar',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _picture(_RequestMedia item) {
+    final url = item.isVideo ? item.previewUrl ?? '' : item.url;
+    const placeholder = ColoredBox(
+      color: AppTheme.colorBackgroundAccent,
+      child: Center(
+        child: Icon(Icons.image_outlined,
+            color: AppTheme.colorMuted, size: 36),
+      ),
+    );
+    if (url.isEmpty) {
+      return const ColoredBox(
+        color: Color(0xFF2A2340),
+        child: Center(
+          child: Icon(Icons.videocam, color: Colors.white70, size: 40),
+        ),
+      );
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) =>
+          progress == null ? child : placeholder,
+      errorBuilder: (context, _, __) => placeholder,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = widget.media;
+    final page = _page.clamp(0, media.length - 1);
+    final current = media[page];
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: AspectRatio(
+        // Más ancha que alta: deja sitio a los botones de ofertar.
+        aspectRatio: 2.15,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            PageView.builder(
+              itemCount: media.length,
+              onPageChanged: (index) => setState(() => _page = index),
+              itemBuilder: (context, index) {
+                final item = media[index];
+                return Semantics(
+                  button: true,
+                  label: item.isVideo
+                      ? 'Reproducir video del trabajo'
+                      : 'Ver foto ${index + 1} de ${media.length}',
+                  child: GestureDetector(
+                    onTap: () => _open(item),
+                    child: _picture(item),
+                  ),
+                );
+              },
+            ),
+            if (current.isVideo)
+              const Positioned(
+                top: 10,
+                left: 10,
+                child: IgnorePointer(
+                  child: _MediaPill(
+                    color: Color(0xB31E1B4B),
+                    foreground: Colors.white,
+                    icon: Icons.play_arrow_rounded,
+                    label: 'Video',
+                  ),
+                ),
+              ),
+            if (widget.isNew)
+              const Positioned(
+                top: 10,
+                right: 10,
+                child: IgnorePointer(
+                  child: _MediaPill(
+                    color: Color(0xFFDDF5E4),
+                    foreground: Color(0xFF14532D),
+                    icon: Icons.check_circle,
+                    iconColor: AppTheme.colorSuccess,
+                    label: 'Nuevo',
+                  ),
+                ),
+              ),
+            if (media.length > 1)
+              Positioned(
+                right: 12,
+                bottom: 10,
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < media.length; i++)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(left: 6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: i == page
+                                ? AppTheme.colorPrimary
+                                : Colors.white,
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x40000000), blurRadius: 3),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Etiqueta sobre la foto ("Video", "Nuevo").
+class _MediaPill extends StatelessWidget {
+  const _MediaPill({
+    required this.color,
+    required this.foreground,
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
+
+  final Color color;
+  final Color foreground;
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 5, 12, 5),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: iconColor ?? foreground),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

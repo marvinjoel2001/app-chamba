@@ -22,6 +22,7 @@ import '../session/session_credentials.dart';
 import '../session/unread_messages_notifier.dart';
 import '../session/unread_notifications_notifier.dart';
 import 'notification_router.dart';
+import 'new_request_burst.dart';
 import 'notification_presentation_policy.dart';
 
 @pragma('vm:entry-point')
@@ -129,6 +130,8 @@ class PushNotificationService {
     } catch (_) { _initialized = false; rethrow; }
   }
 
+  static final NewRequestBurst _requestBurst = NewRequestBurst();
+
   /// Shared presentation owner for Socket.IO and foreground FCM.
   static bool present(Map<String, dynamic> data) {
     if (data['type'] == 'verification_update') {
@@ -143,8 +146,14 @@ class PushNotificationService {
     UnreadMessagesNotifier.instance.refresh();
     final type = data['type']?.toString();
     if (type == 'message_new' && data['threadId'] == SessionCredentials.visibleThreadId) return true;
+    BurstNotice? burst;
     if (type == 'request_new') {
       NewRequestAlert.instance.announceFromPush(data);
+      // Varias solicitudes seguidas se anuncian juntas.
+      burst = _requestBurst.add(
+        scheduled: (data['startDayLabel']?.toString() ?? '').isNotEmpty,
+        now: DateTime.now(),
+      );
     } else if (type == 'offer_new' || type == 'counter_offer') {
       // Le ofertaron (al cliente) o le mejoraron la oferta (al trabajador):
       // tiene que enterarse aunque no esté mirando el teléfono.
@@ -154,7 +163,8 @@ class PushNotificationService {
       // Only the shared, deduplicated foreground owner plays the chime.
       unawaited(SoundEffectService.playMessageChime());
     }
-    ToastService.show(title: data['title']?.toString() ?? 'Chamba', body: data['body']?.toString() ?? '',
+    ToastService.show(title: burst?.title ?? data['title']?.toString() ?? 'Chamba',
+      body: burst?.body ?? data['body']?.toString() ?? '',
       type: ToastType.info, onTap: () => NotificationRouter.openFromData(data));
     return true;
   }

@@ -185,6 +185,10 @@ class ApiService {
   }) async {
     NetworkException? lastNetworkError;
 
+    // Las llamadas con más tiempo que el normal (subir video o fotos) tardan
+    // por naturaleza: no cuentan como "conexión lenta".
+    final expectedSlow = timeout > _requestTimeout;
+    final total = Stopwatch()..start();
     for (final candidate in _candidateBaseUrls()) {
       final stopwatch = Stopwatch()..start();
       try {
@@ -195,23 +199,22 @@ class ApiService {
         ConnectivityService.instance.reportRequest(
           stopwatch.elapsed,
           failed: false,
+          expectedSlow: expectedSlow,
         );
         return _parseResponse(response);
       } on TimeoutException {
-        ConnectivityService.instance.reportRequest(
-          stopwatch.elapsed,
-          failed: true,
-        );
         lastNetworkError = NetworkException(timeoutMessage, isTimeout: true);
       } on http.ClientException {
-        ConnectivityService.instance.reportRequest(
-          stopwatch.elapsed,
-          failed: true,
-        );
         lastNetworkError = const NetworkException(_offlineMessage);
       }
     }
 
+    // Un solo fallo por llamada, aunque se hayan probado varias direcciones.
+    ConnectivityService.instance.reportRequest(
+      total.elapsed,
+      failed: true,
+      expectedSlow: expectedSlow,
+    );
     throw lastNetworkError ?? const NetworkException(_offlineMessage);
   }
 

@@ -23,31 +23,72 @@ class ConnectivityService {
   /// Cuánto tiempo sin requests lentos/fallidos para volver a "normal".
   static const Duration _slowCooldown = Duration(seconds: 20);
 
-  int _consecutiveBadRequests = 0;
+  /// Requests lentos seguidos para avisar. Uno o dos pueden ser el servidor
+  /// pensando; tres ya es la red.
+  static const int _slowStreakToWarn = 3;
+
+  /// Requests sin respuesta seguidos para avisar. Uno solo puede ser un corte
+  /// de un instante, y avisaba "conexión lenta" durante 20 s por nada.
+  static const int _failedStreakToWarn = 2;
+
+  /// Respuestas rápidas seguidas para quitar el aviso sin esperar al reloj.
+  static const int _goodStreakToClear = 2;
+
+  int _slowStreak = 0;
+  int _failedStreak = 0;
+  int _goodStreak = 0;
   Timer? _slowResetTimer;
 
   /// Lo llama `ApiService` al terminar cada request.
-  void reportRequest(Duration elapsed, {required bool failed}) {
-    final bad = failed || elapsed >= slowThreshold;
-    if (!bad) {
-      _consecutiveBadRequests = 0;
+  ///
+  /// [expectedSlow]: la llamada tarda por naturaleza (subir un video o unas
+  /// fotos). Que demore no dice nada de la red; solo cuenta si falla.
+  void reportRequest(
+    Duration elapsed, {
+    required bool failed,
+    bool expectedSlow = false,
+  }) {
+    final slow = !expectedSlow && elapsed >= slowThreshold;
+    if (!failed && !slow) {
+      _slowStreak = 0;
+      _failedStreak = 0;
+      // Una subida larga que termina bien no prueba que la red esté rápida.
+      if (expectedSlow && elapsed >= slowThreshold) return;
+      _goodStreak++;
+      if (isSlow.value && _goodStreak >= _goodStreakToClear) {
+        _clearSlow();
+      }
       return;
     }
+    _goodStreak = 0;
     // Si el dispositivo está sin red, el banner de "sin conexión" ya avisa.
     if (isOffline.value) return;
 
-    _consecutiveBadRequests++;
-    // Un solo request lento puede ser el servidor; con 1 timeout o 2 lentos
-    // seguidos ya es la red.
-    if (failed || _consecutiveBadRequests >= 2) {
+    if (failed) {
+      _failedStreak++;
+    } else {
+      _slowStreak++;
+    }
+    if (_failedStreak >= _failedStreakToWarn ||
+        _slowStreak + _failedStreak >= _slowStreakToWarn) {
       if (!isSlow.value) isSlow.value = true;
       _slowResetTimer?.cancel();
-      _slowResetTimer = Timer(_slowCooldown, () {
-        _consecutiveBadRequests = 0;
-        isSlow.value = false;
-      });
+      _slowResetTimer = Timer(_slowCooldown, _clearSlow);
     }
   }
+
+  void _clearSlow() {
+    _slowResetTimer?.cancel();
+    _slowResetTimer = null;
+    _slowStreak = 0;
+    _failedStreak = 0;
+    _goodStreak = 0;
+    if (isSlow.value) isSlow.value = false;
+  }
+
+  /// Deja el seguimiento como recién iniciado (pruebas y cierre de sesión).
+  @visibleForTesting
+  void resetSlowTracking() => _clearSlow();
 
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   bool _initialized = false;

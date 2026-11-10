@@ -251,7 +251,7 @@ class MessagesInbox extends StatelessWidget {
       if (archived.isNotEmpty)
         ExpansionTile(
           title: const Text('Historial de trabajos'),
-          subtitle: Text('${archived.length} conversaciones conservadas'),
+          subtitle: Text(_archivedLabel(archived.length)),
           children: archived.map(_threadTile).toList(),
         ),
     ]);
@@ -393,7 +393,7 @@ class MessagesInbox extends StatelessWidget {
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600)),
                                     subtitle: Text(
-                                        '${archived.length} conversaciones conservadas',
+                                        _archivedLabel(archived.length),
                                         style: const TextStyle(
                                             color: _muted, fontSize: 12)),
                                     iconColor: AppTheme.colorPrimary,
@@ -552,3 +552,8 @@ class _SectionLabel extends StatelessWidget {
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2)));
 }
+
+/// "1 conversación conservada" / "3 conversaciones conservadas".
+String _archivedLabel(int count) => count == 1
+    ? '1 conversación conservada'
+    : '$count conversaciones conservadas';
