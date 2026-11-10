@@ -99,18 +99,48 @@ void main() {
           '2026-11-12');
     });
 
-    test('una fecha pasada o a menos de una hora no se copia', () {
-      for (final start in [
-        '2026-11-08T08:00:00',
-        '2026-11-09T14:30:00',
-        '2026-11-09',
-      ]) {
-        expect(RequestRetryDraft.fromRequest(daily(start), now: now).startDate,
-            isNull,
-            reason: start);
-      }
+    test('un día pasado no se copia; hoy sí', () {
+      expect(
+          RequestRetryDraft.fromRequest(daily('2026-11-08T08:00:00'), now: now)
+              .startDate,
+          isNull);
       expect(RequestRetryDraft.fromRequest(daily(null), now: now).startDate,
           isNull);
+      // Hoy con hora futura o sin hora: se mantiene.
+      expect(
+          RequestRetryDraft.fromRequest(daily('2026-11-09T14:30:00'), now: now)
+              .startDate,
+          '2026-11-09T14:30:00');
+      expect(
+          RequestRetryDraft.fromRequest(daily('2026-11-09'), now: now)
+              .startDate,
+          '2026-11-09');
+      // Hoy con la hora ya pasada: queda solo el día.
+      expect(
+          RequestRetryDraft.fromRequest(daily('2026-11-09T08:00:00'), now: now)
+              .startDate,
+          '2026-11-09');
+    });
+
+    test('conserva método de pago, fotos y todas las categorías', () {
+      final draft = RequestRetryDraft.fromRequest({
+        ...daily(null),
+        'paymentMethod': 'QR',
+        'video': {'url': 'https://res.cloudinary.com/x/v.mp4', 'thumbnailUrl': null},
+        'photos': [
+          {'id': 'p1', 'url': 'https://res.cloudinary.com/x/a.jpg'},
+          {'id': 'p2', 'url': ''},
+        ],
+        'aiCategories': [
+          {'id': 'c1', 'name': 'Plomería', 'confidence': 0.9},
+          {'id': 'c2', 'name': 'Albañilería', 'confidence': 0.4},
+        ],
+      }, now: now);
+      expect(draft.paymentMethod, 'QR');
+      expect(draft.videoUrl, 'https://res.cloudinary.com/x/v.mp4');
+      expect(draft.videoThumbnailUrl, isNull);
+      expect(draft.photoUrls, ['https://res.cloudinary.com/x/a.jpg']);
+      expect(draft.categories.map((c) => c['name']), ['Plomería', 'Albañilería']);
     });
   });
 }

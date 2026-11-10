@@ -126,6 +126,7 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
   }
 
   final client = http.Client();
+  var forbiddenStreak = 0;
 
   Timer.periodic(const Duration(seconds: 25), (_) async {
     try {
@@ -189,6 +190,19 @@ Future<void> onStartWorkerBackgroundService(ServiceInstance service) async {
             }),
           )
           .timeout(const Duration(seconds: 15));
+      // Sesión vencida o cuenta bloqueada (401), o acceso denegado seguido
+      // (403): se apaga el seguimiento en vez de seguir gastando GPS y datos.
+      // Vuelve a encenderse cuando la app abre con una sesión válida.
+      if (response.statusCode == 403) {
+        forbiddenStreak++;
+      } else {
+        forbiddenStreak = 0;
+      }
+      if (response.statusCode == 401 || forbiddenStreak >= 3) {
+        await prefs.setBool('worker_bg_enabled', false);
+        service.stopSelf();
+        return;
+      }
       if (response.statusCode >= 400) return;
 
       if (service is AndroidServiceInstance) {

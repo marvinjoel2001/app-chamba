@@ -808,15 +808,15 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         unawaited(WorkerBackgroundService.setEnabled(backendAvailable));
       }
 
-      if (!_available) {
-        if (mounted) {
-          setState(() {
-            _requests = [];
-            _loading = false;
-            _error = null;
-          });
-        }
-        return;
+      final backendAgencyWorker = response['isAgencyWorker'] as bool?;
+      final sessionUser = SessionStore.currentUser;
+      if (backendAgencyWorker != null &&
+          sessionUser != null &&
+          sessionUser.isAgencyWorker != backendAgencyWorker) {
+        SessionStore.currentUser =
+            sessionUser.copyWith(isAgencyWorker: backendAgencyWorker);
+        unawaited(SessionStore.persistCurrentUser());
+        if (mounted) setState(() {});
       }
 
       final rawRequests = response['requests'] as List<dynamic>? ?? [];
@@ -827,6 +827,13 @@ class _IncomingRequestScreenState extends State<IncomingRequestScreen>
         if (mutableReq != null) {
           fetchedRequests.add(mutableReq);
         }
+      }
+
+      // "No disponible" oculta las solicitudes nuevas, no los trabajos que ya
+      // le asignaron (los de agencia nacen como no disponibles y no veían el
+      // trabajo que su agencia les consiguió).
+      if (!_available) {
+        fetchedRequests.removeWhere((r) => r['status']?.toString() != 'assigned');
       }
 
       // Filtrar completados o cancelados

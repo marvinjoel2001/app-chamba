@@ -46,9 +46,23 @@ class RequestFormScreen extends StatefulWidget {
     this.isRetry = false,
     this.initialStartDate,
     this.initialMaterialsMode,
+    this.initialPaymentMethodName,
+    this.initialPhotoUrls = const [],
+    this.previousVideoRequestId,
+    this.previousVideoUrl,
+    this.previousVideoThumbnailUrl,
     this.initialVideo,
     super.key,
   });
+
+  /// "Buscar otro trabajador": método de pago y fotos del trabajo cancelado.
+  final String? initialPaymentMethodName;
+  final List<String> initialPhotoUrls;
+
+  /// Video ya subido del trabajo cancelado: el backend lo copia a la
+  /// solicitud nueva a partir del id del pedido original.
+  final String? previousVideoRequestId, previousVideoUrl;
+  final String? previousVideoThumbnailUrl;
 
   final String modality;
 
@@ -87,6 +101,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   final _daysController = TextEditingController(text: '1');
   final _dailyRateController = TextEditingController();
   RecordedJobVideo? _video;
+
+  /// Se mantiene el video del trabajo anterior mientras el cliente no lo
+  /// quite ni grabe uno nuevo.
+  late bool _keepPreviousVideo = widget.previousVideoRequestId != null &&
+      widget.previousVideoUrl != null &&
+      widget.initialVideo == null;
   MaterialsMode _materialsMode = MaterialsMode.client;
   String? _startDate;
   TimeOfDay? _startTime;
@@ -168,6 +188,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         .toList();
     _initializeLocation();
     _loadPaymentMethods();
+    _loadInitialPhotos();
   }
 
   @override
@@ -242,14 +263,40 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     return 'General';
   }
 
-  Future<void> _initializeLocation() async {
+  /// Trae las fotos del trabajo anterior para volver a subirlas con la
+  /// solicitud nueva. Si alguna falla, el cliente puede agregarla a mano.
+  Future<void> _loadInitialPhotos() async {
+    for (final url in widget.initialPhotoUrls.take(5)) {
+      try {
+        final uri = Uri.parse(url);
+        if (uri.scheme != 'https') continue;
+        final response =
+            await _client.get(uri).timeout(const Duration(seconds: 20));
+        if (!mounted) return;
+        if (response.statusCode != 200 || response.bodyBytes.isEmpty) continue;
+        if (_pendingImages.length >= 5) return;
+        final name =
+            uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'foto.jpg';
+        setState(() => _pendingImages
+            .add(_PendingImage(bytes: response.bodyBytes, fileName: name)));
+      } catch (_) {
+        // Sin conexión o foto borrada: se sigue con las demás.
+      }
+    }
+  }
+
+  Future<void> _initializeLocation({bool forceGps = false}) async {
     setState(() {
       _checkingLocation = true;
       _locationBlockMessage = null;
       _locationBlockType = null;
     });
 
-    if (widget.initialLatitude != null && widget.initialLongitude != null) {
+    // forceGps: el botón "Actualizar con mi GPS actual" tiene que leer el GPS
+    // de verdad; antes volvía siempre a las coordenadas iniciales.
+    if (!forceGps &&
+        widget.initialLatitude != null &&
+        widget.initialLongitude != null) {
       _latitude = widget.initialLatitude;
       _longitude = widget.initialLongitude;
       _resolvedAddress = widget.initialAddress;
@@ -495,7 +542,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                               ? null
                               : () async {
                                   setModalState(() => isUpdating = true);
-                                  await _initializeLocation();
+                                  await _initializeLocation(forceGps: true);
                                   if (_latitude != null && _longitude != null) {
                                     mapController.move(
                                       LatLng(_latitude!, _longitude!),
@@ -555,7 +602,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _paymentMethods = methods;
           // Select first method by default (usually "Efectivo")
           if (methods.isNotEmpty) {
-            _selectedPaymentMethod = methods.first;
+            final wanted =
+                widget.initialPaymentMethodName?.trim().toLowerCase();
+            _selectedPaymentMethod = methods.firstWhere(
+              (m) => m.name.trim().toLowerCase() == wanted,
+              orElse: () => methods.first,
+            );
           }
           _loadingPaymentMethods = false;
         });
@@ -705,6 +757,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
       Map<String, String>? uploadedVideo;
       final video = _video;
+      if (video == null && _keepPreviousVideo) {
+        uploadedVideo = {'fromRequestId': widget.previousVideoRequestId!};
+      }
       if (video != null) {
         final result =
             await MobileBackendService.instance.uploadRequestVideo(video.path);
@@ -934,13 +989,22 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   setState(() => _pendingImages.removeAt(index)),
             ),
             const SizedBox(height: 14),
-            RequestVideoPicker(
-              video: _video,
-              enabled: !_loading,
-              onRecord: _recordVideo,
-              onPickFromGallery: _pickVideoFromGallery,
-              onRemove: () => setState(() => _video = null),
-            ),
+            if (_video == null && _keepPreviousVideo)
+              _PreviousVideoCard(
+                videoUrl: widget.previousVideoUrl!,
+                thumbnailUrl: widget.previousVideoThumbnailUrl,
+                onRemove: _loading
+                    ? null
+                    : () => setState(() => _keepPreviousVideo = false),
+              )
+            else
+              RequestVideoPicker(
+                video: _video,
+                enabled: !_loading,
+                onRecord: _recordVideo,
+                onPickFromGallery: _pickVideoFromGallery,
+                onRemove: () => setState(() => _video = null),
+              ),
           ]),
         ),
         const SizedBox(height: 10),
@@ -1293,6 +1357,99 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           ),
         ])),
       ));
+}
+
+/// Video del trabajo anterior que se enviará con la solicitud nueva.
+class _PreviousVideoCard extends StatelessWidget {
+  const _PreviousVideoCard({
+    required this.videoUrl,
+    required this.thumbnailUrl,
+    required this.onRemove,
+  });
+
+  final String videoUrl;
+  final String? thumbnailUrl;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumb = thumbnailUrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Video del trabajo',
+            style: TextStyle(
+                height: 1.2,
+                color: requestInk,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E5F0)),
+          ),
+          child: Row(children: [
+            Semantics(
+              button: true,
+              label: 'Ver el video anterior',
+              child: InkWell(
+                onTap: () => showVideoPreview(context, videoUrl),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2445),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    alignment: Alignment.center,
+                    children: [
+                      if (thumb != null && thumb.startsWith('https://'))
+                        Image.network(thumb,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stack) =>
+                                const SizedBox.shrink()),
+                      const Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Video del pedido anterior',
+                      style: TextStyle(
+                          height: 1.2,
+                          color: requestInk,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700)),
+                  SizedBox(height: 3),
+                  Text('Se envía con esta solicitud. Quítalo para grabar otro.',
+                      style: TextStyle(
+                          height: 1.3, color: requestMuted, fontSize: 11)),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Quitar video',
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded, color: requestMuted),
+            ),
+          ]),
+        ),
+      ],
+    );
+  }
 }
 
 class _PendingImage {

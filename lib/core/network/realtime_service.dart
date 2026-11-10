@@ -127,20 +127,26 @@ class RealtimeService with WidgetsBindingObserver {
       _socket!.emit('join.user', {'userId': userId});
     }
 
-    _socket!.off('notification.new');
-    _socket!.on('notification.new', (dynamic packet) {
-      final data = packet is List ? packet.first : packet;
-      final ack = packet is List && packet.length > 1 ? packet.last : null;
-      final displayed = data is Map && PushNotificationService.present(Map<String, dynamic>.from(data));
-      if (ack is Function) ack({'displayed': displayed});
-    });
-    _socket!.off('notifications.changed');
-    _socket!.on('notifications.changed', (_) => UnreadNotificationsNotifier.instance.refresh());
+    // off() siempre con el handler propio: sin él se borraban también los
+    // listeners que las pantallas (Notificaciones) tienen sobre el mismo evento.
+    _socket!.off('notification.new', _onNotificationNew);
+    _socket!.on('notification.new', _onNotificationNew);
+    _socket!.off('notifications.changed', _onNotificationsChanged);
+    _socket!.on('notifications.changed', _onNotificationsChanged);
     _socket!.off('message.new', _refreshUnread);
     _socket!.on('message.new', _refreshUnread);
-    _socket!.off('notification.toast');
+    _socket!.off('notification.toast', _onNotificationToast);
     _socket!.on('notification.toast', _onNotificationToast);
   }
+
+  void _onNotificationNew(dynamic packet) {
+    final data = packet is List ? packet.first : packet;
+    final ack = packet is List && packet.length > 1 ? packet.last : null;
+    final displayed = data is Map && PushNotificationService.present(Map<String, dynamic>.from(data));
+    if (ack is Function) ack({'displayed': displayed});
+  }
+
+  void _onNotificationsChanged(dynamic _) => UnreadNotificationsNotifier.instance.refresh();
 
   void _onDisconnect(dynamic reason) {
     isConnectedNotifier.value = false;

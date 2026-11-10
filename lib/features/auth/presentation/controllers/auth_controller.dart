@@ -41,7 +41,9 @@ class AuthController extends Notifier<AuthState> {
     required String identifier,
     required String password,
   }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    // Estado nuevo: si la sesión anterior venció (401), isAuthenticated seguía
+    // en true y la pantalla de ingreso no detectaba el nuevo inicio de sesión.
+    state = const AuthState(isLoading: true);
 
     final result = await AuthDependencies.login(
       identifier: identifier.trim(),
@@ -77,7 +79,7 @@ class AuthController extends Notifier<AuthState> {
     String? lastName,
     required String password,
   }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = const AuthState(isLoading: true);
 
     final result = await AuthDependencies.register(
       role: role,

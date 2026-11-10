@@ -127,9 +127,9 @@ class _ProfileMenuScreenState extends ConsumerState<ProfileMenuScreen> {
   bool get _isVerificationPending {
     final user = SessionStore.currentUser;
     if (user == null) return false;
-    return user.verificationStatus == 'pending' ||
-        (user.idPhotoVerified == true || user.facePhotoVerified == true) &&
-            user.verificationStatus != 'verified';
+    // Solo 'pending': con una foto aprobada y la otra rechazada el estado es
+    // 'not_verified' y el trabajador tiene que poder volver a enviarlas.
+    return user.verificationStatus == 'pending';
   }
 
   void _navigateToVerification() {

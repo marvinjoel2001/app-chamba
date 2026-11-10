@@ -936,6 +936,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                               _LiveModalityTrackingCard(
                                 modality: modality,
                                 totalAmount: totalAmount,
+                                materials: materialsAmount,
                                 estimatedHours: estimatedHours,
                                 days: days,
                                 clientConfirmed: clientConfirmed,
@@ -1206,6 +1207,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
   const _LiveModalityTrackingCard({
     required this.modality,
     required this.totalAmount,
+    this.materials = 0,
     required this.estimatedHours,
     required this.days,
     required this.clientConfirmed,
@@ -1213,6 +1215,19 @@ class _LiveModalityTrackingCard extends StatelessWidget {
 
   final String modality;
   final double? totalAmount;
+
+  /// Materiales incluidos en [totalAmount]. La tarifa por hora o por día se
+  /// calcula solo sobre la mano de obra, igual que en el resto de la app.
+  final double materials;
+
+  double get _labor {
+    final total = totalAmount ?? 0;
+    return materials > 0 && materials < total ? total - materials : total;
+  }
+
+  String get _materialsNote => materials > 0 && materials < (totalAmount ?? 0)
+      ? ' (incluye Bs ${formatBs(materials)} de materiales)'
+      : '';
   final double estimatedHours;
   final double days;
   final bool clientConfirmed;
@@ -1227,7 +1242,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
       // Se pagó al aceptar: tarifa × horas acordadas. El tiempo real no
       // cambia el monto, así que no hay cronómetro ni pausa.
       final hours = estimatedHours > 0 ? estimatedHours : 1.0;
-      final hourlyRate = (totalAmount ?? 0) / hours;
+      final hourlyRate = _labor / hours;
       String bs(double v) =>
           v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
@@ -1304,7 +1319,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Total acordado: Bs ${bs(totalAmount ?? 0)}. No cambia si el trabajo dura más o menos.',
+              'Total acordado: Bs ${bs(totalAmount ?? 0)}$_materialsNote. No cambia si el trabajo dura más o menos.',
               style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11),
             ),
           ],
@@ -1315,7 +1330,7 @@ class _LiveModalityTrackingCard extends StatelessWidget {
     if (modality == 'daily') {
       final daysCount = days > 0 ? days.toInt() : 1;
       final dailyRate = daysCount > 0 && totalAmount != null
-          ? totalAmount! / daysCount
+          ? _labor / daysCount
           : 150.0;
 
       return Container(
@@ -1390,9 +1405,11 @@ class _LiveModalityTrackingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-                'El trabajo se finaliza al completar las jornadas acordadas.',
-                style: TextStyle(color: AppTheme.colorMuted, fontSize: 11)),
+            Text(
+                materials > 0 && totalAmount != null
+                    ? 'Total acordado: Bs ${formatBs(totalAmount!)}$_materialsNote. El trabajo se finaliza al completar las jornadas acordadas.'
+                    : 'El trabajo se finaliza al completar las jornadas acordadas.',
+                style: const TextStyle(color: AppTheme.colorMuted, fontSize: 11)),
           ],
         ),
       );

@@ -70,9 +70,17 @@ class _RetryCancelledRequestButtonState
                 initialStartDate:
                     draft.modality == 'daily' ? draft.startDate : null,
                 initialMaterialsMode: draft.materialsMode,
-                suggestedCategories: [
-                  {'id': '', 'name': draft.category, 'confidence': 1.0}
-                ],
+                initialPaymentMethodName: draft.paymentMethod,
+                initialPhotoUrls: draft.photoUrls,
+                previousVideoRequestId:
+                    draft.videoUrl == null ? null : widget.requestId,
+                previousVideoUrl: draft.videoUrl,
+                previousVideoThumbnailUrl: draft.videoThumbnailUrl,
+                suggestedCategories: draft.categories.isNotEmpty
+                    ? draft.categories
+                    : [
+                        {'id': '', 'name': draft.category, 'confidence': 1.0}
+                      ],
                 isRetry: true,
               )));
     } catch (error) {
